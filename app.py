@@ -11,35 +11,33 @@ import os
 from datetime import datetime
 import time
 import torch
+import webbrowser
 
 from text_renderer import put_russian_text, get_text_size
+from pose_analytics import AnalyticsCollector
+from report_generator import generate_html_report
 
 
 # ============================================================
 #  НАСТРОЙКИ
 # ============================================================
 
-VIDEO_SOURCE = "video.mp4"
+VIDEO_SOURCE = "video2.mp4"
 MODEL_NAME = "yolov8n-pose.pt"
 CONFIDENCE = 0.5
 SHOW_SKELETON = True
 SAVE_LOGS = True
 LOG_FILE = "pose_tracking_log.csv"
 
+# Генерация отчёта
+GENERATE_REPORT = True
+OPEN_REPORT = True
+REPORTS_DIR = "reports"
+
 # ── GPU НАСТРОЙКИ ──
-# "auto" = автоматически (GPU если есть, иначе CPU)
-# "cuda" или "cuda:0" = первая видеокарта
-# "cuda:1" = вторая видеокарта
-# "cpu" = принудительно CPU
 DEVICE = "auto"
 
-# Размер входного изображения для модели
-# Меньше = быстрее, но менее точно
-# 640 — стандарт, 320 — быстро, 1280 — точно
-INFERENCE_SIZE = 640
-
-# FP16 (half precision) — ускоряет на GPU в 1.5-2 раза
-# Работает только на GPU с Tensor Cores (RTX 20xx+)
+INFERENCE_SIZE = 320
 USE_HALF_PRECISION = True
 
 
@@ -48,18 +46,11 @@ USE_HALF_PRECISION = True
 # ============================================================
 
 def select_device(requested: str = "auto") -> str:
-    """
-    Определяет лучшее доступное устройство.
-
-    Returns:
-        "cuda:0", "mps" или "cpu"
-    """
     print("=" * 50)
     print("  Проверка GPU...")
     print("=" * 50)
 
     if requested == "auto":
-        # NVIDIA GPU (CUDA)
         if torch.cuda.is_available():
             gpu_name = torch.cuda.get_device_name(0)
             gpu_mem = torch.cuda.get_device_properties(0).total_memory / 1024**3
@@ -67,16 +58,11 @@ def select_device(requested: str = "auto") -> str:
             print(f"     Видеопамять: {gpu_mem:.1f} GB")
             print(f"     CUDA версия: {torch.version.cuda}")
             return "cuda:0"
-
-        # Apple Silicon (MPS)
         elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-            print(f"  ✅ Apple Silicon (MPS) найден")
+            print("  ✅ Apple Silicon (MPS) найден")
             return "mps"
-
-        # Только CPU
         else:
-            print(f"  ⚠️  GPU не найдена, используется CPU")
-            print(f"     Совет: установи CUDA-версию PyTorch")
+            print("  ⚠️  GPU не найдена, используется CPU")
             return "cpu"
 
     elif requested.startswith("cuda"):
@@ -86,22 +72,20 @@ def select_device(requested: str = "auto") -> str:
             print(f"  ✅ Используется GPU: {gpu_name}")
             return requested
         else:
-            print(f"  ❌ CUDA недоступна! Падаем на CPU")
+            print("  ❌ CUDA недоступна! Падаем на CPU")
             return "cpu"
 
     elif requested == "mps":
         if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
             return "mps"
         else:
-            print(f"  ❌ MPS недоступен! Падаем на CPU")
+            print("  ❌ MPS недоступен! Падаем на CPU")
             return "cpu"
 
-    else:
-        return "cpu"
+    return "cpu"
 
 
 def print_gpu_info():
-    """Выводит подробную информацию о GPU."""
     if not torch.cuda.is_available():
         print("  GPU (CUDA) не доступна")
         return
@@ -118,7 +102,6 @@ def print_gpu_info():
         print(f"    Compute Capability: {props.major}.{props.minor}")
         print(f"    SM процессоры: {props.multi_processor_count}")
 
-    # Текущее использование памяти
     allocated = torch.cuda.memory_allocated(0) / 1024**2
     cached = torch.cuda.memory_reserved(0) / 1024**2
     print(f"\n  Память GPU:")
@@ -182,7 +165,7 @@ class PoseCSVLogger:
                     ])
 
     def close(self):
-        if self._initialized:
+        if self._initialized and os.path.exists(self.log_file):
             size = os.path.getsize(self.log_file) / 1024
             print(f"  [LOG] Сохранён: {self.log_file} ({size:.1f} КБ)")
 
@@ -252,9 +235,8 @@ def classify_pose(keypoints, confidences):
         if angle > 150:
             return "standing"
     if all(confidences[i] > MIN_CONF for i in [11, 13, 15]):
-        if keypoints[11][1] < keypoints[13][1] - 30:
-            if keypoints[13][1] < keypoints[15][1] - 30:
-                return "standing"
+        if keypoints[11][1] < keypoints[13][1] - 30 and keypoints[13][1] < keypoints[15][1] - 30:
+            return "standing"
 
     if np.sum(confidences > MIN_CONF) >= 5:
         return "standing"
@@ -305,14 +287,12 @@ def draw_bbox_and_label(frame, bbox, track_id, pose):
 
 
 def draw_info_panel(frame, pose_counts, total, fps, device_name):
-    """Панель информации с устройством."""
     cv2.rectangle(frame, (5, 5), (320, 210), (0, 0, 0), -1)
     cv2.rectangle(frame, (5, 5), (320, 210), (80, 80, 80), 1)
 
     font_size = 16
     y = 14
 
-    # Устройство (GPU/CPU)
     dev_color = (0, 255, 0) if "cuda" in device_name.lower() or "gpu" in device_name.lower() else (0, 165, 255)
     put_russian_text(frame, f"Устройство: {device_name}", (12, y), font_size, dev_color)
     y += 28
@@ -336,6 +316,7 @@ def draw_info_panel(frame, pose_counts, total, fps, device_name):
 #  СГЛАЖИВАНИЕ
 # ============================================================
 
+global pose_history
 pose_history = {}
 
 
@@ -354,18 +335,13 @@ def smooth_pose(track_id, current_pose, history_len=5):
 # ============================================================
 
 def main():
-    # ── Выбор устройства ──
     device = select_device(DEVICE)
     print_gpu_info()
 
-    # ── Загрузка модели НА GPU ──
     print(f"\n  Загрузка модели {MODEL_NAME} на {device}...")
     model = YOLO(MODEL_NAME)
-
-    # Перенос модели на GPU
     model.to(device)
 
-    # Определяем название устройства для отображения
     if device.startswith("cuda"):
         device_display = f"GPU: {torch.cuda.get_device_name(0)}"
     elif device == "mps":
@@ -375,24 +351,21 @@ def main():
 
     print(f"  ✅ Модель загружена на: {device_display}")
 
-    # ── Проверка FP16 ──
     use_half = False
     if USE_HALF_PRECISION and device.startswith("cuda"):
-        # Проверяем поддержку FP16
         capability = torch.cuda.get_device_capability(0)
-        if capability[0] >= 7:  # Volta+ (RTX 20xx, 30xx, 40xx)
+        if capability[0] >= 7:
             use_half = True
-            print(f"  ✅ FP16 (half precision) включён — ускорение ~1.5x")
+            print("  ✅ FP16 (half precision) включён — ускорение ~1.5x")
         else:
-            print(f"  ⚠️  FP16 не поддерживается на вашей GPU")
+            print("  ⚠️  FP16 не поддерживается на вашей GPU")
     elif USE_HALF_PRECISION:
-        print(f"  ⚠️  FP16 работает только на NVIDIA GPU")
+        print("  ⚠️  FP16 работает только на NVIDIA GPU")
 
     print()
     print("  Управление: q=выход, s=скриншот, p=пауза")
     print("=" * 50)
 
-    # ── Прогрев GPU (warmup) ──
     if device.startswith("cuda"):
         print("  Прогрев GPU...")
         dummy = np.zeros((INFERENCE_SIZE, INFERENCE_SIZE, 3), dtype=np.uint8)
@@ -401,10 +374,8 @@ def main():
         torch.cuda.synchronize()
         print("  GPU прогрета!")
 
-    # ── Логгер ──
     logger = PoseCSVLogger(LOG_FILE) if SAVE_LOGS else None
 
-    # ── Видео ──
     cap = cv2.VideoCapture(VIDEO_SOURCE)
     if not cap.isOpened():
         print("\nОШИБКА: Не удалось открыть видео!")
@@ -415,9 +386,17 @@ def main():
     video_fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30
     print(f"  Видео: {w}x{h} @ {video_fps} FPS")
 
+    analytics = AnalyticsCollector(
+        source=str(VIDEO_SOURCE),
+        fps=video_fps,
+        frame_width=w,
+        frame_height=h,
+    )
+
     fps_times = []
     frame_count = 0
     paused = False
+    exit_status = "interrupted"
 
     try:
         while True:
@@ -425,30 +404,26 @@ def main():
                 ret, frame = cap.read()
                 if not ret:
                     print("Конец видео")
+                    exit_status = "completed"
                     break
 
                 frame_count += 1
 
-                # FPS
                 fps_times.append(time.time())
                 if len(fps_times) > 30:
                     fps_times.pop(0)
                 fps = ((len(fps_times) - 1) / (fps_times[-1] - fps_times[0])
                        if len(fps_times) >= 2 else 0)
 
-                # ══════════════════════════════════════════
-                #  ИНФЕРЕНС НА GPU
-                # ══════════════════════════════════════════
                 results = model.track(
                     frame,
                     persist=True,
                     conf=CONFIDENCE,
                     verbose=False,
-                    device=device,         # ← GPU!
-                    imgsz=INFERENCE_SIZE,   # ← Размер входа
-                    half=use_half,          # ← FP16 ускорение
+                    device=device,
+                    imgsz=INFERENCE_SIZE,
+                    half=use_half,
                 )
-                # ══════════════════════════════════════════
 
                 result = results[0]
                 pose_counts = {}
@@ -480,8 +455,10 @@ def main():
                         pose_counts[pose] = pose_counts.get(pose, 0) + 1
 
                         frame_detections.append({
-                            "track_id": tid, "bbox": bbox,
-                            "pose": pose, "confidences": confs,
+                            "track_id": tid,
+                            "bbox": bbox,
+                            "pose": pose,
+                            "confidences": confs,
                         })
 
                         if SHOW_SKELETON:
@@ -493,8 +470,9 @@ def main():
                 if logger:
                     logger.log_frame(frame_count, frame_detections)
 
+                analytics.add_frame(frame_count, frame_detections)
+
                 if frame_count % 30 == 0:
-                    # GPU память
                     gpu_mem = ""
                     if device.startswith("cuda"):
                         mem = torch.cuda.memory_allocated(0) / 1024**2
@@ -506,6 +484,7 @@ def main():
 
             key = cv2.waitKey(1 if not paused else 100) & 0xFF
             if key == ord('q'):
+                exit_status = "stopped_by_user"
                 break
             elif key == ord('s'):
                 fn = f"screenshot_{frame_count}.jpg"
@@ -514,18 +493,41 @@ def main():
             elif key == ord('p'):
                 paused = not paused
 
+    except KeyboardInterrupt:
+        print("  Прервано с клавиатуры (Ctrl+C)")
+        exit_status = "keyboard_interrupt"
+
     finally:
         cap.release()
         cv2.destroyAllWindows()
+
         if logger:
             logger.close()
 
-        # Очистка GPU памяти
         if device.startswith("cuda"):
             torch.cuda.empty_cache()
             print("  GPU память очищена")
 
         print(f"\nГотово! Кадров: {frame_count}")
+
+        if GENERATE_REPORT:
+            try:
+                summary = analytics.finalize(status=exit_status)
+                os.makedirs(REPORTS_DIR, exist_ok=True)
+
+                json_path = os.path.join(REPORTS_DIR, "last_run_summary.json")
+                analytics.save_json(summary, json_path)
+                print(f"  JSON summary сохранён: {json_path}")
+
+                report_path = generate_html_report(summary, output_dir=REPORTS_DIR)
+                print(f"  Отчёт сохранён: {report_path}")
+
+                if OPEN_REPORT:
+                    abs_report = os.path.abspath(report_path)
+                    webbrowser.open(f"file://{abs_report}")
+
+            except Exception as e:
+                print(f"  [ERROR] Не удалось сформировать отчёт: {e}")
 
 
 if __name__ == "__main__":
