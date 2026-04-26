@@ -17,15 +17,6 @@ class FrameRecord:
 
 
 class AnalyticsCollector:
-    """
-    Сборщик аналитики по кадрам, трекам и событиям.
-
-    Накапливает:
-    - временной ряд по кадрам
-    - историю по каждому track_id
-    - события поднятия руки
-    """
-
     def __init__(
         self,
         source: str,
@@ -41,18 +32,9 @@ class AnalyticsCollector:
         self.frames: List[FrameRecord] = []
         self.track_history: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
         self.events: List[Dict[str, Any]] = []
-
-        # Храним последнюю позу по треку, чтобы фиксировать начало событий
         self._last_pose_by_track: Dict[int, Optional[str]] = {}
 
     def add_frame(self, frame_number: int, detections: List[Dict[str, Any]]):
-        """
-        Добавляет аналитику по одному кадру.
-
-        Args:
-            frame_number: номер кадра
-            detections: список детекций из process_frame()
-        """
         timestamp_sec = frame_number / self.fps
         total_people = len(detections)
         frame_detections = []
@@ -88,7 +70,6 @@ class AnalyticsCollector:
 
             prev_pose = self._last_pose_by_track.get(track_id)
 
-            # Фиксируем только момент начала события "поднята рука"
             if pose == "hand_raised" and prev_pose != "hand_raised":
                 self.events.append({
                     "event_type": "hand_raised_start",
@@ -109,9 +90,6 @@ class AnalyticsCollector:
         ))
 
     def finalize(self, status: str = "completed") -> Dict[str, Any]:
-        """
-        Формирует итоговую сводку для отчёта.
-        """
         total_frames = len(self.frames)
         processed_duration_sec = total_frames / self.fps if total_frames else 0.0
 
@@ -121,13 +99,11 @@ class AnalyticsCollector:
 
         unique_tracks = sorted(self.track_history.keys())
 
-        # Суммарные детекции по позам
         pose_counter = Counter()
         for frame in self.frames:
             for det in frame.detections:
                 pose_counter[det["pose"]] += 1
 
-        # Таймлайн по кадрам
         timeline = []
         for frame in self.frames:
             frame_pose_counter = Counter(det["pose"] for det in frame.detections)
@@ -136,12 +112,13 @@ class AnalyticsCollector:
                 "timestamp_sec": frame.timestamp_sec,
                 "total_people": frame.total_people,
                 "standing": frame_pose_counter.get("standing", 0),
+                "walking": frame_pose_counter.get("walking", 0),
                 "sitting": frame_pose_counter.get("sitting", 0),
+                "lying": frame_pose_counter.get("lying", 0),
                 "hand_raised": frame_pose_counter.get("hand_raised", 0),
                 "unknown": frame_pose_counter.get("unknown", 0),
             })
 
-        # Сводка по track_id
         track_summary = []
         for track_id, records in self.track_history.items():
             first_seen = records[0]["timestamp_sec"]
@@ -196,12 +173,11 @@ class AnalyticsCollector:
                 "unique_people": len(unique_tracks),
                 "avg_people_per_frame": avg_people,
                 "max_people_in_frame": max_people,
-                "hand_raise_events": len([
-                    e for e in self.events
-                    if e["event_type"] == "hand_raised_start"
-                ]),
+                "hand_raise_events": len([e for e in self.events if e["event_type"] == "hand_raised_start"]),
                 "standing_detections": pose_counter.get("standing", 0),
+                "walking_detections": pose_counter.get("walking", 0),
                 "sitting_detections": pose_counter.get("sitting", 0),
+                "lying_detections": pose_counter.get("lying", 0),
                 "hand_raised_detections": pose_counter.get("hand_raised", 0),
                 "unknown_detections": pose_counter.get("unknown", 0),
             },
@@ -218,13 +194,9 @@ class AnalyticsCollector:
                 for f in self.frames
             ],
         }
-
         return summary
 
     def save_json(self, summary: Dict[str, Any], output_path: str):
-        """
-        Сохраняет summary в JSON.
-        """
         directory = os.path.dirname(output_path)
         if directory:
             os.makedirs(directory, exist_ok=True)

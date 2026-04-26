@@ -1,84 +1,105 @@
 """
-Отрисовка русского (Unicode) текста на кадрах OpenCV.
-cv2.putText() не поддерживает кириллицу — используем Pillow.
+Быстрый рендер Unicode/русского текста для OpenCV.
+
+Приоритет:
+1) cv2.freetype (opencv-contrib-python) — быстро
+2) Pillow fallback — рисуем только ROI (не весь кадр)
 """
-import cv2
-import numpy as np
-from PIL import Image, ImageDraw, ImageFont
 import os
 import platform
+import cv2
+import numpy as np
+from typing import Optional, Tuple
+
+TEXT_BACKEND_NAME = "unknown"
 
 
-def _find_system_font() -> str:
-    """
-    Ищет системный шрифт с поддержкой кириллицы.
-    Возвращает путь к .ttf файлу.
-    """
+def _find_system_font() -> Optional[str]:
     system = platform.system()
-
-    # Список шрифтов для проверки (в порядке приоритета)
-    font_candidates = []
+    candidates = []
 
     if system == "Windows":
         fonts_dir = r"C:\Windows\Fonts"
-        font_candidates = [
+        candidates = [
             os.path.join(fonts_dir, "arial.ttf"),
             os.path.join(fonts_dir, "calibri.ttf"),
             os.path.join(fonts_dir, "tahoma.ttf"),
             os.path.join(fonts_dir, "segoeui.ttf"),
-            os.path.join(fonts_dir, "times.ttf"),
-            os.path.join(fonts_dir, "cour.ttf"),
         ]
-
-    elif system == "Darwin":  # macOS
-        font_candidates = [
-            "/System/Library/Fonts/Helvetica.ttc",
-            "/System/Library/Fonts/Arial.ttf",
-            "/Library/Fonts/Arial.ttf",
+    elif system == "Darwin":
+        candidates = [
             "/System/Library/Fonts/Supplemental/Arial.ttf",
-            "/System/Library/Fonts/SFNSText.ttf",
+            "/Library/Fonts/Arial.ttf",
         ]
-
-    elif system == "Linux":
-        font_candidates = [
+    else:
+        candidates = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
             "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
-            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-            "/usr/share/fonts/TTF/DejaVuSans.ttf",
-            "/usr/share/fonts/dejavu/DejaVuSans.ttf",
         ]
 
-    # Проверяем каждый кандидат
-    for font_path in font_candidates:
-        if os.path.exists(font_path):
-            return font_path
-
-    # Если ничего не нашли — пробуем через Pillow
+    for p in candidates:
+        if os.path.exists(p):
+            return p
     return None
 
 
-# Глобальный кеш шрифтов (чтобы не загружать каждый кадр)
+# --- FreeType backend ---
+_FT = None
+_FT_FONT_PATH = _find_system_font()
+
+if hasattr(cv2, "freetype") and _FT_FONT_PATH:
+    try:
+        _FT = cv2.freetype.createFreeType2()
+        _FT.loadFontData(fontFileName=_FT_FONT_PATH, id=0)
+        TEXT_BACKEND_NAME = f"cv2.freetype ({os.path.basename(_FT_FONT_PATH)})"
+    except Exception:
+        _FT = None
+
+# --- Pillow fallback ---
+if _FT is None:
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        TEXT_BACKEND_NAME = "pillow_roi"
+    except Exception:
+        Image = ImageDraw = ImageFont = None
+        TEXT_BACKEND_NAME = "none"
+
 _font_cache = {}
 
 
-def get_font(size: int = 20) -> ImageFont.FreeTypeFont:
-    """Получает шрифт нужного размера (с кешированием)."""
+def _get_pil_font(size: int):
     if size in _font_cache:
         return _font_cache[size]
+    if ImageFont is None:
+        return None
 
     font_path = _find_system_font()
-
     if font_path:
         try:
-            font = ImageFont.truetype(font_path, size)
+            f = ImageFont.truetype(font_path, size)
         except Exception:
-            font = ImageFont.load_default()
+            f = ImageFont.load_default()
     else:
-        font = ImageFont.load_default()
+        f = ImageFont.load_default()
 
-    _font_cache[size] = font
-    return font
+    _font_cache[size] = f
+    return f
+
+
+def get_text_size(text: str, font_size: int = 20, thickness: int = 1) -> Tuple[int, int]:
+    if _FT is not None:
+        (w, h), _ = _FT.getTextSize(text, fontHeight=font_size, thickness=thickness)
+        return int(w), int(h)
+
+    if ImageFont is not None:
+        font = _get_pil_font(font_size)
+        dummy = Image.new("RGB", (1, 1))
+        draw = ImageDraw.Draw(dummy)
+        bbox = draw.textbbox((0, 0), text, font=font)
+        return int(bbox[2] - bbox[0]), int(bbox[3] - bbox[1])
+
+    return int(len(text) * font_size * 0.6), int(font_size)
 
 
 def put_russian_text(
@@ -87,72 +108,58 @@ def put_russian_text(
     position: tuple,
     font_size: int = 20,
     color: tuple = (255, 255, 255),
-    bg_color: tuple = None,
-    padding: int = 5,
+    bg_color: Optional[tuple] = None,
+    padding: int = 4,
 ) -> np.ndarray:
-    """
-    Рисует текст (включая кириллицу) на кадре OpenCV.
+    x, y = int(position[0]), int(position[1])
 
-    Args:
-        frame:     кадр BGR (numpy array)
-        text:      текст для отрисовки (любой Unicode)
-        position:  (x, y) — левый верхний угол текста
-        font_size: размер шрифта в пикселях
-        color:     цвет текста в BGR (OpenCV формат)
-        bg_color:  цвет фона в BGR (None = без фона)
-        padding:   отступ фона от текста
+    # FreeType (быстро)
+    if _FT is not None:
+        if bg_color is not None:
+            w, h = get_text_size(text, font_size)
+            x1 = max(0, x - padding)
+            y1 = max(0, y - padding)
+            x2 = min(frame.shape[1] - 1, x + w + padding)
+            y2 = min(frame.shape[0] - 1, y + h + padding)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), bg_color, -1)
 
-    Returns:
-        Кадр с нарисованным текстом
-    """
-    # Конвертируем BGR → RGB для Pillow
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    pil_image = Image.fromarray(frame_rgb)
-    draw = ImageDraw.Draw(pil_image)
+        _FT.putText(
+            frame, text, (x, y + font_size),
+            fontHeight=font_size,
+            color=color,
+            thickness=1,
+            line_type=cv2.LINE_AA,
+            bottomLeftOrigin=False,
+        )
+        return frame
 
-    # Получаем шрифт
-    font = get_font(font_size)
+    # Pillow fallback (ROI)
+    if ImageFont is None:
+        cv2.putText(frame, text, (x, y + font_size), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1, cv2.LINE_AA)
+        return frame
 
-    # Цвет: BGR → RGB
-    color_rgb = (color[2], color[1], color[0])
+    w, h = get_text_size(text, font_size)
+    x1 = max(0, x - padding)
+    y1 = max(0, y - padding)
+    x2 = min(frame.shape[1], x + w + padding)
+    y2 = min(frame.shape[0], y + h + padding)
 
-    x, y = position
+    if x1 >= x2 or y1 >= y2:
+        return frame
 
-    # Рисуем фон, если нужен
+    roi = frame[y1:y2, x1:x2]
+    roi_rgb = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
+    pil_img = Image.fromarray(roi_rgb)
+    draw = ImageDraw.Draw(pil_img)
+    font = _get_pil_font(font_size)
+
     if bg_color is not None:
         bg_rgb = (bg_color[2], bg_color[1], bg_color[0])
+        draw.rectangle([0, 0, pil_img.size[0], pil_img.size[1]], fill=bg_rgb)
 
-        # Получаем размер текста
-        bbox = draw.textbbox((x, y), text, font=font)
-        text_w = bbox[2] - bbox[0]
-        text_h = bbox[3] - bbox[1]
+    color_rgb = (color[2], color[1], color[0])
+    draw.text((x - x1, y - y1), text, font=font, fill=color_rgb)
 
-        draw.rectangle(
-            [x - padding, y - padding,
-             x + text_w + padding, y + text_h + padding],
-            fill=bg_rgb,
-        )
-
-    # Рисуем текст
-    draw.text((x, y), text, font=font, fill=color_rgb)
-
-    # Конвертируем обратно RGB → BGR
-    result = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-
-    # Копируем результат обратно в исходный массив
-    np.copyto(frame, result)
-
+    roi_bgr = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+    frame[y1:y2, x1:x2] = roi_bgr
     return frame
-
-
-def get_text_size(text: str, font_size: int = 20) -> tuple:
-    """
-    Возвращает размер текста (width, height) в пикселях.
-    Полезно для позиционирования.
-    """
-    font = get_font(font_size)
-    # Создаём временное изображение для измерения
-    dummy = Image.new("RGB", (1, 1))
-    draw = ImageDraw.Draw(dummy)
-    bbox = draw.textbbox((0, 0), text, font=font)
-    return bbox[2] - bbox[0], bbox[3] - bbox[1]
