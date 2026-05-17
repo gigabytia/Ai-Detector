@@ -3,7 +3,8 @@
     <!-- Topbar -->
     <header class="border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div class="flex items-center gap-3">
-        <img src="/public/ico.png" alt="ico" class="flex h-10 w-10 items-center justify-center bg-white-600 text-white font-bold">
+        <!-- В Vite public/ доступен по корню: /ico.png -->
+        <img src="/ico.png" alt="ico" class="h-10 w-10" />
 
         <div>
           <div class="text-lg font-bold leading-none">ИИ-Детектор</div>
@@ -13,11 +14,9 @@
           <button
             @click="tab='cameras'"
             class="rounded-xl px-4 py-2 text-sm font-medium transition"
-            :class="
-              tab === 'cameras'
-                ? 'bg-indigo-600 text-white shadow'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            "
+            :class="tab === 'cameras'
+              ? 'bg-indigo-600 text-white shadow'
+              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
           >
             Камеры
           </button>
@@ -25,11 +24,9 @@
           <button
             @click="tab='alerts'"
             class="rounded-xl px-4 py-2 text-sm font-medium transition"
-            :class="
-              tab === 'alerts'
-                ? 'bg-indigo-600 text-white shadow'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            "
+            :class="tab === 'alerts'
+              ? 'bg-indigo-600 text-white shadow'
+              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
           >
             Уведомления
           </button>
@@ -37,11 +34,9 @@
           <button
             @click="tab='dashboard'"
             class="rounded-xl px-4 py-2 text-sm font-medium transition"
-            :class="
-              tab === 'dashboard'
-                ? 'bg-indigo-600 text-white shadow'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            "
+            :class="tab === 'dashboard'
+              ? 'bg-indigo-600 text-white shadow'
+              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
           >
             Дашборд
           </button>
@@ -49,9 +44,7 @@
 
         <div class="flex-1"></div>
 
-        <label
-          class="cursor-pointer rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-2 text-sm hover:bg-slate-100 transition"
-        >
+        <label class="cursor-pointer rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-2 text-sm hover:bg-slate-100 transition">
           <span class="font-medium">Загрузить видео</span>
           <input
             type="file"
@@ -77,10 +70,7 @@
           </div>
         </div>
 
-        <div
-          v-else
-          class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4"
-        >
+        <div v-else class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
           <div
             v-for="cam in cameras"
             :key="cam.camera_id"
@@ -92,15 +82,11 @@
                 <div class="flex items-center gap-2">
                   <div
                     class="h-2.5 w-2.5 rounded-full"
-                    :class="
-                      cam.status === 'running'
-                        ? 'bg-emerald-500'
-                        : 'bg-slate-400'
-                    "
+                    :class="cam.status === 'running' ? 'bg-emerald-500' : 'bg-slate-400'"
                   ></div>
 
                   <div class="font-semibold">
-                    Cam {{ cam.camera_id }}
+                    Камера {{ cam.camera_id }}
                   </div>
                 </div>
 
@@ -129,17 +115,18 @@
 
             <!-- Stream -->
             <div class="aspect-video overflow-hidden bg-black">
-              <img
-                :src="streamUrl(cam.camera_id)"
-                class="h-full w-full object-contain"
-              />
+              <img :src="streamUrl(cam.camera_id)" class="h-full w-full object-contain" />
             </div>
 
-            <!-- Footer -->
+            <!-- Footer (можно расширить) -->
             <div class="flex items-center justify-between p-4">
-
-
-
+              <a
+                :href="annotUrl(cam.camera_id)"
+                target="_blank"
+                class="text-xs text-slate-500 hover:text-slate-700"
+              >
+                Annotated stream
+              </a>
             </div>
           </div>
         </div>
@@ -148,33 +135,28 @@
       <!-- Alerts -->
       <section v-else-if="tab==='alerts'" class="p-5">
         <div class="rounded-3xl bg-white p-5 shadow-sm">
-            <div class=" flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div class="text-2xl font-bold">Уведомления</div>
-                <div class="text-sm text-slate-500">
-                  Поток событий и обнаружения
-                </div>
-              </div>
-
-              <div class="flex items-center gap-3">
-                <select
-                  v-model="ackFilter"
-                  class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm outline-none"
-                >
-                  <option value="unacked">Только новые</option>
-                  <option value="all">Все</option>
-                  <option value="ack">ACK</option>
-                  <option value="false">False alarm</option>
-                </select>
-
-                <button
-                  @click="refreshEvents()"
-                  class="rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow transition hover:bg-indigo-700"
-                >
-                  Обновить
-                </button>
-              </div>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-2xl font-bold">Уведомления</div>
+              <div class="text-sm text-slate-500">Поток событий и обнаружения</div>
             </div>
+
+            <div class="flex items-center gap-3">
+              <select v-model="ackFilter" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm outline-none">
+                <option value="unacked">Только новые</option>
+                <option value="all">Все</option>
+                <option value="ack">ACK</option>
+                <option value="false">False alarm</option>
+              </select>
+
+              <button
+                @click="refreshEvents()"
+                class="rounded-2xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow transition hover:bg-indigo-700"
+              >
+                Обновить
+              </button>
+            </div>
+          </div>
         </div>
 
         <div
@@ -182,12 +164,10 @@
           class="mt-5 rounded-3xl bg-white p-10 text-center shadow-sm"
         >
           <div class="text-lg font-semibold">Нет событий</div>
-          <div class="mt-2 text-sm text-slate-500">
-            Система ожидает обнаружения
-          </div>
+          <div class="mt-2 text-sm text-slate-500">Система ожидает обнаружения</div>
         </div>
 
-        <div class="space-y-4">
+        <div v-else class="mt-5 space-y-4">
           <div
             v-for="e in events"
             :key="e.id"
@@ -197,27 +177,23 @@
               <div>
                 <div class="flex items-center gap-3">
                   <div class="text-lg font-semibold">
-                    Cam {{ e.camera_id }}
+                    Камера {{ e.camera_id }}
                   </div>
 
                   <span
                     class="rounded-full px-2.5 py-1 text-xs font-semibold"
-                    :class="
-                      e.severity === 'warn'
-                        ? 'bg-amber-100 text-amber-700'
-                        : 'bg-blue-100 text-blue-700'
-                    "
+                    :class="e.severity === 'warn'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-blue-100 text-blue-700'"
                   >
                     {{ e.severity }}
                   </span>
 
                   <span
                     class="rounded-full px-2.5 py-1 text-xs font-semibold"
-                    :class="
-                      e.ack_status === 'unacked'
-                        ? 'bg-rose-100 text-rose-700'
-                        : 'bg-emerald-100 text-emerald-700'
-                    "
+                    :class="e.ack_status === 'unacked'
+                      ? 'bg-rose-100 text-rose-700'
+                      : 'bg-emerald-100 text-emerald-700'"
                   >
                     {{ e.ack_status }}
                   </span>
@@ -274,12 +250,8 @@
         <div class="rounded-3xl bg-white p-5 shadow-sm">
           <div class="flex flex-wrap items-center gap-4">
             <div>
-              <div class="text-2xl font-bold">
-                Аналитика
-              </div>
-              <div class="text-sm text-slate-500">
-                Показатели и отслеживание камеры
-              </div>
+              <div class="text-2xl font-bold">Аналитика</div>
+              <div class="text-sm text-slate-500">Показатели и отслеживание камеры</div>
             </div>
 
             <div class="flex-1"></div>
@@ -290,13 +262,8 @@
               class="rounded-2xl border border-slate-200 px-4 py-2 text-sm"
             >
               <option :value="null">Выберите камеру</option>
-
-              <option
-                v-for="c in cameras"
-                :key="c.camera_id"
-                :value="c.camera_id"
-              >
-                Cam {{ c.camera_id }}
+              <option v-for="c in cameras" :key="c.camera_id" :value="c.camera_id">
+                Камера {{ c.camera_id }}
               </option>
             </select>
 
@@ -307,12 +274,7 @@
               class="rounded-2xl border border-slate-200 px-4 py-2 text-sm disabled:opacity-40"
             >
               <option value="overall">Общая аналитика</option>
-
-              <option
-                v-for="t in dashTracks"
-                :key="t"
-                :value="String(t)"
-              >
+              <option v-for="t in dashTracks" :key="t" :value="String(t)">
                 ID {{ t }}
               </option>
             </select>
@@ -335,109 +297,149 @@
           </div>
         </div>
 
-        <!-- KPI -->
-        <div
-          v-if="dashCameraId && dashTrackSel === 'overall'"
-          class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"
-        >
-          <div
-            class="rounded-3xl bg-white p-5 shadow-sm"
-          >
-            <div class="text-sm text-slate-500">
-              Длительность
+        <!-- Общая аналитика -->
+        <div v-if="dashCameraId && dashTrackSel === 'overall'">
+          <!-- KPI -->
+          <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div class="rounded-3xl bg-white p-5 shadow-sm">
+              <div class="text-sm text-slate-500">Длительность</div>
+              <div class="mt-2 text-3xl font-bold">{{ fmtNum(camKpi?.duration_sec, 1) }}</div>
+              <div class="mt-1 text-xs text-slate-400">seconds</div>
             </div>
 
-            <div class="mt-2 text-3xl font-bold">
-              {{ fmtNum(camKpi?.duration_sec, 1) }}
+            <div class="rounded-3xl bg-white p-5 shadow-sm">
+              <div class="text-sm text-slate-500">Среднее людей</div>
+              <div class="mt-2 text-3xl font-bold">{{ fmtNum(camKpi?.avg_people, 2) }}</div>
             </div>
 
-            <div class="mt-1 text-xs text-slate-400">
-              seconds
-            </div>
-          </div>
-
-          <div class="rounded-3xl bg-white p-5 shadow-sm">
-            <div class="text-sm text-slate-500">
-              Среднее людей
+            <div class="rounded-3xl bg-white p-5 shadow-sm">
+              <div class="text-sm text-slate-500">Макс людей</div>
+              <div class="mt-2 text-3xl font-bold">{{ camKpi?.max_people ?? 0 }}</div>
             </div>
 
-            <div class="mt-2 text-3xl font-bold">
-              {{ fmtNum(camKpi?.avg_people, 2) }}
+            <div class="rounded-3xl bg-white p-5 shadow-sm">
+              <div class="text-sm text-slate-500">Уникальных треков</div>
+              <div class="mt-2 text-3xl font-bold">{{ camKpi?.unique_tracks ?? 0 }}</div>
             </div>
           </div>
 
-          <div class="rounded-3xl bg-white p-5 shadow-sm">
-            <div class="text-sm text-slate-500">
-              Макс людей
-            </div>
-
-            <div class="mt-2 text-3xl font-bold">
-              {{ camKpi?.max_people ?? 0 }}
-            </div>
+          <div v-if="camTimeline.length===0" class="mt-5 rounded-3xl bg-white p-8 text-slate-500 shadow-sm">
+            Пока нет точек timeline для этой камеры (подожди пару секунд после старта).
           </div>
 
-          <div class="rounded-3xl bg-white p-5 shadow-sm">
-            <div class="text-sm text-slate-500">
-              Уникальных треков
+          <div v-else class="mt-5 space-y-5">
+            <div class="rounded-3xl bg-white p-5 shadow-sm">
+              <LineChart
+                title="Люди по времени"
+                x-label="Время (сек)"
+                y-label="Количество людей"
+                :x-values="camTimeline.map(r => Number(r.t_sec))"
+                :series="[
+                  { name: 'Всего людей', color: '#2563eb', values: camTimeline.map(r => Number(r.total_people)) }
+                ]"
+              />
             </div>
 
-            <div class="mt-2 text-3xl font-bold">
-              {{ camKpi?.unique_tracks ?? 0 }}
+            <div class="rounded-3xl bg-white p-5 shadow-sm">
+              <LineChart
+                title="Позы по времени"
+                x-label="Время (сек)"
+                y-label="Количество"
+                :x-values="camTimeline.map(r => Number(r.t_sec))"
+                :series="[
+                  { name: 'Стоит', color: '#22c55e', values: camTimeline.map(r => Number(r.standing)) },
+                  { name: 'Идет',  color: '#3b82f6', values: camTimeline.map(r => Number(r.walking)) },
+                  { name: 'Сидит',  color: '#f59e0b', values: camTimeline.map(r => Number(r.sitting)) },
+                  { name: 'Лежит',    color: '#d946ef', values: camTimeline.map(r => Number(r.lying)) },
+                  { name: 'Неопознано',  color: '#9ca3af', values: camTimeline.map(r => Number(r.unknown)) }
+                ]"
+              />
             </div>
           </div>
         </div>
 
-        <!-- Charts -->
-        <div
-          v-if="camTimeline.length"
-          class="mt-5 space-y-5"
-        >
-          <div class="rounded-3xl bg-white p-5 shadow-sm">
-            <LineChart
-              title="Люди по времени"
-              x-label="Время"
-              y-label="People"
-              :x-values="camTimeline.map(r => Number(r.t_sec))"
-              :series="[
-                {
-                  name: 'Люди',
-                  color: '#2563eb',
-                  values: camTimeline.map(r => Number(r.total_people))
-                }
-              ]"
-            />
-          </div>
+        <!-- Track timeline -->
+        <div v-else-if="dashCameraId && dashTrackSel !== 'overall'">
+          <div class="mt-5 rounded-3xl bg-white p-5 shadow-sm">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <div class="text-xl font-bold">Таймлайн состояний</div>
+                <div class="text-sm text-slate-500">
+                  Камера {{ dashCameraId }} - ID {{ dashTrackSel }}
+                </div>
+              </div>
 
-          <div class="rounded-3xl bg-white p-5 shadow-sm">
-            <LineChart
-              title="Позы по времени"
-              x-label="Время"
-              y-label="Pose count"
-              :x-values="camTimeline.map(r => Number(r.t_sec))"
-              :series="[
-                {
-                  name: 'Стоит',
-                  color: '#22c55e',
-                  values: camTimeline.map(r => Number(r.standing))
-                },
-                {
-                  name: 'Идет',
-                  color: '#3b82f6',
-                  values: camTimeline.map(r => Number(r.walking))
-                },
-                {
-                  name: 'Сидит',
-                  color: '#f59e0b',
-                  values: camTimeline.map(r => Number(r.sitting))
-                },
-                {
-                  name: 'Лежит',
-                  color: '#d946ef',
-                  values: camTimeline.map(r => Number(r.lying))
-                }
-              ]"
-            />
+              <div class="text-sm text-slate-500">
+                Диапазон: 0 – {{ timelineMaxTrack.toFixed(1) }} сек
+              </div>
+            </div>
+
+            <div v-if="dashSegments.length===0" class="mt-4 text-slate-500">
+              Для этого трека пока нет сегментов (или трек ещё не записан). Нажми "Обновить" через пару секунд.
+            </div>
+
+            <div v-else class="mt-4">
+              <!-- bar -->
+              <div class="relative h-6 w-full rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
+                <div
+                  v-for="s in dashSegments"
+                  :key="s.id"
+                  class="absolute inset-y-0"
+                  :title="`${s.state}: ${s.start_sec.toFixed(1)}–${s.end_sec.toFixed(1)}`"
+                  :style="segmentStyle(s)"
+                ></div>
+              </div>
+
+              <!-- legend -->
+              <div class="mt-3 flex flex-wrap gap-3 text-xs text-slate-600">
+                <span class="inline-flex items-center gap-2">
+                  <span class="h-3 w-3 rounded" style="background:#22c55e;"></span> Стоит
+                </span>
+                <span class="inline-flex items-center gap-2">
+                  <span class="h-3 w-3 rounded" style="background:#3b82f6;"></span> Идет
+                </span>
+                <span class="inline-flex items-center gap-2">
+                  <span class="h-3 w-3 rounded" style="background:#f59e0b;"></span> Сидит
+                </span>
+                <span class="inline-flex items-center gap-2">
+                  <span class="h-3 w-3 rounded" style="background:#d946ef;"></span> Лежит
+                </span>
+                <span class="inline-flex items-center gap-2">
+                  <span class="h-3 w-3 rounded" style="background:#9ca3af;"></span> Неопознано
+                </span>
+              </div>
+
+              <!-- table -->
+              <div class="mt-4">
+                <div class="text-sm font-semibold mb-2">Сегменты</div>
+                <div class="overflow-auto rounded-2xl border border-slate-200">
+                  <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-600">
+                      <tr>
+                        <th class="px-3 py-2 text-left font-semibold">Состояние</th>
+                        <th class="px-3 py-2 text-left font-semibold">Начало</th>
+                        <th class="px-3 py-2 text-left font-semibold">Конец</th>
+                        <th class="px-3 py-2 text-left font-semibold">Продолжительность</th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white">
+                      <tr v-for="s in dashSegments" :key="s.id" class="border-t border-slate-100">
+                        <td class="px-3 py-2">{{ s.state }}</td>
+                        <td class="px-3 py-2">{{ s.start_sec.toFixed(1) }}</td>
+                        <td class="px-3 py-2">{{ s.end_sec.toFixed(1) }}</td>
+                        <td class="px-3 py-2">{{ (s.end_sec - s.start_sec).toFixed(1) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
           </div>
+        </div>
+
+        <div v-else class="mt-5 rounded-3xl bg-white p-8 text-slate-500 shadow-sm">
+          Выберите камеру.
         </div>
       </section>
     </main>
@@ -448,20 +450,11 @@
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
       @click.self="closeViewer()"
     >
-      <div
-        class="w-full max-w-7xl overflow-hidden rounded-3xl bg-white shadow-2xl"
-      >
-        <div
-          class="flex items-center justify-between border-b border-slate-200 px-5 py-4"
-        >
+      <div class="w-full max-w-7xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
-            <div class="text-lg font-bold">
-              Cam {{ viewer.camera_id }}
-            </div>
-
-            <div class="text-sm text-slate-500">
-              {{ viewer.status }}
-            </div>
+            <div class="text-lg font-bold">Камера {{ viewer.camera_id }}</div>
+            <div class="text-sm text-slate-500">{{ viewer.status }}</div>
           </div>
 
           <div class="flex items-center gap-4">
@@ -489,21 +482,14 @@
           </div>
         </div>
 
-        <div
-          ref="viewerWrap"
-          class="relative aspect-video bg-black"
-        >
+        <div ref="viewerWrap" class="relative aspect-video bg-black">
           <img
             ref="viewerImg"
             :src="streamUrl(viewer.camera_id)"
             @load="onViewerImgLoad"
             class="h-full w-full object-contain"
           />
-
-          <canvas
-            ref="canvas"
-            class="pointer-events-none absolute inset-0 h-full w-full"
-          ></canvas>
+          <canvas ref="canvas" class="pointer-events-none absolute inset-0 h-full w-full"></canvas>
         </div>
       </div>
     </div>
@@ -516,18 +502,13 @@
     >
       <div class="w-full max-w-md rounded-3xl bg-white shadow-2xl">
         <div class="border-b border-slate-200 px-6 py-4">
-          <div class="text-lg font-bold">
-            Подтверждение
-          </div>
+          <div class="text-lg font-bold">Подтверждение</div>
         </div>
 
         <div class="p-6">
           <div class="text-base">
             Очистить аналитику для
-            <span class="font-bold">
-              Cam {{ clearModal.cameraId }}
-            </span>
-            ?
+            <span class="font-bold">Камера {{ clearModal.cameraId }}</span>?
           </div>
 
           <div class="mt-3 text-sm text-slate-500">
@@ -552,6 +533,7 @@
         </div>
       </div>
     </div>
+
   </div>
 </template>
 
@@ -559,17 +541,6 @@
 import { onMounted, onBeforeUnmount, reactive, ref, computed } from "vue";
 import { api, API_BASE } from "./api";
 import LineChart from "./components/LineChart.vue";
-
-/** маленький компонент легенды (для сегментов трека) */
-const LegendItem = {
-  props: ["color", "label"],
-  template: `
-    <span style="display:inline-flex; align-items:center; gap:6px;">
-      <span :style="{width:'10px', height:'10px', background:color, display:'inline-block'}"></span>
-      <span>{{ label }}</span>
-    </span>
-  `,
-};
 
 const tab = ref("cameras");
 const cameras = ref([]);
@@ -597,53 +568,24 @@ let timers = [];
 let overlayTimer = null;
 let resizeObs = null;
 
-// dashboard state
+// dashboard
 const dashCameraId = ref(null);
-const dashTrackSel = ref("overall"); // "overall" или "123"
+const dashTrackSel = ref("overall");
 const dashTracks = ref([]);
 const dashSegments = ref([]);
+
+const camKpi = ref(null);
+const camTimeline = ref([]);
 
 const clearModal = reactive({
   open: false,
   cameraId: null,
 });
 
-const camKpi = ref(null);
-const camTimeline = ref([]);
-
 const timelineMaxTrack = computed(() => {
   if (!dashSegments.value.length) return 0;
   return Math.max(...dashSegments.value.map(s => Number(s.end_sec) || 0));
 });
-
-function openClearModal() {
-  if (!dashCameraId.value) return;
-  clearModal.open = true;
-  clearModal.cameraId = dashCameraId.value;
-}
-
-function closeClearModal() {
-  clearModal.open = false;
-  clearModal.cameraId = null;
-}
-
-async function confirmClearCamera() {
-  if (!clearModal.cameraId) return;
-
-  await api.post(`/api/camera/${clearModal.cameraId}/clear`);
-
-  // локально сбросить данные дашборда, чтобы сразу исчезли старые линии
-  camKpi.value = null;
-  camTimeline.value = [];
-  dashTracks.value = [];
-  dashSegments.value = [];
-  dashTrackSel.value = "overall";
-
-  // перезагрузить заново (пусто -> затем накопится новое)
-  await onDashCameraChange();
-
-  closeClearModal();
-}
 
 function fmtNum(v, digits) {
   const x = Number(v);
@@ -700,7 +642,7 @@ async function ackEvent(eventId, status) {
   await refreshEvents();
 }
 
-// ------- dashboard loading -------
+// dashboard load
 async function onDashCameraChange() {
   dashTracks.value = [];
   dashSegments.value = [];
@@ -729,6 +671,7 @@ async function onDashTrackChange() {
 
 async function refreshDashboard() {
   if (!dashCameraId.value) return;
+
   if (dashTrackSel.value === "overall") {
     await loadCameraDashboard();
   } else {
@@ -763,24 +706,48 @@ async function loadTimeline() {
   }));
 }
 
-// ------- track segments bar -------
+// clear modal + backend cleanup
+function openClearModal() {
+  if (!dashCameraId.value) return;
+  clearModal.open = true;
+  clearModal.cameraId = dashCameraId.value;
+}
+
+function closeClearModal() {
+  clearModal.open = false;
+  clearModal.cameraId = null;
+}
+
+async function confirmClearCamera() {
+  if (!clearModal.cameraId) return;
+
+  await api.post(`/api/camera/${clearModal.cameraId}/clear`);
+
+  camKpi.value = null;
+  camTimeline.value = [];
+  dashTracks.value = [];
+  dashSegments.value = [];
+  dashTrackSel.value = "overall";
+
+  await onDashCameraChange();
+  closeClearModal();
+}
+
+// segment bar style
 function segmentStyle(s) {
   const maxT = Math.max(1e-6, timelineMaxTrack.value);
   const leftPct = (s.start_sec / maxT) * 100;
   const widthPct = ((s.end_sec - s.start_sec) / maxT) * 100;
 
   return {
-    position: "absolute",
     left: `${leftPct}%`,
     width: `${Math.max(0.2, widthPct)}%`,
-    top: "0px",
-    bottom: "0px",
     background: poseColor(s.state),
     opacity: 0.9,
   };
 }
 
-// ------- viewer overlay drawing -------
+// viewer overlay
 const SKELETON = [
   [0,1],[0,2],[1,3],[2,4],[5,6],
   [5,7],[7,9],[6,8],[8,10],
@@ -848,7 +815,6 @@ function getContainedImageRect() {
   return { x: (cw - dw) / 2, y: (ch - dh) / 2, w: dw, h: dh };
 }
 
-// фильтр keypoints (чтобы не улетали в (0,0))
 function kpOk(k, bbox) {
   if (!k || k.length < 3) return false;
   const x = Number(k[0]), y = Number(k[1]), c = Number(k[2]);
@@ -943,11 +909,10 @@ async function overlayTick() {
 
 function startOverlayLoop() {
   stopOverlayLoop();
-
   resizeCanvasToWrapper();
   overlayTick();
 
-  overlayTimer = setInterval(overlayTick, 100); // 10Hz только в viewer
+  overlayTimer = setInterval(overlayTick, 100);
   resizeObs = new ResizeObserver(() => resizeCanvasToWrapper());
   if (viewerWrap.value) resizeObs.observe(viewerWrap.value);
 }
@@ -963,7 +928,6 @@ function stopOverlayLoop() {
 onMounted(async () => {
   await refreshCameras();
   await refreshEvents();
-
   timers.push(setInterval(refreshCameras, 1500));
   timers.push(setInterval(refreshEvents, 1000));
 });
