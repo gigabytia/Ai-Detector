@@ -1,3 +1,4 @@
+# backend/main.py
 import os
 import json
 import time
@@ -25,7 +26,7 @@ class AckRequest(BaseModel):
 
 class CameraConfigRequest(BaseModel):
     exit_line: Optional[list] = None   # [[x,y],[x,y]]
-    exit_zone: Optional[list] = None   # [[x,y],[x,y],...]
+    exit_zone: Optional[list] = None   # [[x,y],...]
 
 
 @asynccontextmanager
@@ -42,7 +43,7 @@ app = FastAPI(title="AI-Detector Backend (Carry-Out MVP)", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # dev only
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -58,7 +59,6 @@ def get_mgr(request: Request) -> CameraManager:
     return mgr
 
 
-# ---------- upload ----------
 @app.post("/api/cameras/upload")
 async def upload_cameras(request: Request, files: List[UploadFile] = File(...)):
     if not files:
@@ -71,40 +71,30 @@ async def upload_cameras(request: Request, files: List[UploadFile] = File(...)):
         safe_name = os.path.basename(f.filename)
         tmp_path = os.path.join(UPLOAD_DIR, f"up_{int(time.time()*1000)}_{safe_name}")
 
-        try:
-            with open(tmp_path, "wb") as out:
-                while True:
-                    chunk = await f.read(1024 * 1024)  # 1MB chunks
-                    if not chunk:
-                        break
-                    out.write(chunk)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"save failed: {e}")
+        with open(tmp_path, "wb") as out:
+            while True:
+                chunk = await f.read(1024 * 1024)
+                if not chunk:
+                    break
+                out.write(chunk)
 
         saved.append((f.filename, tmp_path))
 
-    try:
-        ids = mgr.add_videos(saved)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
+    ids = mgr.add_videos(saved)
     return {"camera_ids": ids}
 
 
 @app.get("/api/cameras")
 def list_cameras(request: Request):
-    mgr = get_mgr(request)
-    return mgr.list_cameras()
+    return get_mgr(request).list_cameras()
 
 
 @app.post("/api/cameras/{camera_id}/stop")
 def stop_camera(request: Request, camera_id: int):
-    mgr = get_mgr(request)
-    mgr.stop_camera(camera_id)
+    get_mgr(request).stop_camera(camera_id)
     return {"ok": True}
 
 
-# ---------- config ----------
 @app.get("/api/camera/{camera_id}/config")
 def get_camera_config(request: Request, camera_id: int):
     mgr = get_mgr(request)
@@ -115,23 +105,26 @@ def get_camera_config(request: Request, camera_id: int):
 def set_camera_config(request: Request, camera_id: int, req: CameraConfigRequest):
     mgr = get_mgr(request)
     row = mgr.store.set_camera_config(camera_id, req.exit_line, req.exit_zone)
+    # сбрасываем кэш конфига чтобы pipeline сразу подхватил изменения
+    mgr.invalidate_config_cache(camera_id)
     return {"config": row}
 
 
-# ---------- overlays ----------
+@app.post("/api/camera/{camera_id}/config/reset")
+def reset_camera_config(request: Request, camera_id: int):
+    """Сбросить зоны (exit_line и exit_zone) для камеры."""
+    mgr = get_mgr(request)
+    row = mgr.store.set_camera_config(camera_id, exit_line=None, exit_zone=None)
+    mgr.invalidate_config_cache(camera_id)
+    return {"config": row}
+
+
 @app.get("/api/overlay/{camera_id}")
 def get_overlay(request: Request, camera_id: int):
-    mgr = get_mgr(request)
-    return mgr.get_overlay(camera_id)
+    return get_mgr(request).get_overlay(camera_id)
 
 
-# ---------- streams (MJPEG) ----------
 def mjpeg_generator(packet_fn, camera_id: int, mgr: CameraManager):
-    """
-    packet_fn(camera_id) -> (ts, jpg_bytes)
-    Отдаём кадр только если он обновился, иначе спим.
-    Это критично, иначе стрим начинает крутиться в tight-loop и душит inference.
-    """
     boundary = b"--frame"
     last_ts = -1.0
 
@@ -141,7 +134,6 @@ def mjpeg_generator(packet_fn, camera_id: int, mgr: CameraManager):
             break
 
         ts, jpg = packet_fn(camera_id)
-
         if jpg is None or ts <= last_ts:
             time.sleep(0.01)
             continue
@@ -172,22 +164,16 @@ def stream_mjpeg_annotated(request: Request, camera_id: int):
     )
 
 
-# ---------- events ----------
 @app.get("/api/events")
 def get_events(request: Request, limit: int = 200, ack: str = "all", camera_id: Optional[int] = None):
     mgr = get_mgr(request)
-    evs = mgr.store.list_events(limit=limit, ack=ack, camera_id=camera_id)
-    return {"events": evs}
+    return {"events": mgr.store.list_events(limit=limit, ack=ack, camera_id=camera_id)}
 
 
 @app.post("/api/events/{event_id}/ack")
 def ack_event(request: Request, event_id: int, req: AckRequest):
     mgr = get_mgr(request)
-    try:
-        row = mgr.store.set_ack(event_id, status=req.status, note=req.note)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return {"event": row}
+    return {"event": mgr.store.set_ack(event_id, status=req.status, note=req.note)}
 
 
 @app.get("/api/events/stream")
@@ -211,7 +197,6 @@ def events_stream(request: Request):
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
-# ---------- analytics ----------
 @app.get("/api/tracks")
 def list_tracks(request: Request, camera_id: int):
     mgr = get_mgr(request)
@@ -221,8 +206,7 @@ def list_tracks(request: Request, camera_id: int):
 @app.get("/api/track_timeline")
 def track_timeline(request: Request, camera_id: int, track_id: int):
     mgr = get_mgr(request)
-    segs = mgr.store.get_track_timeline(camera_id, track_id)
-    return {"camera_id": camera_id, "track_id": track_id, "segments": segs}
+    return {"camera_id": camera_id, "track_id": track_id, "segments": mgr.store.get_track_timeline(camera_id, track_id)}
 
 
 @app.get("/api/camera/kpi")
@@ -240,5 +224,9 @@ def camera_timeline(request: Request, camera_id: int, limit: int = 2000):
 @app.post("/api/camera/{camera_id}/clear")
 def clear_camera_analytics(request: Request, camera_id: int):
     mgr = get_mgr(request)
-    info = mgr.store.clear_camera(camera_id)
-    return {"ok": True, "deleted": info}
+    # очищаем аналитику
+    deleted = mgr.store.clear_camera(camera_id)
+    # также сбрасываем конфиг зон
+    mgr.store.set_camera_config(camera_id, exit_line=None, exit_zone=None)
+    mgr.invalidate_config_cache(camera_id)
+    return {"ok": True, "deleted": deleted}
