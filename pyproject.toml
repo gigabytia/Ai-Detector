@@ -1,0 +1,62 @@
+[project]
+name = "ai-detector"
+version = "0.1.0"
+description = "AI Detector: person detection and tracking for video surveillance"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "ai-detector-shared",
+    "ai-detector-backend",
+    "ai-detector-vision-worker",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["shared", "backend", "vision-worker"]
+
+[tool.uv.sources]
+ai-detector-shared = { workspace = true }
+ai-detector-backend = { workspace = true }
+ai-detector-vision-worker = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1",
+    "pytest-asyncio>=1.4",
+    "httpx>=0.28",
+    "ruff>=0.16",
+    "mypy>=2.4",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-m 'not integration' --strict-markers --import-mode=importlib"
+markers = [
+    "integration: needs running PostgreSQL and Redis (DATABASE_URL, REDIS_URL)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["shared/src", "backend/src", "vision-worker/src", "tests"]
+extend-exclude = ["backend/migrations/versions", "*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N", "S", "ASYNC", "BLE", "RUF", "SIM", "PTH"]
+ignore = ["S101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ai_detector_core", "app", "vision_worker", "fakes"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = ["shared/src", "backend/src", "vision-worker/src", "tests/unit"]
+explicit_package_bases = true
+plugins = ["pydantic.mypy"]

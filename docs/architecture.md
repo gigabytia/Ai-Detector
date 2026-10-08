@@ -60,7 +60,8 @@ backend (app)    vision-worker (vision_worker)     друг от друга не
 ```text
 backend/src/app/
 ├── main.py                 # create_app(), lifespan
-├── api/v1/                 # cameras, zones, events, analytics, uploads, snapshots, realtime (SSE), worker (internal), health
+├── api/                    # health.py (/health/live, /health/ready), errors.py, deps.py
+├── api/v1/                 # system, cameras, zones, events, analytics, uploads, snapshots, realtime (SSE), worker (internal)
 ├── core/                   # config (pydantic-settings), logging (JSON), lifecycle
 ├── application/            # camera_service, zone_service, event_service, analytics_service, upload_service
 ├── infrastructure/

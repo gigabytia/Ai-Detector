@@ -23,3 +23,5 @@
 | [ADR-019](ADR-019-track-persistence.md) | Запись треков |
 | [ADR-020](ADR-020-dependency-versions.md) | Версии зависимостей |
 | [ADR-021](ADR-021-agent-defaults.md) | Значения по умолчанию, не заданные в ТЗ |
+| [ADR-022](ADR-022-typescript-version.md) | Версия TypeScript |
+| [ADR-023](ADR-023-worker-http.md) | HTTP-сервер worker'а |

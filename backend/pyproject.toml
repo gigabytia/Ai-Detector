@@ -1,0 +1,30 @@
+[project]
+name = "ai-detector-backend"
+version = "0.1.0"
+description = "AI Detector REST/SSE API"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "ai-detector-shared",
+    "fastapi>=0.142",
+    "uvicorn[standard]>=0.54",
+    "sqlalchemy[asyncio]>=2.1",
+    "alembic>=1.20",
+    "asyncpg>=0.32",
+    "redis>=8.1",
+    "pydantic-settings>=2.15",
+    "orjson>=3.13",
+]
+
+[project.scripts]
+ai-detector-api = "app.main:run"
+ai-detector-openapi = "app.openapi_export:main"
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "app"
+
+[tool.uv.sources]
+ai-detector-shared = { workspace = true }

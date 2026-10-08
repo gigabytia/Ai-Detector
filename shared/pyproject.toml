@@ -1,0 +1,13 @@
+[project]
+name = "ai-detector-shared"
+version = "0.1.0"
+description = "Domain models, ports and message contracts shared by API and vision worker"
+requires-python = ">=3.12,<3.13"
+dependencies = ["pydantic>=2.13", "orjson>=3.13"]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "ai_detector_core"

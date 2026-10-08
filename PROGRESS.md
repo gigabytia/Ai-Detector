@@ -4,40 +4,59 @@
 
 ## Текущий этап
 
-**Milestone 1 — архитектура: выполнен, ждёт подтверждения человеком.** Дальше работа не продолжается без подтверждения (ТЗ §0.7).
+**Milestone 2 — инфраструктура: выполнен.** Следующий — Milestone 3 (камеры).
 
 ## Сделано
 
-* Структура каталогов (пустые каталоги с `.gitkeep`, кода нет).
-* `docs/architecture.md`, `docs/data-flow.md`, `docs/database.md`, `docs/behavior.md`.
-* `docs/decisions/` — ADR-001…006 (обязательные) и ADR-007…021 (решения там, где ТЗ молчит или противоречит себе).
-* `.gitignore`, `README.md`.
+### Milestone 1 — архитектура (подтверждено человеком)
+* Документы `docs/architecture.md`, `data-flow.md`, `database.md`, `behavior.md`, ADR-001…021.
 
-## Проверено
+### Milestone 2 — инфраструктура
+* uv workspace: `shared` (`ai_detector_core`), `backend` (`app`), `vision-worker` (`vision_worker`); `uv.lock`.
+* `shared`: `Clock`, `WorkerHeartbeat`, имена Redis-ключей, JSON-логирование (stdlib).
+* API: настройки (pydantic-settings, CORS без `*`, только `postgresql+asyncpg`), JSON-логи, lifespan с engine/Redis, `/health/live`, `/health/ready` (БД + Redis, 503 при отказе), `GET /api/v1/system/status` (зависимости + живые worker'ы), единый формат ошибок, Alembic (async, без миграций — таблицы с Milestone 3), экспорт OpenAPI.
+* Worker: `Supervisor`, heartbeat в Redis раз в 1 с с TTL 5 с, HTTP `/health/live`, `/health/ready`, штатная остановка удаляет heartbeat.
+* Frontend: Vite + Vue 3 + TS, Pinia, Vue Query, vue-i18n (ru), Tailwind 4, shadcn-vue (Button), Lucide; маршруты `/monitoring`, `/events`, `/analytics`, `/cameras`, `/settings`; светлая/тёмная (графит) темы; индикатор состояния системы и панель на «Настройках»; типы API из OpenAPI.
+* Docker: Dockerfile api/worker/frontend, nginx (same-origin `/api`, `/health`, `/live`), `docker-compose.yml` (mediamtx — profile `media`).
+* `Makefile` + эквиваленты PowerShell (`docs/development.md`), `.env.example`, CI (`.github/workflows/ci.yml`), `docs/api.md`.
+* ADR-022 (TypeScript 5.9), ADR-023 (HTTP worker'а на FastAPI).
 
-* Ссылки между документами и на ADR существуют (скрипт-проверка).
-* Код не запускался: его нет на этом этапе.
+## Проверено (в песочнице агента: Linux x86_64, Python 3.12.15, Node 24.14.1, CPU, без Docker)
+
+| Проверка | Результат |
+|---|---|
+| `uv run pytest` | 13 passed |
+| `uv run pytest -m integration` (PostgreSQL 17 + Valkey 9 из пакетов ОС) | 4 passed |
+| `ruff check`, `ruff format --check`, `mypy --strict` | без ошибок |
+| `npm run lint` / `format:check` / `typecheck` / `test` / `build` | без ошибок, 7 тестов Vitest |
+| Живой запуск API + worker | ready 200; system status показывает worker'а |
+| Отключение Redis | API и worker ready → 503, статус `degraded`, ошибка в логе worker'а один раз; после возврата Redis — восстановление без перезапуска |
+| SIGTERM worker'у | штатная остановка, heartbeat-ключ удалён |
+| UI `/settings` через Vite proxy | скриншоты светлой и тёмной темы, данные с API |
+| Шаги `uv sync` из Dockerfile api/worker | выполнены вне Docker; `alembic upgrade head` работает; образ worker'а не содержит `app` |
 
 ## Не проверено и почему
 
-* Версии зависимостей не выбирались и не проверялись: в среде нет сети и `uv` ([ADR-020](docs/decisions/ADR-020-dependency-versions.md)).
-* Соответствие параметров ByteTrack (`supervision`) требованиям ТЗ — проверяется тестами в Milestone 5 ([ADR-003](docs/decisions/ADR-003-person-tracking.md)).
-* GPU и реальных камер нет; все оценки производительности — ориентиры, не измерения.
+* `docker compose build/up` и CI на GitHub не запускались — в песочнице нет Docker и GitHub Actions. YAML compose и CI только распарсен.
+* Интеграционные тесты шли на PostgreSQL 17 и Valkey 9 (совместим с Redis), а в compose/CI указаны `postgres:18-alpine` и `redis:8.8-alpine`.
+* Сборка проверялась на Node 24.14.1; часть dev-зависимостей просит ≥ 24.15 (только предупреждения).
+* Windows не проверялся (нет машины); команды в `docs/development.md` кроссплатформенные, кроме копирования `.env`.
+
+## Версии
+
+Проверены по PyPI/npm/Docker Hub на 2026-10-08 и зафиксированы в `uv.lock` и `frontend/package-lock.json`. Исключение — TypeScript 5.9 вместо 7.0 ([ADR-022](docs/decisions/ADR-022-typescript-version.md)).
 
 ## Ключевые решения
 
-* Worker не ходит в PostgreSQL: конфиг — через internal API, результаты — через Redis Streams, запись делает API ([ADR-002](docs/decisions/ADR-002-vision-worker-separation.md), [ADR-004](docs/decisions/ADR-004-event-bus.md)).
-* Превью «JPEG + метаданные» отдаёт сам worker по WebSocket ([ADR-005](docs/decisions/ADR-005-video-streaming.md)).
-* Событие идёт в pub/sub и в Stream одновременно ([ADR-017](docs/decisions/ADR-017-event-persistence.md)).
-* Статусы событий без `RESOLVED` ([ADR-007](docs/decisions/ADR-007-event-statuses.md)); `PersonState` без `CROSSING_LINE` ([ADR-014](docs/decisions/ADR-014-person-states.md)).
-* Mock-режим = mock-источник + scripted-детектор ([ADR-016](docs/decisions/ADR-016-mock-mode.md)).
+* Worker не ходит в PostgreSQL ([ADR-002](docs/decisions/ADR-002-vision-worker-separation.md), [ADR-004](docs/decisions/ADR-004-event-bus.md)); превью — из worker'а ([ADR-005](docs/decisions/ADR-005-video-streaming.md)); событие — в pub/sub и Stream одновременно ([ADR-017](docs/decisions/ADR-017-event-persistence.md)).
+* Интеграционные тесты исключены из обычного `pytest` и при недоступном сервисе падают, а не пропускаются.
 
 ## Известные проблемы / риски
 
-* Cooldown по ключу «камера + track + тип» без zone_id при нескольких зонах может подавить вход во вторую зону в течение 3 с ([ADR-008](docs/decisions/ADR-008-cooldown.md)).
-* Треки, активные при аварийном падении worker'а, не сохраняются ([ADR-019](docs/decisions/ADR-019-track-persistence.md)).
-* `analytics_aggregates` с шагом 1 с растёт на ~0,7 млн строк/сутки при 8 камерах; роллап и retention — Milestone 10.
+* `StarletteDeprecationWarning`: TestClient на `httpx` объявлен устаревшим в пользу `httpx2`; на работу не влияет, перейти при обновлении FastAPI.
+* Риски из Milestone 1 актуальны: cooldown без zone_id ([ADR-008](docs/decisions/ADR-008-cooldown.md)), потеря активных треков при аварии worker'а ([ADR-019](docs/decisions/ADR-019-track-persistence.md)), рост `analytics_aggregates`.
+* ECharts, Playwright, Prometheus-метрики ещё не подключены — появятся вместе с функциями (Milestone 10, Уровень 3).
 
-## Следующий шаг (после подтверждения)
+## Следующий шаг
 
-Milestone 2: uv workspace (`pyproject.toml` в корне, `backend`, `vision-worker`, `shared`), каркас frontend (Vite + Vue 3 + TS), `docker-compose.yml` (postgres, redis; api/worker/frontend; mediamtx — profile), health-эндпоинты API и worker'а, проверки подключения к БД и Redis, Makefile с эквивалентами для PowerShell.
+Milestone 3: таблицы `cameras`, `camera_configs` (первая миграция), CRUD камер, загрузка видео, `FrameSource` (file + mock), `CameraSession` с lifecycle и reconnect, команды start/stop/restart через Redis, статус камер в UI.

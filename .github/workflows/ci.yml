@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy shared/src backend/src vision-worker/src tests
+      - run: uv run pytest
+      - name: OpenAPI contract is up to date
+        run: |
+          uv run ai-detector-openapi frontend/openapi.json
+          git diff --exit-code frontend/openapi.json
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: ai_detector
+          POSTGRES_PASSWORD: ai_detector
+          POSTGRES_DB: ai_detector
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ai_detector" --health-interval 5s --health-retries 10
+      redis:
+        image: redis:8.8-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://ai_detector:ai_detector@localhost:5432/ai_detector
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --frozen
+      - run: uv run pytest -m integration
+
+  frontend-quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Generated API types match openapi.json
+        run: |
+          npm run api:types
+          git diff --exit-code src/api/generated.ts
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker compose build
