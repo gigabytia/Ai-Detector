@@ -2,9 +2,10 @@
 
 import socket
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, RedisDsn
+from pydantic import AnyHttpUrl, Field, RedisDsn, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +20,19 @@ class WorkerSettings(BaseSettings):
     worker_id: str = Field(default_factory=socket.gethostname, min_length=1, max_length=128)
     worker_http_host: str = "127.0.0.1"
     worker_http_port: int = Field(default=8001, ge=1, le=65535)
+
+    api_base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8000")
+    worker_api_token: SecretStr | None = None
+    upload_path: Path = Path("data/uploads")
+
+    reconnect_initial_delay_seconds: float = Field(default=1.0, gt=0)
+    reconnect_max_delay_seconds: float = Field(default=30.0, gt=0)
+
+    @model_validator(mode="after")
+    def _check_backoff(self) -> "WorkerSettings":
+        if self.reconnect_max_delay_seconds < self.reconnect_initial_delay_seconds:
+            raise ValueError("RECONNECT_MAX_DELAY_SECONDS must be >= the initial delay")
+        return self
 
 
 @lru_cache

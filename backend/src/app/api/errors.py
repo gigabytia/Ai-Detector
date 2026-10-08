@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.application.errors import AppError
+
 logger = logging.getLogger(__name__)
 
 
@@ -19,22 +21,6 @@ class ErrorBody(BaseModel):
 
 class ErrorResponse(BaseModel):
     error: ErrorBody
-
-
-class AppError(Exception):
-    """Base class for expected application errors mapped to HTTP responses."""
-
-    status_code: int = status.HTTP_400_BAD_REQUEST
-    code: str = "BAD_REQUEST"
-
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-        self.message = message
-
-
-class ServiceUnavailableError(AppError):
-    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    code = "SERVICE_UNAVAILABLE"
 
 
 def _response(status_code: int, body: ErrorBody) -> JSONResponse:

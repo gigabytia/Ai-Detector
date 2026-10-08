@@ -18,7 +18,10 @@ uv sync
 npm --prefix frontend ci
 docker compose up -d postgres redis
 uv run alembic -c backend/alembic.ini upgrade head
+uv run ai-detector-seed              # две демо-камеры (mock), повторный запуск ничего не дублирует
 ```
+
+API и worker должны знать один и тот же `WORKER_API_TOKEN` (в `.env.example` — dev-значение; вне локальной машины замените на случайное). Без токена worker не получит список камер, а API ответит на внутренние запросы `503`.
 
 Затем в трёх терминалах:
 
@@ -28,7 +31,26 @@ uv run ai-detector-worker            # http://localhost:8001/health/ready
 npm --prefix frontend run dev        # http://localhost:5173
 ```
 
-Откройте http://localhost:5173/settings: база данных и Redis — «Доступно», в «Обработчики видео» — ваш `WORKER_ID`.
+Откройте http://localhost:5173/settings: база данных и Redis — «Доступно», в «Обработчики видео» — ваш `WORKER_ID`. На http://localhost:5173/monitoring демо-камеры через 1–2 с переходят в «В работе».
+
+В Docker seed запускается вручную: `docker compose exec api ai-detector-seed`.
+
+## Пример видео (§108)
+
+Видео в git не хранятся (`data/` в `.gitignore`). Подойдёт любой локальный `.mp4`/`.mov`/`.mkv`/`.avi`: «Камеры» → «Добавить камеру» → «Видеофайл». Файл загружается в `UPLOAD_PATH` и воспроизводится по кругу в реальном темпе. Для проверки детекции людей (с Milestone 4) нужна запись, где в кадре есть люди. Для проверки только захвата достаточно тестовой таблицы:
+
+```powershell
+ffmpeg -f lavfi -i testsrc2=size=1280x720:rate=25 -t 30 -pix_fmt yuv420p sample.mp4
+```
+
+## Проверка RTSP без камеры
+
+```powershell
+docker compose --profile media up -d mediamtx
+ffmpeg -re -f lavfi -i testsrc2=size=1280x720:rate=25 -c:v libx264 -preset ultrafast -tune zerolatency -g 25 -f rtsp rtsp://localhost:8554/cam1
+```
+
+Добавьте камеру `rtsp://localhost:8554/cam1` (из контейнера worker'а — `rtsp://mediamtx:8554/cam1`). Если остановить ffmpeg или MediaMTX, камера перейдёт в «Недоступна» и вернётся в «В работе» после восстановления потока. Публикация файла через `-re -stream_loop -1 -i file.mp4` после первого круга может отдавать кадры быстрее реального времени (особенность ffmpeg) — для замеров FPS используйте `lavfi`.
 
 ## Полностью в Docker
 
@@ -45,6 +67,7 @@ docker compose --profile media up    # + MediaMTX (Уровень 3)
 | `make infra` | `docker compose up -d postgres redis` |
 | `make up` / `make down` | `docker compose up --build` / `docker compose down` |
 | `make migrate` | `uv run alembic -c backend/alembic.ini upgrade head` |
+| `make seed` | `uv run ai-detector-seed` |
 | `make api` | `uv run ai-detector-api` |
 | `make worker` | `uv run ai-detector-worker` |
 | `make frontend` | `npm --prefix frontend run dev` |
@@ -62,7 +85,7 @@ docker compose --profile media up    # + MediaMTX (Уровень 3)
 ## Тесты
 
 * `tests/unit` — без внешних сервисов, запускаются по умолчанию.
-* `tests/integration` — реальные PostgreSQL и Redis по `DATABASE_URL` / `REDIS_URL`. Если сервис недоступен, тест **падает**, а не пропускается.
+* `tests/integration` — реальные PostgreSQL и Redis по `DATABASE_URL` / `REDIS_URL`; перед запуском нужен `make migrate`. Тесты камер очищают таблицу `cameras` — не запускайте их на базе с нужными данными. Если сервис недоступен, тест **падает**, а не пропускается.
 * `frontend/src/**/*.test.ts` — Vitest.
 
 ## Миграции

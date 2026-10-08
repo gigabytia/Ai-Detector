@@ -27,6 +27,8 @@ cameras 1─1 camera_configs
 | deleted_at | timestamptz null | мягкое удаление ([ADR-011](decisions/ADR-011-camera-soft-delete.md)) |
 
 ### camera_configs
+> Создаётся в Milestone 4 вместе с первыми используемыми полями ([ADR-026](decisions/ADR-026-camera-configs-deferred.md)). В Milestone 3 есть только `cameras`.
+
 Переопределения настроек камеры; `NULL` = глобальный default из конфигурации ([behavior.md](behavior.md)). Типизированные колонки, не JSON.
 
 | Колонка | Тип | Ограничение |

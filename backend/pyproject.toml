@@ -13,11 +13,13 @@ dependencies = [
     "redis>=8.1",
     "pydantic-settings>=2.15",
     "orjson>=3.13",
+    "python-multipart>=0.0.32",
 ]
 
 [project.scripts]
 ai-detector-api = "app.main:run"
 ai-detector-openapi = "app.openapi_export:main"
+ai-detector-seed = "app.seed:main"
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]

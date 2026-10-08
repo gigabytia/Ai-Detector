@@ -14,7 +14,7 @@ COPY shared shared
 COPY backend backend
 RUN uv sync --frozen --no-dev --package ai-detector-backend
 
-RUN useradd --system --uid 10001 app
+RUN useradd --system --uid 10001 app && mkdir -p /data/uploads && chown app /data/uploads
 USER app
 WORKDIR /app/backend
 ENV API_HOST=0.0.0.0

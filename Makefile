@@ -1,5 +1,5 @@
 # Every target has a PowerShell equivalent in docs/development.md; make is optional.
-.PHONY: install infra up down migrate api worker frontend test test-integration lint fmt api-types build check
+.PHONY: install infra up down migrate seed api worker frontend test test-integration lint fmt api-types build check
 
 install:
 	uv sync
@@ -17,6 +17,9 @@ down:
 migrate:
 	uv run alembic -c backend/alembic.ini upgrade head
 
+seed:
+	uv run ai-detector-seed
+
 api:
 	uv run ai-detector-api
 
@@ -30,7 +33,7 @@ test:
 	uv run pytest
 	npm --prefix frontend test
 
-test-integration:
+test-integration: migrate
 	uv run pytest -m integration
 
 lint:

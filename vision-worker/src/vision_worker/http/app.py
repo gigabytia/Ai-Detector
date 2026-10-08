@@ -1,4 +1,4 @@
-"""Worker HTTP app: liveness and readiness of this worker process."""
+"""Worker HTTP app: liveness, readiness and per-camera runtime status."""
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -7,6 +7,7 @@ from typing import Literal
 from fastapi import FastAPI, Response, status
 from pydantic import AwareDatetime, BaseModel
 
+from ai_detector_core.cameras.status import CameraRuntimeStatus
 from vision_worker.supervisor import Supervisor
 
 
@@ -18,6 +19,10 @@ class WorkerReadinessRead(BaseModel):
     status: Literal["ready", "not_ready"]
     redis_ok: bool
     last_heartbeat_at: AwareDatetime | None
+
+
+class WorkerStatusRead(BaseModel):
+    cameras: list[CameraRuntimeStatus]
 
 
 def create_http_app(supervisor: Supervisor) -> FastAPI:
@@ -45,5 +50,9 @@ def create_http_app(supervisor: Supervisor) -> FastAPI:
             redis_ok=heartbeat.redis_ok,
             last_heartbeat_at=heartbeat.last_published_at,
         )
+
+    @app.get("/status", response_model=WorkerStatusRead)
+    async def worker_status() -> WorkerStatusRead:
+        return WorkerStatusRead(cameras=[s.status() for s in supervisor.manager.sessions])
 
     return app

@@ -10,6 +10,9 @@ dependencies = [
     "redis>=8.1",
     "pydantic-settings>=2.15",
     "orjson>=3.13",
+    "opencv-python-headless>=5.0.0.93",
+    "numpy>=2.5.3",
+    "httpx>=0.28.1",
 ]
 
 [project.scripts]

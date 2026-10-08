@@ -35,6 +35,9 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ai_detector}:${POSTGRES_PASSWORD:-ai_detector}@postgres:5432/${POSTGRES_DB:-ai_detector}
       REDIS_URL: redis://redis:6379/0
       CORS_ORIGINS: http://localhost:8080,http://localhost:5173
+      WORKER_API_TOKEN: ${WORKER_API_TOKEN:-dev-worker-token-change-me}
+      UPLOAD_PATH: /data/uploads
+    volumes: ["uploads:/data/uploads"]
     ports: ["8000:8000"]
     depends_on:
       postgres: { condition: service_healthy }
@@ -46,9 +49,14 @@ services:
       APP_ENV: development
       REDIS_URL: redis://redis:6379/0
       WORKER_ID: worker-1
+      API_BASE_URL: http://api:8000
+      WORKER_API_TOKEN: ${WORKER_API_TOKEN:-dev-worker-token-change-me}
+      UPLOAD_PATH: /data/uploads
+    volumes: ["uploads:/data/uploads:ro"]
     ports: ["8001:8001"]
     depends_on:
       redis: { condition: service_healthy }
+      api: { condition: service_started }
 
   frontend:
     build: { context: ., dockerfile: docker/frontend.Dockerfile }
@@ -64,3 +72,4 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  uploads:

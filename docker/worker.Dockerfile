@@ -14,7 +14,7 @@ COPY shared shared
 COPY vision-worker vision-worker
 RUN uv sync --frozen --no-dev --package ai-detector-vision-worker
 
-RUN useradd --system --uid 10001 app
+RUN useradd --system --uid 10001 app && mkdir -p /data/uploads && chown app /data/uploads
 USER app
 ENV WORKER_HTTP_HOST=0.0.0.0
 EXPOSE 8001

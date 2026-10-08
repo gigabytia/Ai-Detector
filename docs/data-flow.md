@@ -63,13 +63,14 @@ UI → REST (камера / конфиг / зона / линия / start / stop 
 worker: команда → GET /api/v1/internal/worker/cameras/{id} (токен) → CameraSpec
         → CameraManager.reconcile(): запустить / остановить / применить конфиг
 ```
-* Полная сверка (`GET /api/v1/internal/worker/cameras`) — при старте worker'а и после восстановления связи с Redis (команды, пропущенные за время разрыва, не теряются).
+* Полная сверка (`GET /api/v1/internal/worker/cameras`) — при старте worker'а и после восстановления связи с Redis (команды, пропущенные за время разрыва, не теряются); если API недоступен — повтор, текущие сессии продолжают работать ([ADR-028](decisions/ADR-028-worker-commands-best-effort.md)).
+* `camera.changed` для работающей камеры с тем же источником (например, переименование) не переоткрывает поток.
 * Новая зона/линия/порог применяется без перезапуска источника: `CameraSession` получает новый `SceneContext`; состояния треков по удалённым зонам сбрасываются.
 * `CameraSpec` содержит URL с учётными данными; в публичном `CameraRead` URL маскируется (`rtsp://***:***@host/...`), в логах — только host.
 
 ## 4. Статус камер
 
-worker раз в 1 с: `SET ad:camera:{id}:status {CameraRuntimeStatus} EX 5`; при смене статуса — дополнительно `PUBLISH ad:cameras:status`. API в `GET /cameras` объединяет данные из PostgreSQL со статусом из Redis (`MGET`); ключа нет → `OFFLINE`. Поля статуса: `status`, `fps_processed`, `persons`, `last_frame_at`, `last_error`, `last_reconnect_attempt_at`, `worker_id`.
+worker раз в 1 с: `SET ad:camera:{id}:status {CameraRuntimeStatus} EX 5` (pipeline на все камеры); у остановленной камеры ключ удаляется сразу. API в `GET /cameras` объединяет данные из PostgreSQL со статусом из Redis (`MGET`); ключа нет → `runtime: null`. Поля: `status`, `capture_fps`, `frame_size`, `last_frame_at`, `last_error`, `reconnect_attempts`, `last_reconnect_attempt_at`, `worker_id`, `run_id`, `updated_at`. `fps_processed` и число людей добавятся с детектором (Milestone 4). До SSE (Milestone 7) UI опрашивает `GET /cameras` раз в 2 с; канал `ad:cameras:status` появится вместе с SSE.
 
 ## 5. Превью и телеметрия в браузер (Уровень 1)
 
@@ -101,7 +102,7 @@ bbox нормализован (x1, y1, x2, y2). Уровень 3: видео ч�
 
 ## 7. Загрузка видео
 
-`POST /api/v1/uploads` (multipart; расширения `UPLOAD_ALLOWED_EXTENSIONS`, размер ≤ `UPLOAD_MAX_BYTES`) → файл под сгенерированным именем `{uuid}.{ext}` в `UPLOAD_PATH` → ответ `{file_ref}`. Камера типа `file` хранит `source_url = "upload://{file_ref}"`; worker разрешает ссылку только внутри `UPLOAD_PATH` (общий том). Произвольные пути не принимаются ([ADR-012](decisions/ADR-012-file-sources.md)).
+`POST /api/v1/uploads` (multipart; расширения `UPLOAD_ALLOWED_EXTENSIONS`, размер ≤ `UPLOAD_MAX_BYTES`) → файл под сгенерированным именем `{uuid hex}.{ext}` в `UPLOAD_PATH` (запись во временный `.part`, затем переименование) → ответ `{file_ref, source_url}`. Камера типа `file` хранит `source_url = "upload://{file_ref}"`; worker разрешает ссылку только внутри `UPLOAD_PATH` (общий том). Произвольные пути не принимаются ([ADR-012](decisions/ADR-012-file-sources.md)).
 
 ## 8. Redis: имена и назначение
 

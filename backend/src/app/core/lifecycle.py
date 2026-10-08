@@ -7,39 +7,62 @@ from dataclasses import dataclass
 
 from fastapi import FastAPI
 from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from ai_detector_core.ports.clock import SystemClock
+from ai_detector_core.ports.clock import Clock, SystemClock
 from app.application.system_service import SystemService
 from app.core.config import Settings
-from app.infrastructure.database.session import DatabaseProbe, create_engine
+from app.infrastructure.database.session import (
+    DatabaseProbe,
+    create_engine,
+    create_session_factory,
+)
 from app.infrastructure.redis.client import (
     RedisProbe,
     RedisWorkerHeartbeatReader,
     create_redis,
 )
+from app.infrastructure.storage.uploads import LocalUploadStorage
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class AppResources:
+    settings: Settings
     engine: AsyncEngine
+    session_factory: async_sessionmaker[AsyncSession]
     redis: Redis
+    clock: Clock
+    uploads: LocalUploadStorage
     system_service: SystemService
 
 
 def build_resources(settings: Settings) -> AppResources:
     engine = create_engine(str(settings.database_url))
     redis = create_redis(str(settings.redis_url))
+    clock = SystemClock()
     redis_probe = RedisProbe(redis)
     system_service = SystemService(
         probes=[DatabaseProbe(engine), redis_probe],
         heartbeats=RedisWorkerHeartbeatReader(redis),
         redis_probe_name=redis_probe.name,
-        clock=SystemClock(),
+        clock=clock,
     )
-    return AppResources(engine=engine, redis=redis, system_service=system_service)
+    uploads = LocalUploadStorage(
+        root=settings.upload_path,
+        max_bytes=settings.upload_max_bytes,
+        allowed_extensions=settings.upload_allowed_extensions,
+    )
+    return AppResources(
+        settings=settings,
+        engine=engine,
+        session_factory=create_session_factory(engine),
+        redis=redis,
+        clock=clock,
+        uploads=uploads,
+        system_service=system_service,
+    )
 
 
 async def close_resources(resources: AppResources) -> None:

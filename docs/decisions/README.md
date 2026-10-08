@@ -25,3 +25,8 @@
 | [ADR-021](ADR-021-agent-defaults.md) | Значения по умолчанию, не заданные в ТЗ |
 | [ADR-022](ADR-022-typescript-version.md) | Версия TypeScript |
 | [ADR-023](ADR-023-worker-http.md) | HTTP-сервер worker'а |
+| [ADR-024](ADR-024-mock-scenarios-location.md) | Где лежат сценарии mock-камер |
+| [ADR-025](ADR-025-frame-source-contract.md) | Контракт FrameSource и ошибки источника |
+| [ADR-026](ADR-026-camera-configs-deferred.md) | camera_configs — с Milestone 4 |
+| [ADR-027](ADR-027-source-validation.md) | Проверка источника при добавлении камеры |
+| [ADR-028](ADR-028-worker-commands-best-effort.md) | Команды worker'у — уведомление |

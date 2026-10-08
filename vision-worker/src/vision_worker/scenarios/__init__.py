@@ -1,0 +1,1 @@
+"""Bundled mock scenarios (JSON)."""

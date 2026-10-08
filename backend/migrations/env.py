@@ -7,6 +7,7 @@ from alembic import context
 from sqlalchemy.engine import Connection
 
 from app.core.config import get_settings
+from app.infrastructure.database import models  # noqa: F401 - registers tables
 from app.infrastructure.database.base import Base
 from app.infrastructure.database.session import create_engine
 

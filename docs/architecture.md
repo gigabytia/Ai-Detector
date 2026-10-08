@@ -117,7 +117,7 @@ CREATED → STARTING → RUNNING ⇄ DEGRADED
              └──── RECONNECTING (backoff 1→2→4…≤30 с)
 любое → STOPPING → STOPPED;   неустранимая ошибка (нет файла, неверный URL) → ERROR
 ```
-Переходы задаются таблицей разрешённых переходов в `state_machine.py`; недопустимый переход — исключение. UI: RUNNING → LIVE, STARTING/RECONNECTING → CONNECTING, STOPPED или нет статуса в Redis → OFFLINE, ERROR → ERROR, DEGRADED → LIVE с предупреждением.
+Переходы задаются таблицей разрешённых переходов в `vision_worker/cameras/lifecycle.py`; недопустимый переход — исключение. UI (`frontend/src/lib/cameraStatus.ts`): камера выключена → «Остановлена»; включена, но статуса в Redis нет → «Нет обработчика»; RUNNING → «В работе»; CREATED/STARTING → «Подключение…»; RECONNECTING → «Недоступна» (с временем последней попытки, §120); DEGRADED → «Работа ограничена»; ERROR → «Ошибка». Ошибки источника: [ADR-025](decisions/ADR-025-frame-source-contract.md).
 
 ## 6. Границы замены (§189, §203)
 
@@ -170,7 +170,8 @@ class EventRule(Protocol):
 
 | Отказ | Поведение |
 |---|---|
-| Камера/файл недоступны | `RECONNECTING` с backoff, остальные камеры работают |
+| RTSP-камера недоступна | `RECONNECTING` с backoff, остальные камеры работают |
+| Файл не найден / не декодируется | эта камера `ERROR` до перезапуска или смены источника ([ADR-025](decisions/ADR-025-frame-source-contract.md)) |
 | Ошибка обработки одной камеры | эта камера `ERROR`, исключение в логе |
 | Redis недоступен | worker продолжает inference, копит outbox (bounded), статус degraded; API `/health/ready` = 503, SSE переподключается |
 | PostgreSQL недоступен | API отвечает 503; worker продолжает, сообщения ждут в Redis Stream и записываются позже |
