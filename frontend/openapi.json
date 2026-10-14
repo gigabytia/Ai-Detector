@@ -589,6 +589,140 @@
         }
       }
     },
+    "/api/v1/cameras/{camera_id}/config": {
+      "get": {
+        "tags": [
+          "cameras"
+        ],
+        "summary": "Get Config",
+        "operationId": "get_config_api_v1_cameras__camera_id__config_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CameraConfigRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "cameras"
+        ],
+        "summary": "Replace Config",
+        "operationId": "replace_config_api_v1_cameras__camera_id__config_put",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CameraConfigOverrides"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CameraConfigRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/uploads": {
       "post": {
         "tags": [
@@ -666,6 +800,80 @@
           "file"
         ],
         "title": "Body_upload_video_api_v1_uploads_post"
+      },
+      "CameraConfig": {
+        "properties": {
+          "target_fps": {
+            "type": "number",
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Target Fps",
+            "default": 10
+          },
+          "detection_confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Detection Confidence",
+            "default": 0.25
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CameraConfig"
+      },
+      "CameraConfigOverrides": {
+        "properties": {
+          "target_fps": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 30.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Fps"
+          },
+          "detection_confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detection Confidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CameraConfigOverrides"
+      },
+      "CameraConfigRead": {
+        "properties": {
+          "overrides": {
+            "$ref": "#/components/schemas/CameraConfigOverrides"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/CameraConfig"
+          },
+          "effective": {
+            "$ref": "#/components/schemas/CameraConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "overrides",
+          "defaults",
+          "effective"
+        ],
+        "title": "CameraConfigRead"
       },
       "CameraCreate": {
         "properties": {
@@ -762,6 +970,40 @@
           "status": {
             "$ref": "#/components/schemas/CameraStatus"
           },
+          "processed_fps": {
+            "type": "number",
+            "title": "Processed Fps"
+          },
+          "inference_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inference Ms"
+          },
+          "detections_count": {
+            "type": "integer",
+            "title": "Detections Count"
+          },
+          "dropped_frames": {
+            "type": "integer",
+            "title": "Dropped Frames"
+          },
+          "inference_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inference Error"
+          },
           "capture_fps": {
             "type": "number",
             "title": "Capture Fps"
@@ -839,6 +1081,11 @@
         "type": "object",
         "required": [
           "status",
+          "processed_fps",
+          "inference_ms",
+          "detections_count",
+          "dropped_frames",
+          "inference_error",
           "capture_fps",
           "frame_size",
           "last_frame_at",

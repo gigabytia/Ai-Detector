@@ -27,7 +27,7 @@ cameras 1─1 camera_configs
 | deleted_at | timestamptz null | мягкое удаление ([ADR-011](decisions/ADR-011-camera-soft-delete.md)) |
 
 ### camera_configs
-> Создаётся в Milestone 4 вместе с первыми используемыми полями ([ADR-026](decisions/ADR-026-camera-configs-deferred.md)). В Milestone 3 есть только `cameras`.
+> В Milestone 4 созданы `camera_id`, `target_fps`, `detection_confidence`; ниже также перечислены целевые поля последующих этапов. Реализованные колонки и миграция — в конце документа ([ADR-031](decisions/ADR-031-camera-config-defaults.md)).
 
 Переопределения настроек камеры; `NULL` = глобальный default из конфигурации ([behavior.md](behavior.md)). Типизированные колонки, не JSON.
 
@@ -153,3 +153,8 @@ cameras 1─1 camera_configs
 | Временной ряд | `analytics_aggregates`; для длинных диапазонов — `date_bin` в SQL |
 | Track timeline | `track_sessions` + `track_segments` |
 | События всего / critical / ложные / по камере / по типу / по времени | `events`, `GROUP BY` |
+
+
+## Реализовано в Milestone 4
+
+Миграция `b452b4c88e6b` создаёт `camera_configs`: `camera_id UUID PRIMARY KEY REFERENCES cameras(id) ON DELETE CASCADE`, nullable `target_fps FLOAT` (CHECK 1–30), nullable `detection_confidence FLOAT` (CHECK >0…1). Отсутствие строки или NULL — значение API по умолчанию (ADR-031). Остальные ранее описанные настройки добавятся вместе с использующими их этапами; сейчас их в таблице нет. Runtime-метрики остаются в Redis с TTL, кадры/боксы в БД не записываются.

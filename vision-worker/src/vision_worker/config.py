@@ -24,6 +24,21 @@ class WorkerSettings(BaseSettings):
     api_base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8000")
     worker_api_token: SecretStr | None = None
     upload_path: Path = Path("data/uploads")
+    model_manifest_path: Path = Path("models/person-detector/manifest.yaml")
+    inference_device: Literal["auto", "cpu", "cuda"] = "auto"
+    inference_batch_size: int = Field(default=4, ge=1, le=32)
+    inference_max_wait_ms: float = Field(default=20, ge=0, le=1000)
+    inference_threads: int = Field(default=2, ge=1, le=64)
+    detection_iou: float = Field(default=0.45, gt=0, le=1)
+    preview_fps: float = Field(default=5, gt=0, le=30)
+    preview_max_width: int = Field(default=640, ge=64, le=1920)
+    preview_allowed_origins: list[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8080",
+    ]
+
+    reconcile_interval_seconds: float = Field(default=30, ge=1, le=300)
 
     reconnect_initial_delay_seconds: float = Field(default=1.0, gt=0)
     reconnect_max_delay_seconds: float = Field(default=30.0, gt=0)

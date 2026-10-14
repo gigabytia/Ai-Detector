@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     # Shared secret for /api/v1/internal/worker/*; internal endpoints answer 503 when unset.
     worker_api_token: SecretStr | None = None
 
+    target_fps: float = Field(default=10, ge=1, le=30)
+    detection_confidence: float = Field(default=0.25, gt=0, le=1)
     max_cameras: int = Field(default=8, ge=1)
     upload_path: Path = Path("data/uploads")
     upload_max_bytes: int = Field(default=2 * 1024**3, ge=1)

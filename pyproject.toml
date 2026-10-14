@@ -11,6 +11,7 @@ dependencies = [
 
 [tool.uv]
 package = false
+override-dependencies = ["opencv-python; sys_platform == 'never'"]
 
 [tool.uv.workspace]
 members = ["shared", "backend", "vision-worker"]
@@ -60,3 +61,13 @@ strict = true
 mypy_path = ["shared/src", "backend/src", "vision-worker/src", "tests/unit"]
 explicit_package_bases = true
 plugins = ["pydantic.mypy"]
+
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.mypy.overrides]]
+module = ["ultralytics.*", "yaml.*"]
+ignore_missing_imports = true

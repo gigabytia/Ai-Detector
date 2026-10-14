@@ -1,6 +1,7 @@
 import uuid
 from typing import cast
 
+import pytest
 from redis.asyncio import Redis
 
 from ai_detector_core.cameras.source import SourceType
@@ -97,3 +98,40 @@ async def test_api_outage_schedules_full_reconcile() -> None:
     specs.fail = False
     await listener._full_reconcile()
     assert listener._needs_full_reconcile is False
+
+
+async def test_periodic_reconcile_repairs_missed_notifications(
+    monkeypatch: "pytest.MonkeyPatch",
+) -> None:
+    import asyncio
+
+    now = [100.0]
+    stop = asyncio.Event()
+
+    class FakePubSub:
+        calls = 0
+
+        async def __aenter__(self) -> "FakePubSub":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            pass
+
+        async def subscribe(self, _: str) -> None:
+            pass
+
+        async def get_message(self, **_: object) -> None:
+            self.calls += 1
+            now[0] += 31
+            if self.calls == 2:
+                stop.set()
+
+    class FakeRedis:
+        def pubsub(self) -> FakePubSub:
+            return FakePubSub()
+
+    listener, _, manager = make_listener()
+    listener._redis = cast(Redis, FakeRedis())
+    monkeypatch.setattr("vision_worker.messaging.commands.time.monotonic", lambda: now[0])
+    await listener._listen(stop)
+    assert manager.calls == [("reconcile", [CAM.id]), ("reconcile", [CAM.id])]

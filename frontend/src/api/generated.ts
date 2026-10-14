@@ -143,6 +143,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cameras/{camera_id}/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Config */
+        get: operations["get_config_api_v1_cameras__camera_id__config_get"];
+        /** Replace Config */
+        put: operations["replace_config_api_v1_cameras__camera_id__config_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/uploads": {
         parameters: {
             query?: never;
@@ -168,6 +186,32 @@ export interface components {
         Body_upload_video_api_v1_uploads_post: {
             /** File */
             file: string;
+        };
+        /** CameraConfig */
+        CameraConfig: {
+            /**
+             * Target Fps
+             * @default 10
+             */
+            target_fps: number;
+            /**
+             * Detection Confidence
+             * @default 0.25
+             */
+            detection_confidence: number;
+        };
+        /** CameraConfigOverrides */
+        CameraConfigOverrides: {
+            /** Target Fps */
+            target_fps?: number | null;
+            /** Detection Confidence */
+            detection_confidence?: number | null;
+        };
+        /** CameraConfigRead */
+        CameraConfigRead: {
+            overrides: components["schemas"]["CameraConfigOverrides"];
+            defaults: components["schemas"]["CameraConfig"];
+            effective: components["schemas"]["CameraConfig"];
         };
         /** CameraCreate */
         CameraCreate: {
@@ -218,6 +262,16 @@ export interface components {
         /** CameraRuntimeRead */
         CameraRuntimeRead: {
             status: components["schemas"]["CameraStatus"];
+            /** Processed Fps */
+            processed_fps: number;
+            /** Inference Ms */
+            inference_ms: number | null;
+            /** Detections Count */
+            detections_count: number;
+            /** Dropped Frames */
+            dropped_frames: number;
+            /** Inference Error */
+            inference_error: string | null;
             /** Capture Fps */
             capture_fps: number;
             /** Frame Size */
@@ -807,6 +861,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CameraRead"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_config_api_v1_cameras__camera_id__config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CameraConfigRead"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    replace_config_api_v1_cameras__camera_id__config_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CameraConfigOverrides"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CameraConfigRead"];
                 };
             };
             /** @description Not Found */

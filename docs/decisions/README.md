@@ -30,3 +30,6 @@
 | [ADR-026](ADR-026-camera-configs-deferred.md) | camera_configs — с Milestone 4 |
 | [ADR-027](ADR-027-source-validation.md) | Проверка источника при добавлении камеры |
 | [ADR-028](ADR-028-worker-commands-best-effort.md) | Команды worker'у — уведомление |
+| [ADR-029](ADR-029-detector-per-source.md) | Детектор по источнику и fail-fast модель |
+| [ADR-030](ADR-030-torch-cpu-and-opencv.md) | CPU PyTorch и headless OpenCV |
+| [ADR-031](ADR-031-camera-config-defaults.md) | Переопределения настроек камеры |

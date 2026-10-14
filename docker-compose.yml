@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-ai_detector}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ai_detector}
       POSTGRES_DB: ${POSTGRES_DB:-ai_detector}
-    ports: ["5432:5432"]
+    ports: ["15432:5432"]
     volumes: ["postgres-data:/var/lib/postgresql"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -52,7 +52,7 @@ services:
       API_BASE_URL: http://api:8000
       WORKER_API_TOKEN: ${WORKER_API_TOKEN:-dev-worker-token-change-me}
       UPLOAD_PATH: /data/uploads
-    volumes: ["uploads:/data/uploads:ro"]
+    volumes: ["uploads:/data/uploads:ro", "./models:/app/models:ro"]
     ports: ["8001:8001"]
     depends_on:
       redis: { condition: service_healthy }

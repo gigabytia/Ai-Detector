@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from ai_detector_core.cameras.config import CameraConfig
 from ai_detector_core.cameras.source import SourceType
 
 
@@ -16,3 +17,4 @@ class CameraSpec(BaseModel):
     # Contains credentials for RTSP. Never log it; use mask_source_url().
     source_url: str
     enabled: bool
+    config: CameraConfig = CameraConfig()

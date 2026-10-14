@@ -1,5 +1,7 @@
 # Архитектура AI Detector v2
 
+> Текущий реализованный объём — камеры, детекция и превью (Milestone 4). Документ также описывает целевую архитектуру следующих этапов; трекинг, зоны, события, аналитика и SSE пока не реализованы. Подробный текущий состав — в конце документа и PROGRESS.md.
+
 Система видеонаблюдения: находит **людей** на видеопотоках, отслеживает их (track ID внутри камеры) и сообщает оператору о входе в опасную зону, пересечении линии и долгом нахождении в зоне. Объекты, перенос груза и pose estimation в эту версию не входят (ТЗ §2, §27).
 
 ## 1. Процессы
@@ -86,8 +88,8 @@ vision-worker/src/vision_worker/
 ├── config.py
 ├── supervisor.py        # жизненный цикл компонентов, без бизнес-логики
 ├── cameras/             # session.py (CameraSession + state machine), source.py (FrameSource + file/rtsp/mock), reconnect.py (backoff), manager.py (reconcile желаемого состояния)
-├── pipeline/            # frame_buffer.py (latest-frame), scheduler.py (batch builder), pipeline.py (detect→track→rules), results.py
-├── inference/           # detector.py (PersonDetector Protocol), runtime.py (device), adapters/ (ultralytics, onnx_runtime, scripted)
+├── pipeline/            # frame_buffer.py, scheduler.py (fair inference batching), results.py, preview.py; pipeline.py — с трекингом/правилами
+├── inference/           # detector.py, manifest.py, fetch.py, adapters/ (ultralytics, scripted); ONNX — позднее
 ├── tracking/            # tracker.py (PersonTracker Protocol + TrackRegistry), bytetrack_adapter.py
 ├── analytics/           # zone_engine.py, line_engine.py, state_machine.py, event_engine.py, rules/, cooldown.py, stats.py
 ├── messaging/           # event_bus.py (Redis), outbox.py (bounded), commands.py
@@ -100,13 +102,13 @@ vision-worker/src/vision_worker/
 | Где | Что | Почему |
 |---|---|---|
 | Поток захвата на камеру | `FrameSource.read()` (блокирующий) → `LatestFrameBuffer` (размер 1, старый кадр вытесняется) | блокирующий I/O не должен держать остальных |
-| Один поток inference | scheduler собирает свежие кадры камер, у которых наступило время по `TARGET_FPS`, батч до `INFERENCE_BATCH_SIZE` или `INFERENCE_MAX_WAIT_MS` → `PersonDetector.predict(batch)` → для каждой камеры `tracker.update` → `EventEngine.process` | модель одна, GPU-вызовы последовательны; состояние трекеров и правил трогает только этот поток — без блокировок |
-| Пул из 2 потоков | JPEG snapshot и превью | кодирование не тормозит inference |
+| Один поток inference | scheduler собирает свежие кадры камер, у которых наступило время по `TARGET_FPS`, батч до `INFERENCE_BATCH_SIZE` или `INFERENCE_MAX_WAIT_MS` → `PersonDetector.detect(batch, confidence)` → для каждой камеры `tracker.update` → `EventEngine.process` | модель одна, GPU-вызовы последовательны; состояние трекеров и правил трогает только этот поток — без блокировок |
+| Пул из 2 потоков | JPEG превью (snapshot — на следующем этапе) | кодирование не тормозит inference; без зрителей не выполняется |
 | asyncio loop | HTTP/WS, Redis (publish, команды, heartbeat), outbox | I/O — async (§194) |
 
 Передача из потока inference в asyncio — `loop.call_soon_threadsafe` в ограниченные очереди. Телеметрия: «последнее значение на камеру» (перезаписывается). События/треки/аналитика: bounded outbox (`WORKER_OUTBOX_MAX_ITEMS`); при переполнении отбрасывается самое старое, растёт метрика, статус worker'а → degraded.
 
-Изоляция ошибок: обработка каждой камеры внутри батча в своём `try/except` с `logger.exception`; упавшая камера → `ERROR`, остальные продолжают (§37). Ошибка самого `predict` → камеры батча `DEGRADED`, повтор; при повторяющихся ошибках `/health/ready` = false.
+Изоляция ошибок: обработка каждой камеры внутри батча в своём `try/except` с `logger.exception`; упавшая камера → `ERROR`, остальные продолжают (§37). Ошибка самого `predict` → камеры батча `DEGRADED`, повтор; после трёх подряд ошибочных реальных батчей `/health/ready` = false; успешный реальный батч восстанавливает готовность. Успех scripted-камер не скрывает отказ модели.
 
 ### Жизненный цикл камеры
 
@@ -181,3 +183,15 @@ class EventRule(Protocol):
 ## 10. Вне объёма
 
 Детекция объектов, перенос груза, pose, re-ID, распознавание лиц, межкамерная идентичность, RBAC, Kafka, Kubernetes, микросервисы под каждый модуль (§158–159). Заглушки под них не создаются.
+
+
+## Milestone 4: реализованные компоненты
+
+* `inference/detector.py`: `PersonDetector`, `PersonDetection` — без зависимости от Ultralytics.
+* `inference/manifest.py`, `fetch.py`: манифест и SHA-256, явная загрузка весов; `adapters/ultralytics.py` и `adapters/scripted.py`: реальная и сценарная детекция.
+* `pipeline/scheduler.py`: `InferenceScheduler`, один inference executor, latest-frame + round-robin + батчинг; `results.py`: immutable `DetectionResult`; `preview.py`: `PreviewHub`, два потока JPEG и ограниченные очереди зрителей.
+* `CameraSession`: метрики обработки и деградация; захват остаётся в своём потоке. `Supervisor`: запускает inference loop и при остановке дожидается текущего батча, закрывает камеры, preview, Redis/HTTP-клиенты.
+* `CameraConfigService`, `CameraConfigModel`: сохраняемые переопределения и effective конфигурация в `CameraSpec`.
+* Frontend `lib/live/`: протокол и `CameraImageSource`/`WsPreviewSource`; `useCameraLive`: отдельное `shallowRef`-состояние и явное освобождение bitmap на камеру; `CameraLiveView`: canvas кадра и боксов в одном requestAnimationFrame, подписка только при видимой работающей камере; `CameraFocusView`: крупный просмотр и `CameraConfigPanel`.
+
+Трекинг и правила ещё не подключены: интерфейс показывает детекции кадра, а не track ID/события. ONNX/WebRTC — дальнейшие adapters, не заглушки работающей функции.

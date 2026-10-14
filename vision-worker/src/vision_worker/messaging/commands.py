@@ -6,6 +6,7 @@ reconcile, so commands missed while Redis or the API were down are not lost (ADR
 
 import asyncio
 import logging
+import time
 
 from pydantic import ValidationError
 from redis.asyncio import Redis
@@ -29,12 +30,15 @@ class CommandListener:
         specs: CameraSpecClient,
         manager: CameraManager,
         retry: BackoffPolicy,
+        reconcile_interval_seconds: float = 30,
     ) -> None:
         self._redis = redis
         self._specs = specs
         self._manager = manager
         self._retry = Backoff(retry)
         self._needs_full_reconcile = True
+        self._reconcile_interval = reconcile_interval_seconds
+        self._last_reconcile = -float("inf")
 
     async def run(self, stop: asyncio.Event) -> None:
         while not stop.is_set():
@@ -51,7 +55,10 @@ class CommandListener:
             await pubsub.subscribe(WORKER_COMMANDS_CHANNEL)
             self._retry.reset()
             while not stop.is_set():
-                if self._needs_full_reconcile:
+                if (
+                    self._needs_full_reconcile
+                    or time.monotonic() - self._last_reconcile >= self._reconcile_interval
+                ):
                     await self._full_reconcile()
                 message = await pubsub.get_message(
                     ignore_subscribe_messages=True, timeout=POLL_TIMEOUT_SECONDS
@@ -67,6 +74,7 @@ class CommandListener:
             return  # retried on the next poll iteration
         await self._manager.reconcile(specs)
         self._needs_full_reconcile = False
+        self._last_reconcile = time.monotonic()
         logger.info("cameras reconciled", extra={"cameras": len(specs)})
 
     async def _handle(self, raw: bytes | str) -> None:

@@ -10,6 +10,11 @@ function runtime(
 ): CameraRuntime {
   return {
     status,
+    processed_fps: 0,
+    inference_ms: null,
+    detections_count: 0,
+    dropped_frames: 0,
+    inference_error: null,
     capture_fps: 15,
     frame_size: [1280, 720],
     last_frame_at: '2026-01-01T12:00:00Z',

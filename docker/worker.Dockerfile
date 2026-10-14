@@ -16,6 +16,6 @@ RUN uv sync --frozen --no-dev --package ai-detector-vision-worker
 
 RUN useradd --system --uid 10001 app && mkdir -p /data/uploads && chown app /data/uploads
 USER app
-ENV WORKER_HTTP_HOST=0.0.0.0
+ENV WORKER_HTTP_HOST=0.0.0.0 YOLO_CONFIG_DIR=/tmp
 EXPOSE 8001
 CMD ["ai-detector-worker"]

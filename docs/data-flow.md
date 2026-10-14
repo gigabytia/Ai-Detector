@@ -70,7 +70,7 @@ worker: команда → GET /api/v1/internal/worker/cameras/{id} (токен)
 
 ## 4. Статус камер
 
-worker раз в 1 с: `SET ad:camera:{id}:status {CameraRuntimeStatus} EX 5` (pipeline на все камеры); у остановленной камеры ключ удаляется сразу. API в `GET /cameras` объединяет данные из PostgreSQL со статусом из Redis (`MGET`); ключа нет → `runtime: null`. Поля: `status`, `capture_fps`, `frame_size`, `last_frame_at`, `last_error`, `reconnect_attempts`, `last_reconnect_attempt_at`, `worker_id`, `run_id`, `updated_at`. `fps_processed` и число людей добавятся с детектором (Milestone 4). До SSE (Milestone 7) UI опрашивает `GET /cameras` раз в 2 с; канал `ad:cameras:status` появится вместе с SSE.
+worker раз в 1 с: `SET ad:camera:{id}:status {CameraRuntimeStatus} EX 5` (pipeline на все камеры); у остановленной камеры ключ удаляется сразу. API в `GET /cameras` объединяет данные из PostgreSQL со статусом из Redis (`MGET`); ключа нет → `runtime: null`. Поля: `status`, `capture_fps`, `frame_size`, `last_frame_at`, `last_error`, `reconnect_attempts`, `last_reconnect_attempt_at`, `worker_id`, `run_id`, `updated_at`. С Milestone 4 есть `processed_fps`, `inference_ms`, `detections_count`, `dropped_frames`, `inference_error`. До SSE (Milestone 7) UI опрашивает `GET /cameras` раз в 2 с; канал `ad:cameras:status` появится вместе с SSE.
 
 ## 5. Превью и телеметрия в браузер (Уровень 1)
 
@@ -117,3 +117,10 @@ bbox нормализован (x1, y1, x2, y2). Уровень 3: видео ч�
 | `ad:worker:{worker_id}:heartbeat` | string, TTL 5 с | worker | API `/health`, UI «Система» |
 
 Схемы всех сообщений — Pydantic-модели в `shared/telemetry`; ни один слой не передаёт `dict[str, Any]`.
+
+
+## Реализованный поток детекции (Milestone 4)
+
+Поток захвата → latest-frame буфер (1) → справедливая round-robin очередь с индивидуальным target_fps → сбор батча до `INFERENCE_BATCH_SIZE` с ожиданием до `INFERENCE_MAX_WAIT_MS` → один выделенный inference-поток → результат, привязанный к исходным frame_id/run_id → runtime-метрики в Redis и on-demand PreviewHub → WebSocket → canvas браузера.
+
+Для реальных кадров общий порог вызова равен минимуму порогов в батче; затем результаты фильтруются по порогу каждой камеры. Mock-кадры обрабатываются scripted adapter отдельно и не подаются в YOLO. Ошибка реального батча не блокирует mock-детекции. Новая конфигурация приходит из API при уведомлении/сверке, применяется без restart. Ответ завершившегося inference от уже остановленного run_id отбрасывается. Медленный JPEG не блокирует inference: отдельный пул из двух потоков, latest-only очереди. Redis хранит статусы, но не видео.

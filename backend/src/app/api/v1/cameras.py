@@ -5,13 +5,16 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Response, status
 
-from app.api.deps import get_camera_service
+from ai_detector_core.cameras.config import CameraConfigOverrides, CameraConfigRead
+from app.api.deps import get_camera_config_service, get_camera_service
 from app.api.errors import ErrorResponse
+from app.application.camera_config_service import CameraConfigService
 from app.application.camera_service import CameraChanges, CameraService
 from app.schemas.cameras import CameraCreate, CameraRead, CameraUpdate
 
 router = APIRouter(prefix="/cameras", tags=["cameras"])
 Service = Annotated[CameraService, Depends(get_camera_service)]
+ConfigService = Annotated[CameraConfigService, Depends(get_camera_config_service)]
 # Any: FastAPI types the OpenAPI "responses" mapping as dict[int | str, dict[str, Any]].
 NOT_FOUND: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}}
 
@@ -68,3 +71,15 @@ async def stop_camera(camera_id: uuid.UUID, service: Service) -> CameraRead:
 @router.post("/{camera_id}/restart", response_model=CameraRead, responses=NOT_FOUND)
 async def restart_camera(camera_id: uuid.UUID, service: Service) -> CameraRead:
     return CameraRead.from_view(await service.restart(camera_id))
+
+
+@router.get("/{camera_id}/config", response_model=CameraConfigRead, responses=NOT_FOUND)
+async def get_config(camera_id: uuid.UUID, service: ConfigService) -> CameraConfigRead:
+    return await service.get(camera_id)
+
+
+@router.put("/{camera_id}/config", response_model=CameraConfigRead, responses=NOT_FOUND)
+async def replace_config(
+    camera_id: uuid.UUID, body: CameraConfigOverrides, service: ConfigService
+) -> CameraConfigRead:
+    return await service.replace(camera_id, body)

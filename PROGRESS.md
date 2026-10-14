@@ -4,9 +4,46 @@
 
 ## Текущий этап
 
-**Milestone 3 — камеры: выполнен.** Следующий — Milestone 4 (детекция людей и визуализация).
+**Milestone 4 — детекция людей и визуализация: выполнен.** Следующий — Milestone 5 (person tracking).
+
+Реализация заново восстановлена на базе присланного архива Milestone 3 после утраты предыдущего рабочего окружения. Это не побайтовое восстановление незавершённой сессии: использованы сохранённые архитектурные документы, ADR и доступный контекст. Исходный `AI_DETECTOR_v2_MASTER_PROMPT.md` в архиве отсутствовал.
 
 ## Сделано
+
+### Milestone 4 — детекция людей и визуализация
+* `PersonDetector`/`PersonDetection`, Ultralytics adapter: YOLO26 nano, только COCO person, боксы в пикселях исходного изображения. Manifest (backend, веса, SHA-256, вход 640, класс, лицензия), явная атомарная загрузка `uv run ai-detector-model` / `make model`, проверка целостности и warmup до HTTP. При ошибке модели/устройства — CRITICAL и exit 1; скачивания и тихого scripted fallback на старте нет.
+* Scripted adapter выбирается по `mock://` и использует тот же сценарий и source timestamp, что и renderer. Реальные и mock-камеры работают одновременно; mock явно помечен «ДЕМО».
+* `InferenceScheduler`: отдельный одиночный executor, справедливая round-robin очередь, индивидуальный target_fps, батч до 4 с ожиданием до 20 мс, только последний кадр камеры. Индивидуальные confidence сохраняются при батчинге. Результаты остановленного run_id отбрасываются.
+* Runtime: processed_fps, inference_ms, detections_count, dropped_frames, отдельная inference_error; DEGRADED при низком FPS более 5 с/ошибке inference, автоматическое восстановление. После 3 ошибочных реальных батчей readiness 503; успешные mock-камеры не скрывают отказ модели.
+* `camera_configs`, миграция `b452b4c88e6b`, GET/PUT `/cameras/{id}/config`: только nullable переопределения FPS/порога, ответы overrides/defaults/effective, в worker-spec — effective. Горячее применение без переподключения; периодическая сверка каждые 30 с исправляет потерянные уведомления.
+* `PreviewHub`: JPEG только для зрителей, пул из двух потоков, не более одного encode на камеру и одного ожидающего сообщения на зрителя. Binary WebSocket-пакет содержит JSON и JPEG одного frame_id/run_id; нет несогласованных рамок. Проверка Origin, таймаут медленного зрителя, очистка даже при отключении во время отсутствия кадров.
+* Frontend: `CameraImageSource`/`WsPreviewSource`, bounded latest-only decode, backoff; отдельное shallow-состояние на камеру, явное освобождение bitmap. Canvas кадров и нормализованных боксов, подписка только для видимой работающей камеры, устаревший кадр помечается. Плитка открывает крупный просмотр `/monitoring/:cameraId`, редактор FPS/порога с наследованием, валидацией, сбросом и сохранением. Трекинг и уникальные посетители не имитируются.
+* Обновлены OpenAPI/TS-типы, README, `.env.example`, Makefile, Docker mount моделей и `.dockerignore` (без host node_modules/venv в контексте), docs и ADR-029…031; ADR-016/028 уточнены. CPU PyTorch и единственная headless-сборка OpenCV; веса и лицензионные сведения включены в передаваемый архив.
+
+## Проверено сейчас — Milestone 4
+
+Окружение: Linux x86_64, Python 3.12.15 (uv), Node 24.14.1, PostgreSQL 17.10, Valkey 9.0.5, CPU. Node в песочнице ниже заявленного в package.json engine >=24.15.0; для своего запуска используйте поддерживаемую версию Node. Реальная модель: Ultralytics 8.4.177, torch 2.14.1+cpu, torchvision 0.29.1+cpu, numpy 2.5.3, OpenCV headless 5.0.0.93.
+
+| Проверка | Результат |
+|---|---|
+| `uv run pytest` | 98 passed, интеграционные исключены; протокол/боксы, fairness, FPS, scripted, целостность модели, горячая конфигурация, деградация/восстановление, отбрасывание результатов старого run_id, готовность при отказе модели, периодическая сверка, WebSocket/очистка без кадров |
+| `uv run pytest -m integration` | 11 passed на настоящих PostgreSQL + Valkey; прежние CRUD/uploads/internal/health и новая конфигурация: defaults, PUT/сброс, валидация, effective в worker-spec, 404 после удаления |
+| `ruff check`, `ruff format --check`, `mypy --strict` | Без ошибок |
+| Frontend lint / format:check / typecheck / test / build | Без ошибок; 46 Vitest-тестов, включая числовую форму, protocol, reconnect и освобождение bitmap |
+| Миграции и `alembic check` | Обе миграции применены с пустой БД; расхождений моделей со схемой нет |
+| `uv lock --check` | Lock согласован; CPU-источники зависимостей разрешаются |
+| Настоящая модель | Warmup и батч 4 на официальном тестовом bus.jpg; person-боксы найдены на каждом кадре |
+| Настоящий видеофайл | MP4 из тестового изображения загружен через API; real inference, JPEG/боксы через Vite WebSocket, 8 последовательных frame_id без дублей; при target_fps=3 наблюдалось около 3 FPS |
+| Горячая конфигурация | Смена FPS/порога не меняет run_id; наследование и сброс проверены через API и UI |
+| Нагрузка 8 камер | 6 file + 2 mock, CPU: все получают обработку (~1.56–1.57 FPS на этой машине), все корректно DEGRADED, readiness остаётся ready. Это smoke-проверка fairness, не обещание производительности |
+| SIGTERM с открытым WebSocket | Обновлённый worker завершился примерно за 0.4 с, статусы и heartbeat `ad:*` удалены |
+| Fail-fast | Несуществующий манифест → exit 1 до открытия HTTP; неправильный SHA-256 и отсутствующие веса дополнительно проверены unit-тестами |
+| UI, локальный Chromium/Playwright | Реальные и mock-кадры с рамками; focus, числовая валидация, сохранение и сброс, stop/start, светлая/тёмная темы, 390px без горизонтального overflow, pageerror отсутствуют |
+| `npm audit` | Production: 0 уязвимостей; полный audit: прежние 4 high в dev-цепочке eslint-config → fast-glob → micromatch → braces |
+
+Скриншоты проверенного UI — `docs/qa/`. Видео для smoke-теста создано из статичного тестового изображения: это не проверка качества на реальном движущемся CCTV-потоке.
+
+## История предыдущих этапов (из исходного архива)
 
 ### Milestone 1 — архитектура (подтверждено человеком)
 * Документы `docs/architecture.md`, `data-flow.md`, `database.md`, `behavior.md`, ADR-001…021.
@@ -29,7 +66,7 @@
 * `Makefile` + эквиваленты PowerShell (`docs/development.md`), `.env.example`, CI (`.github/workflows/ci.yml`), `docs/api.md`.
 * ADR-022 (TypeScript 5.9), ADR-023 (HTTP worker'а на FastAPI).
 
-## Проверено (Milestone 3; песочница агента: Linux x86_64, Python 3.12.15, Node 24.14.1, CPU, без Docker)
+## Проверено ранее по полученному архиву (Milestone 3; песочница агента: Linux x86_64, Python 3.12.15, Node 24.14.1, CPU, без Docker)
 
 | Проверка | Результат |
 |---|---|
@@ -48,17 +85,19 @@
 
 Milestone 2 проверки (health, отключение Redis, шаги Dockerfile) не повторялись целиком; health-тесты входят в `pytest`.
 
-## Не проверено и почему
+## Ограничения и что не проверено сейчас
 
 * `docker compose build/up` и CI на GitHub — в песочнице нет Docker и GitHub Actions; YAML только распарсен. Общий том `uploads` и `API_BASE_URL=http://api:8000` в compose не проверены в контейнерах.
-* Настоящая IP-камера не подключалась (нет оборудования); RTSP проверен только через MediaMTX локально.
+* В восстановленной сессии реальная IP-камера/RTSP не подключались. Ранее в Milestone 3 по архиву RTSP проверялся через MediaMTX; это не повторная проверка текущей версии.
 * RTSP с потерями пакетов/высокой задержкой и камеры с H.265 не проверялись.
 * Интеграционные тесты шли на PostgreSQL 17 и Valkey 9, а в compose/CI — `postgres:18-alpine` и `redis:8.8-alpine`.
-* Windows не проверялся (нет машины).
+* Windows, CUDA/GPU, ONNX и WebRTC не проверялись/не реализованы на этом этапе.
+* Качество детекции на пользовательских CCTV-данных не оценивалось. Восемь камер на CPU не достигают целевых 10 FPS — нужна настройка FPS/железа; GPU-оптимизация — позднее.
+* Авторизации оператора нет: нельзя открывать API/worker в публичный Интернет. AGPL-3.0 модели/Ultralytics нужно учитывать перед внедрением.
 
 ## Версии
 
-Проверены по PyPI/npm/Docker Hub на 2026-10-08 и зафиксированы в `uv.lock` и `frontend/package-lock.json`. Исключение — TypeScript 5.9 вместо 7.0 ([ADR-022](docs/decisions/ADR-022-typescript-version.md)).
+Базовые зависимости были зафиксированы в исходном архиве на 2026-10-08. Восстановление Milestone 4 обновило `uv.lock` для inference; фактически проверенные версии перечислены выше. Frontend lock сохранён из исходного архива. Исключение — TypeScript 5.9 вместо 7.0 ([ADR-022](docs/decisions/ADR-022-typescript-version.md)).
 
 ## Ключевые решения
 
@@ -78,4 +117,4 @@ Milestone 2 проверки (health, отключение Redis, шаги Docke
 
 ## Следующий шаг
 
-Milestone 4 — детекция людей: `PersonDetector` (Ultralytics, класс person), scheduler с `target_fps` и батчингом, таблица `camera_configs` ([ADR-026](docs/decisions/ADR-026-camera-configs-deferred.md)), `scripted`-детектор для mock-сцен, превью JPEG + боксы по WebSocket, `/health/ready` worker'а с признаком загруженной модели.
+Milestone 5 — person tracking: интерфейс `PersonTracker`, ByteTrack adapter, registry и track_id в пределах камеры/run_id, update на каждом обработанном кадре (включая пустые детекции), сброс при discontinuity, отрисовка track ID. Зоны/линии/события пока не добавлять раньше своих этапов.

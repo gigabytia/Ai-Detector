@@ -2,32 +2,49 @@
 
 import uuid
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ai_detector_core.cameras.config import CameraConfig
 from ai_detector_core.cameras.source import SourceType
 from ai_detector_core.cameras.spec import CameraSpec
+from app.application.camera_config_service import config_overrides
 from app.application.errors import CameraNotFoundError
-from app.infrastructure.database.models import CameraModel
+from app.infrastructure.database.models import CameraConfigModel, CameraModel
 from app.infrastructure.database.repositories.cameras import CameraRepository
 
 
-def to_spec(camera: CameraModel) -> CameraSpec:
+def to_spec(camera: CameraModel, config: CameraConfig) -> CameraSpec:
     return CameraSpec(
         id=camera.id,
         name=camera.name,
         source_type=SourceType(camera.source_type),
         source_url=camera.source_url,
         enabled=camera.enabled,
+        config=config,
     )
 
 
 class WorkerSpecService:
-    def __init__(self, repository: CameraRepository) -> None:
+    def __init__(
+        self, repository: CameraRepository, session: AsyncSession, defaults: CameraConfig
+    ) -> None:
         self._repo = repository
+        self._session = session
+        self._defaults = defaults
+
+    async def _config(self, camera_id: uuid.UUID) -> CameraConfig:
+        return config_overrides(await self._session.get(CameraConfigModel, camera_id)).resolve(
+            self._defaults
+        )
 
     async def enabled_specs(self) -> list[CameraSpec]:
-        return [to_spec(camera) for camera in await self._repo.list_enabled()]
+        return [
+            to_spec(camera, await self._config(camera.id))
+            for camera in await self._repo.list_enabled()
+        ]
 
     async def spec(self, camera_id: uuid.UUID) -> CameraSpec:
         camera = await self._repo.get_active(camera_id)
         if camera is None:
             raise CameraNotFoundError
-        return to_spec(camera)
+        return to_spec(camera, await self._config(camera.id))

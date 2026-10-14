@@ -6,6 +6,8 @@ from typing import Annotated
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai_detector_core.cameras.config import CameraConfig
+from app.application.camera_config_service import CameraConfigService
 from app.application.camera_service import CameraService
 from app.application.system_service import SystemService
 from app.application.worker_spec_service import WorkerSpecService
@@ -45,5 +47,18 @@ def get_camera_service(resources: Resources, session: Session) -> CameraService:
     )
 
 
-def get_worker_spec_service(session: Session) -> WorkerSpecService:
-    return WorkerSpecService(CameraRepository(session))
+def get_config_defaults(resources: Resources) -> CameraConfig:
+    return CameraConfig(
+        target_fps=resources.settings.target_fps,
+        detection_confidence=resources.settings.detection_confidence,
+    )
+
+
+def get_camera_config_service(resources: Resources, session: Session) -> CameraConfigService:
+    return CameraConfigService(
+        session, RedisCommandPublisher(resources.redis), get_config_defaults(resources)
+    )
+
+
+def get_worker_spec_service(resources: Resources, session: Session) -> WorkerSpecService:
+    return WorkerSpecService(CameraRepository(session), session, get_config_defaults(resources))

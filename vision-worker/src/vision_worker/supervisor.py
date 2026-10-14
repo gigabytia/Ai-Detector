@@ -11,6 +11,8 @@ from vision_worker.cameras.manager import CameraManager
 from vision_worker.messaging.camera_status import CameraStatusPublisher
 from vision_worker.messaging.commands import CommandListener
 from vision_worker.messaging.heartbeat import HeartbeatPublisher
+from vision_worker.pipeline.preview import PreviewHub
+from vision_worker.pipeline.scheduler import InferenceScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,13 @@ class Supervisor:
         manager: CameraManager,
         commands: CommandListener,
         camera_status: CameraStatusPublisher,
+        scheduler: InferenceScheduler,
+        preview: PreviewHub,
+        detector_info: dict[str, str],
     ) -> None:
+        self.scheduler = scheduler
+        self.preview = preview
+        self.detector_info = detector_info
         self._redis = redis
         self._api_http = api_http
         self._heartbeat = heartbeat
@@ -47,6 +55,7 @@ class Supervisor:
     async def start(self) -> None:
         self._stop.clear()
         loops: dict[str, Loop] = {
+            "inference": self.scheduler.run,
             "heartbeat": self._heartbeat.run,
             "commands": self._commands.run,
             "camera-status": self._camera_status.run,
@@ -63,6 +72,7 @@ class Supervisor:
         await asyncio.gather(*self._tasks, return_exceptions=True)
         self._tasks.clear()
         await self._manager.stop_all()
+        await self.preview.close()
         await self._camera_status.publish_once()  # deletes status keys of stopped cameras
         await self._heartbeat.withdraw()
         await self._api_http.aclose()

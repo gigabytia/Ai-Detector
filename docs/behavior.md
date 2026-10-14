@@ -8,15 +8,14 @@
 
 | Параметр | Default | Где применяется |
 |---|---|---|
-| `TARGET_FPS` (камера) | 10 **[агент]** | частота обработки кадров камеры |
-| `DETECTOR_BACKEND` | `ultralytics` | `ultralytics` \| `onnx` \| `scripted` (mock/тесты) |
-| `MODEL_PERSON_PATH` | `models/person-detector/…` | файл модели класса nano |
+| `TARGET_FPS` (камера) | 10 **[агент]** | частота обработки, 1–30; умолчание API и переопределение камеры |
+| `MODEL_MANIFEST_PATH` | `models/person-detector/manifest.yaml` | модель, SHA-256, класс person, размер входа |
 | `INFERENCE_DEVICE` | `auto` | `auto` \| `cpu` \| `cuda`; `auto` = CUDA при наличии, иначе CPU |
 | `INFERENCE_BATCH_SIZE` | 4 **[агент]** | максимум кадров в батче |
 | `INFERENCE_MAX_WAIT_MS` | 20 **[агент]** | ожидание добора батча |
 | `DETECTION_CONFIDENCE` (камера) | 0.25 | порог детектора |
 | `DETECTION_IOU` | 0.45 | NMS |
-| `DETECTION_INPUT_SIZE` | 640 | вход модели |
+| `INFERENCE_THREADS` | 2 | CPU-потоки PyTorch; размер входа — из манифеста (`input_size=640`) |
 | `PERSON_TRACK_MAX_AGE` | 25 | кадров без совпадения до удаления трека |
 | `TRACK_MATCH_IOU` | 0.5 | порог IoU сопоставления |
 | `TRACK_ACTIVATION_CONFIDENCE` | 0.25 | минимум confidence для нового трека |
@@ -39,7 +38,7 @@
 | `WORKER_OUTBOX_MAX_ITEMS` | 10000 **[агент]** | буфер сообщений при недоступном Redis |
 | `TEST_MODE` | false | фиксированные часы и сценарии (§181) |
 
-Константы кода (не настраиваются в MVP, при необходимости вынесем): DEGRADED при `fps_processed < 0.8 × TARGET_FPS` дольше 5 с; TTL статуса 5 с; пакет аналитики раз в 10 с; JPEG quality 80.
+Константы кода (не настраиваются в MVP, при необходимости вынесем): DEGRADED при `processed_fps < 0.8 × min(TARGET_FPS, FPS источника)` дольше 5 с либо при ошибке inference; автоматическое восстановление при нормализации; TTL статуса 5 с; пакет аналитики раз в 10 с; JPEG quality 80.
 
 ## 2. Точка человека и координаты
 

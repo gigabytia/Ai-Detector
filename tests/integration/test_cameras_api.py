@@ -30,7 +30,7 @@ MOCK = {"name": "Склад", "source_type": "mock", "source_url": "mock://walk_
 async def _truncate(url: str) -> None:
     engine = create_async_engine(url)
     async with engine.begin() as conn:
-        await conn.execute(text("TRUNCATE cameras"))
+        await conn.execute(text("TRUNCATE camera_configs, cameras"))
     await engine.dispose()
 
 
@@ -158,3 +158,29 @@ def test_internal_worker_api_requires_token(client: TestClient) -> None:
     client.delete(f"/api/v1/cameras/{enabled['id']}")
     gone = client.get(f"/api/v1/internal/worker/cameras/{enabled['id']}", headers=AUTH)
     assert gone.status_code == 404
+
+
+def test_detection_config_defaults_replace_reset_and_spec(
+    client: TestClient, commands: redis.client.PubSub
+) -> None:
+    camera_id = client.post("/api/v1/cameras", json=MOCK).json()["id"]
+    url = f"/api/v1/cameras/{camera_id}/config"
+    config = client.get(url).json()
+    assert config["overrides"] == {"target_fps": None, "detection_confidence": None}
+    assert config["effective"] == config["defaults"]
+    saved = client.put(url, json={"target_fps": 3, "detection_confidence": 0.8})
+    assert saved.status_code == 200
+    assert saved.json()["effective"] == {"target_fps": 3, "detection_confidence": 0.8}
+    assert next_command(commands)["type"] == "camera.changed"
+    spec = client.get(f"/api/v1/internal/worker/cameras/{camera_id}", headers=AUTH)
+    assert spec.status_code == 200
+    assert spec.json()["config"] == saved.json()["effective"]
+    # PUT replaces, not patches: omitted threshold is inherited again.
+    saved = client.put(url, json={"target_fps": 4}).json()
+    assert saved["overrides"]["detection_confidence"] is None
+    assert client.put(url, json={}).json()["effective"] == config["defaults"]
+    assert client.put(url, json={"target_fps": 31}).status_code == 422
+    assert client.put(url, json={"detection_confidence": 0}).status_code == 422
+    client.delete(f"/api/v1/cameras/{camera_id}")
+    assert client.get(url).status_code == 404
+    assert client.put(url, json={}).status_code == 404

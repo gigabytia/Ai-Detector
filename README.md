@@ -2,7 +2,7 @@
 
 Система видеонаблюдения: детекция и трекинг **людей**, события входа в опасную зону, пересечения линии и долгого нахождения в зоне, интерфейс оператора.
 
-**Статус:** Milestone 3 — камеры: видеофайл, RTSP и демо-сцены; добавление, запуск, остановка, перезапуск, удаление; статус камер в UI. Детекции людей и событий пока нет. Подробности — [PROGRESS.md](PROGRESS.md).
+**Статус:** Milestone 4 — детекция людей: YOLO nano для видеофайлов/RTSP, детерминированные демо-сцены, живое видео с рамками, настройки FPS/порога на камеру. Трекинг, зоны и события — следующие этапы. Подробности — [PROGRESS.md](PROGRESS.md).
 
 ## Архитектура
 
@@ -13,6 +13,7 @@ Frontend (Vue 3) ↔ API (FastAPI) ↔ PostgreSQL / Redis ↔ Vision worker. Inf
 ```powershell
 Copy-Item .env.example .env        # bash: cp .env.example .env
 uv sync; npm --prefix frontend ci
+uv run ai-detector-model           # скачать и проверить веса; можно не выполнять, если веса уже есть
 docker compose up -d postgres redis
 uv run alembic -c backend/alembic.ini upgrade head
 uv run ai-detector-seed           # демо-камеры
@@ -20,7 +21,7 @@ uv run ai-detector-api             # терминал 1
 uv run ai-detector-worker          # терминал 2
 npm --prefix frontend run dev      # терминал 3 → http://localhost:5173
 ```
-Или всё в Docker: `docker compose up --build` → http://localhost:8080.
+Или всё в Docker: подготовьте веса (`uv sync; uv run ai-detector-model`), затем `docker compose up --build` → http://localhost:8080. Каталог `models` подключается к worker в режиме чтения; без проверенных весов worker завершится с кодом 1. API-контейнер при старте сам выполняет `alembic upgrade head`; для ручного запуска миграций: `docker compose run --rm api alembic upgrade head`.
 
 ## Окружение и команды
 
@@ -28,6 +29,8 @@ npm --prefix frontend run dev      # терминал 3 → http://localhost:517
 
 ## Камеры
 
-Источники: локальный видеофайл (загружается через UI, играет по кругу в реальном темпе), RTSP-камера, демо-сцена без камеры (`mock://walk_through`, `mock://two_people`). Как подключить свой `.mp4` и проверить RTSP без камеры — [docs/development.md](docs/development.md#пример-видео-108). Модели детекции появятся в Milestone 4.
+Источники: локальный видеофайл (загружается через UI, играет по кругу в реальном темпе), RTSP-камера, демо-сцена без камеры (`mock://walk_through`, `mock://two_people`). Как подключить свой `.mp4` и проверить RTSP без камеры — [docs/development.md](docs/development.md#пример-видео-108). Для mock-камер детекции берутся из сценария (маркировка «ДЕМО»); для файла/RTSP работает настоящая модель. Плитка открывает крупный просмотр и настройки. Рамки рисуются на canvas, число людей — число детекций текущего кадра, не уникальных посетителей. Трекинга и track ID пока нет.
 
-Техническое задание: [AI_DETECTOR_v2_MASTER_PROMPT.md](AI_DETECTOR_v2_MASTER_PROMPT.md).
+Модель `yolo26n` и Ultralytics: AGPL-3.0; перед production-использованием проверьте лицензионные требования ([ADR-006](docs/decisions/ADR-006-inference-runtime.md)).
+
+Стенд предназначен для локальной доверенной сети: аутентификации оператора пока нет. Не выставляйте API/worker напрямую в Интернет. Исходный `AI_DETECTOR_v2_MASTER_PROMPT.md` не входил в присланный архив; восстановление опирается на сохранённые архитектурные документы и контекст сессии.

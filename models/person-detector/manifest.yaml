@@ -1,0 +1,8 @@
+name: yolo26n-coco
+backend: ultralytics
+weights: yolo26n.pt
+sha256: 9b09cc8bf347f0fc8a5f7657480587f25db09b34bf33b0652110fb03a8ad4fef
+download_url: https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26n.pt
+input_size: 640
+person_class_id: 0
+license: AGPL-3.0

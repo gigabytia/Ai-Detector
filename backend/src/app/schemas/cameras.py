@@ -44,6 +44,11 @@ class CameraUpdate(BaseModel):
 
 class CameraRuntimeRead(BaseModel):
     status: CameraStatus
+    processed_fps: float
+    inference_ms: float | None
+    detections_count: int
+    dropped_frames: int
+    inference_error: str | None
     capture_fps: float
     frame_size: tuple[int, int] | None
     last_frame_at: AwareDatetime | None
@@ -58,6 +63,11 @@ class CameraRuntimeRead(BaseModel):
         return cls(
             status=status.status,
             capture_fps=status.capture_fps,
+            processed_fps=status.processed_fps,
+            inference_ms=status.inference_ms,
+            detections_count=status.detections_count,
+            dropped_frames=status.dropped_frames,
+            inference_error=status.inference_error,
             frame_size=status.frame_size,
             last_frame_at=status.last_frame_at,
             last_error=status.last_error,

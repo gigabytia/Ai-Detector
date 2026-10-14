@@ -2,6 +2,7 @@
 
 import logging
 import threading
+import time
 import uuid
 from datetime import datetime
 
@@ -13,6 +14,7 @@ from vision_worker.cameras.metrics import RateMeter
 from vision_worker.cameras.reconnect import Backoff, BackoffPolicy
 from vision_worker.cameras.source import FrameSource, SourceFatalError, SourceUnavailableError
 from vision_worker.pipeline.frame_buffer import LatestFrameBuffer
+from vision_worker.pipeline.results import DetectionResult
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,10 @@ class CameraSession:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._rate = RateMeter()
+        self._processed_rate = RateMeter()
+        self._result: DetectionResult | None = None
+        self._inference_error: str | None = None
+        self._low_fps_since: float | None = None
         self._lock = threading.Lock()
         self._frame_size: tuple[int, int] | None = None
         self._last_frame_at: datetime | None = None
@@ -52,6 +58,37 @@ class CameraSession:
     @property
     def state(self) -> CameraStatus:
         return self._lifecycle.state
+
+    def record_result(self, result: DetectionResult) -> None:
+        with self._lock:
+            self._result = result
+            self._processed_rate.tick()
+            self._inference_error = None
+        self.check_performance()
+
+    def record_inference_error(self, error: Exception) -> None:
+        with self._lock:
+            self._inference_error = str(error) or type(error).__name__
+        self._lifecycle.try_transition(CameraStatus.DEGRADED)
+
+    def check_performance(self) -> None:
+        if self.state not in (CameraStatus.RUNNING, CameraStatus.DEGRADED):
+            return
+        now = time.monotonic()
+        with self._lock:
+            target = min(
+                self.spec.config.target_fps, self._rate.rate() or self.spec.config.target_fps
+            )
+            low = self._processed_rate.rate() < 0.8 * target
+            if low:
+                if self._low_fps_since is None:
+                    self._low_fps_since = now
+            else:
+                self._low_fps_since = None
+            degraded = self._inference_error is not None or (
+                self._low_fps_since is not None and now - self._low_fps_since >= 5
+            )
+        self._lifecycle.try_transition(CameraStatus.DEGRADED if degraded else CameraStatus.RUNNING)
 
     def start(self) -> None:
         self._lifecycle.transition(CameraStatus.STARTING)
@@ -81,6 +118,11 @@ class CameraSession:
                 worker_id=self._worker_id,
                 status=self._lifecycle.state,
                 capture_fps=round(self._rate.rate(), 2),
+                processed_fps=round(self._processed_rate.rate(), 2),
+                inference_ms=round(self._result.inference_ms, 2) if self._result else None,
+                detections_count=len(self._result.detections) if self._result else 0,
+                dropped_frames=self.buffer.dropped,
+                inference_error=self._inference_error,
                 frame_size=self._frame_size,
                 last_frame_at=self._last_frame_at,
                 last_error=self._last_error,
@@ -117,8 +159,8 @@ class CameraSession:
                 if self._lifecycle.try_transition(CameraStatus.RUNNING):
                     logger.info("camera running", extra=self._log_extra())
             self.buffer.put(frame)
-            self._rate.tick()
             with self._lock:
+                self._rate.tick()
                 self._frame_size = frame.size
                 self._last_frame_at = frame.captured_at
                 self._last_error = None

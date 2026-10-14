@@ -15,6 +15,11 @@ const routes: RouteRecordRaw[] = [
     name: 'monitoring',
     component: () => import('@/views/MonitoringView.vue'),
   },
+  {
+    path: '/monitoring/:cameraId',
+    name: 'camera-focus',
+    component: () => import('@/views/CameraFocusView.vue'),
+  },
   { path: '/events', name: 'events', component: () => import('@/views/EventsView.vue') },
   { path: '/analytics', name: 'analytics', component: () => import('@/views/AnalyticsView.vue') },
   { path: '/cameras', name: 'cameras', component: () => import('@/views/CamerasView.vue') },

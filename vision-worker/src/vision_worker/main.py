@@ -14,15 +14,25 @@ from vision_worker.cameras.reconnect import BackoffPolicy
 from vision_worker.cameras.spec_client import CameraSpecClient, create_api_http_client
 from vision_worker.config import WorkerSettings, get_settings
 from vision_worker.http.app import create_http_app
+from vision_worker.inference.adapters.ultralytics import UltralyticsPersonDetector
 from vision_worker.messaging.camera_status import CameraStatusPublisher
 from vision_worker.messaging.commands import CommandListener
 from vision_worker.messaging.heartbeat import HeartbeatPublisher
+from vision_worker.pipeline.preview import PreviewHub
+from vision_worker.pipeline.scheduler import InferenceScheduler
 from vision_worker.supervisor import Supervisor
 
 logger = logging.getLogger(__name__)
 
 
 def build_supervisor(settings: WorkerSettings) -> Supervisor:
+    # Must complete before HTTP startup. Never auto-download weights or fall back to scripted.
+    detector = UltralyticsPersonDetector(
+        settings.model_manifest_path,
+        settings.inference_device,
+        settings.detection_iou,
+        settings.inference_threads,
+    )
     clock = SystemClock()
     redis = Redis.from_url(str(settings.redis_url), socket_connect_timeout=2, socket_timeout=5)
     backoff = BackoffPolicy(
@@ -41,7 +51,21 @@ def build_supervisor(settings: WorkerSettings) -> Supervisor:
             clock=clock,
         )
     )
+    preview = PreviewHub(settings.preview_fps, settings.preview_max_width)
     return Supervisor(
+        scheduler=InferenceScheduler(
+            manager,
+            detector,
+            preview,
+            settings.inference_batch_size,
+            settings.inference_max_wait_ms,
+        ),
+        preview=preview,
+        detector_info={
+            "backend": "ultralytics",
+            "model": detector.manifest.name,
+            "device": detector.device,
+        },
         redis=redis,
         api_http=api_http,
         heartbeat=HeartbeatPublisher(
@@ -49,7 +73,11 @@ def build_supervisor(settings: WorkerSettings) -> Supervisor:
         ),
         manager=manager,
         commands=CommandListener(
-            redis=redis, specs=CameraSpecClient(api_http), manager=manager, retry=backoff
+            redis=redis,
+            specs=CameraSpecClient(api_http),
+            manager=manager,
+            retry=backoff,
+            reconcile_interval_seconds=settings.reconcile_interval_seconds,
         ),
         camera_status=CameraStatusPublisher(
             redis=redis, statuses=lambda: [s.status() for s in manager.sessions]
@@ -60,7 +88,12 @@ def build_supervisor(settings: WorkerSettings) -> Supervisor:
 def run() -> None:
     settings = get_settings()
     configure_json_logging(service="vision-worker", level=settings.log_level)
-    app = create_http_app(build_supervisor(settings))
+    try:
+        supervisor = build_supervisor(settings)
+    except Exception:
+        logger.critical("person detector not loaded; worker cannot start", exc_info=True)
+        raise SystemExit(1) from None
+    app = create_http_app(supervisor, settings.preview_allowed_origins)
     uvicorn.run(
         app, host=settings.worker_http_host, port=settings.worker_http_port, log_config=None
     )

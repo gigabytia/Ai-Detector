@@ -89,5 +89,24 @@
 | Запрос | Ответ |
 |---|---|
 | `GET /health/live` | `200 {"status":"alive"}` |
-| `GET /health/ready` | `200`/`503`: `{"status":"ready","redis_ok":true,"last_heartbeat_at":"…"}`. С Milestone 4 добавится «модель загружена». |
+| `GET /health/ready` | `200`/`503`: `status`, `redis_ok`, `last_heartbeat_at`, `detector_loaded`, `detector` (backend/model/device). |
 | `GET /status` | runtime-статусы камер этого worker'а (как `runtime` выше, плюс `camera_id`, `run_id`) — для отладки |
+
+
+## Детекция и настройки камеры (Milestone 4)
+
+* `GET /api/v1/cameras/{id}/config` → `{overrides, defaults, effective}`. Каждая часть содержит `target_fps`, `detection_confidence`; только overrides допускает null.
+* `PUT /api/v1/cameras/{id}/config` → тот же ответ. Полная замена: `{}` сбрасывает переопределения. FPS 1–30, confidence >0 и ≤1; лишние поля/ошибочные значения → 422, удалённая/неизвестная камера → 404. Настройки действуют без смены `run_id` и переподключения к источнику.
+* Внутренний `CameraSpec` содержит effective `config`; учётные данные источника не выдаются в публичном API.
+* Runtime камеры дополнен `processed_fps`, `inference_ms` (время батча / количество реальных кадров, мс), `detections_count`, `dropped_frames` (заменённые в latest-frame буфере), `inference_error` (технический текст, UI показывает безопасное объяснение).
+* Worker `GET /health/ready` дополнен `detector_loaded` и `detector: {backend, model, device}`. Готовность требует Redis, живого inference loop и отсутствия серии из трёх подряд ошибочных реальных батчей. Ошибка загрузки модели завершается до запуска HTTP.
+
+### WebSocket превью, версия 1
+
+Браузер: `/live/cameras/{UUID}/preview`; напрямую worker: `/cameras/{UUID}/preview`. nginx/Vite удаляют `/live`. Никакого видео через API/Redis/PostgreSQL.
+
+Каждое binary-сообщение — **один согласованный кадр**: 4 байта unsigned big-endian (длина JSON), JSON UTF-8, затем JPEG. JSON: `version=1`, `camera_id`, `run_id`, `frame_id`, `source_ts_ms`, `captured_at` (UTC), `width`, `height` (исходное разрешение), `inference_ms`, `detections: [{bbox:[x1,y1,x2,y2],confidence}]`. Bbox нормализован 0…1, JPEG уменьшен максимум до `PREVIEW_MAX_WIDTH`, без увеличения маленького кадра. Пустой массив детекций — нормальный результат.
+
+Только открытые зрители вызывают JPEG-кодирование; частота не выше `PREVIEW_FPS` и частоты обработанных кадров. На камеру не более одного кодирования; на зрителя очередь 1 (latest-only), медленная отправка ограничена 2 с. Остановка/смена сессии закрывает сокет. UI переподключается с backoff 0.5…8 с, не рисует старые рамки на новом кадре, освобождает ImageBitmap и помечает кадр устаревшим через 3 с. Плитки вне viewport не подписываются.
+
+Неизвестная камера или запрещённый Origin → close 1008. Разрешены same-origin и `PREVIEW_ALLOWED_ORIGINS` (JSON-массив). Это защита границы браузера, не авторизация: доступ только в доверенной локальной сети. Авторизация оператора не реализована.

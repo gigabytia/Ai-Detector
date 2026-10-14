@@ -13,10 +13,15 @@ dependencies = [
     "opencv-python-headless>=5.0.0.93",
     "numpy>=2.5.3",
     "httpx>=0.28.1",
+    "ultralytics>=8.4.174",
+    "torch>=2.9",
+    "torchvision>=0.24",
+    "pyyaml>=6.0",
 ]
 
 [project.scripts]
 ai-detector-worker = "vision_worker.main:run"
+ai-detector-model = "vision_worker.inference.fetch:run"
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]
@@ -27,3 +32,6 @@ module-name = "vision_worker"
 
 [tool.uv.sources]
 ai-detector-shared = { workspace = true }
+
+torch = { index = "pytorch-cpu", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }
+torchvision = { index = "pytorch-cpu", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }

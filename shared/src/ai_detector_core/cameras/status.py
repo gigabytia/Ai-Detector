@@ -25,6 +25,11 @@ class CameraRuntimeStatus(BaseModel):
     worker_id: str
     status: CameraStatus
     capture_fps: float = Field(ge=0)
+    processed_fps: float = Field(default=0, ge=0)
+    inference_ms: float | None = Field(default=None, ge=0)
+    detections_count: int = Field(default=0, ge=0)
+    dropped_frames: int = Field(default=0, ge=0)
+    inference_error: str | None = None
     frame_size: tuple[int, int] | None
     last_frame_at: AwareDatetime | None
     last_error: str | None

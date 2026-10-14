@@ -22,7 +22,7 @@ function isErrorResponse(value: unknown): value is ErrorResponse {
   )
 }
 
-type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE'
+type Method = 'GET' | 'PUT' | 'POST' | 'PATCH' | 'DELETE'
 
 /**
  * Call the API. A plain object body is sent as JSON, FormData as multipart.

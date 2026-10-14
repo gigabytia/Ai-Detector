@@ -35,3 +35,16 @@ export function uploadVideo(file: File): Promise<Upload> {
   form.append('file', file)
   return apiRequest<Upload>('POST', '/api/v1/uploads', { body: form })
 }
+
+export type CameraConfig = components['schemas']['CameraConfig']
+export type CameraConfigOverrides = components['schemas']['CameraConfigOverrides']
+export type CameraConfigRead = components['schemas']['CameraConfigRead']
+export function fetchCameraConfig(id: string, signal?: AbortSignal): Promise<CameraConfigRead> {
+  return apiGet<CameraConfigRead>(`/api/v1/cameras/${id}/config`, { signal })
+}
+export function saveCameraConfig(
+  id: string,
+  body: CameraConfigOverrides,
+): Promise<CameraConfigRead> {
+  return apiRequest<CameraConfigRead>('PUT', `/api/v1/cameras/${id}/config`, { body })
+}
