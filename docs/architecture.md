@@ -1,6 +1,6 @@
 # Архитектура AI Detector v2
 
-> Текущий реализованный объём — камеры, детекция и превью (Milestone 4). Документ также описывает целевую архитектуру следующих этапов; трекинг, зоны, события, аналитика и SSE пока не реализованы. Подробный текущий состав — в конце документа и PROGRESS.md.
+> Реализованы камеры, детекция, ByteTrack, preview, CRUD/редактор опасной зоны и генерация события входа (Milestone 6). Документ также содержит целевую архитектуру: доставка/хранение событий, SSE/телеметрия — M7, snapshot — M8, линии/loitering/аналитика — позже. Подробный текущий состав — в конце документа и PROGRESS.md.
 
 Система видеонаблюдения: находит **людей** на видеопотоках, отслеживает их (track ID внутри камеры) и сообщает оператору о входе в опасную зону, пересечении линии и долгом нахождении в зоне. Объекты, перенос груза и pose estimation в эту версию не входят (ТЗ §2, §27).
 
@@ -202,4 +202,12 @@ class EventRule(Protocol):
 * `DetectionResult.tracks` — immutable snapshot именно этого кадра. Preview v1 дополнен `tracks`; canvas подписывает подтверждённые детекции ID, не рисует LOST. Детекции-кандидаты пока без ID.
 * Параметры worker'а: `PERSON_TRACK_MAX_AGE`, `TRACK_MATCH_IOU`, `TRACK_ACTIVATION_CONFIDENCE`; конкретная семантика — [ADR-032](decisions/ADR-032-bytetrack-runtime.md).
 
-Зоны/линии/события, запись track sessions, аналитика и уникальные посетители ещё не подключены. ONNX/WebRTC — дальнейшие adapters, не заглушки работающей функции.
+В M5 зоны и события ещё не подключались; текущая реализация M6 описана ниже. Линии, запись track sessions, аналитика и уникальные посетители пока отсутствуют. ONNX/WebRTC — дальнейшие adapters, не заглушки работающей функции.
+
+## Milestone 6: опасная зона
+
+* `shared/zones/{model,geometry}.py`: immutable ZoneShape/ZoneSpec, валидация простого нормализованного polygon и point-in-polygon с включённой границей. `shared/events/domain.py`: типизированное событие входа; PersonState дополнен IN_DANGER_ZONE.
+* API: ZoneService/ZoneRepository/ZoneModel, camera-scoped CRUD и миграция c631d038af01; CameraSpec включает зоны и effective интервалы. Worker не обращается к PostgreSQL.
+* `rules/{zone_engine,registry}.py`: membership/dwell/grace/confidence/cooldown в одиночном inference executor после tracker. DetectionResult содержит tracks/zones/events из одной сцены и кадра; в лог выходят события только актуального run. Preview v1 передаёт enabled zones и состояние треков.
+* Frontend: ZoneEditor с локальным черновиком и REST, SVG overlay над canvas с учётом letterbox, красные рамки IN_DANGER_ZONE. Модель/API и worker выполняют правила; UI только редактирует и отображает.
+* События пока генерируются и логируются, а не пишутся в БД/Redis Stream. Это сознательная граница M6/M7, а не гарантированная доставка. [ADR-033](decisions/ADR-033-danger-zone-runtime.md).

@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 from ai_detector_core.cameras.config import CameraConfig
 from ai_detector_core.cameras.source import SourceType
+from ai_detector_core.zones.model import ZoneSpec
 
 
 class CameraSpec(BaseModel):
@@ -18,3 +19,4 @@ class CameraSpec(BaseModel):
     source_url: str
     enabled: bool
     config: CameraConfig = CameraConfig()
+    zones: tuple[ZoneSpec, ...] = ()

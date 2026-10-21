@@ -130,6 +130,12 @@ bbox нормализован (x1, y1, x2, y2). Уровень 3: видео ч�
 
 `CameraSession` добавляет к Frame устойчивый `source_epoch` → latest-frame buffer → детектор → `TrackerRegistry` / `PersonTracker.update(frame, detections)` в одном inference executor → `DetectionResult(detections, tracks)` → статус камеры и on-demand PreviewHub. Tracker получает пустые детекции на каждом обработанном пустом кадре. При ошибке детектора трекер не получает выдуманный пустой результат. Реестр не копит историю удалённых треков, закрытых камер или старых run.
 
-Preview v1 содержит дополнительный `tracks: [{track_id, bbox, confidence, state, age, hits, missed_frames}]`, bbox нормализован. `LOST` относится к последнему наблюдению и не отрисовывается на текущем JPEG. Браузер сопоставляет подтверждённые NORMAL-треки с детекциями того же пакета, кандидатам не выдумывает ID. Полный текущий wire-контракт — [api.md](api.md#websocket-превью-версия-1); пример с зонами выше описывает целевой последующий этап, не реализованную телеметрию.
+Preview v1 содержит дополнительный `tracks: [{track_id, bbox, confidence, state, age, hits, missed_frames}]`, bbox нормализован. `LOST` относится к последнему наблюдению и не отрисовывается на текущем JPEG. Браузер сопоставляет подтверждённые не-LOST треки с детекциями того же пакета, кандидатам не выдумывает ID. Полный текущий wire-контракт — [api.md](api.md#websocket-превью-версия-1); пример с зонами выше описывает целевой последующий этап, не реализованную телеметрию.
 
 Сброс сцены (loop/reconnect/разрешение) очищает ByteTrack и активные записи, сохраняя возрастающий публичный ID внутри run. Stop/restart/delete удаляет tracker экземпляр; новый run имеет собственную нумерацию. EventEngine, ingest, track sessions и аналитика в схемах выше остаются планом дальнейших milestone.
+
+## Milestone 6: фактический путь зоны
+
+REST зоны → PostgreSQL commit → camera.changed → internal CameraSpec (zones + effective config) → CameraSession.spec без reopen. При сборе кадра scheduler фиксирует spec. Детектор → tracker → SceneRegistry/ZoneEngine (тот же executor) → immutable DetectionResult(tracks, zones, events) → log event + preview JPEG/metadata. `zones`/tracks передаются атомарно с кадром; событие не отправляется через preview. SVG overlay использует геометрию этого кадра, черновик редактора только локальный до REST save. Polling камер остаётся раз в 2 с.
+
+Части этого документа про Redis event bus, Stream ingest, SSE, отдельную WS-телеметрию и snapshot — пока целевая схема, не реализация M6. SceneContext как отдельный изменяемый объект не вводился: текущий вход — frozen CameraSpec и per-run SceneRegistry. Линии ещё не обрабатываются. [ADR-033](decisions/ADR-033-danger-zone-runtime.md).

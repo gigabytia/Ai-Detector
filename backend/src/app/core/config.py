@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # Shared secret for /api/v1/internal/worker/*; internal endpoints answer 503 when unset.
     worker_api_token: SecretStr | None = None
 
+    zone_enter_dwell_seconds: float = Field(default=0.25, ge=0, le=3600)
+    zone_exit_grace_seconds: float = Field(default=0.5, ge=0, le=3600)
+    event_cooldown_seconds: float = Field(default=3, ge=0, le=3600)
     target_fps: float = Field(default=10, ge=1, le=30)
     detection_confidence: float = Field(default=0.25, gt=0, le=1)
     max_cameras: int = Field(default=8, ge=1)

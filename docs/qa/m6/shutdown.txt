@@ -1,0 +1,1 @@
+SIGTERM with active preview: socket closed, runtime/heartbeat keys removed in 0.82s

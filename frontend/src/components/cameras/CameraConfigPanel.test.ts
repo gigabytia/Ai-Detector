@@ -8,10 +8,20 @@ import { i18n } from '@/i18n'
 import CameraConfigPanel from './CameraConfigPanel.vue'
 
 vi.mock('@/api/cameras', () => ({ fetchCameraConfig: vi.fn(), saveCameraConfig: vi.fn() }))
+const timingDefaults = {
+  zone_enter_dwell_seconds: 0.25,
+  zone_exit_grace_seconds: 0.5,
+  event_cooldown_seconds: 3,
+}
+const timingOverrides = {
+  zone_enter_dwell_seconds: null,
+  zone_exit_grace_seconds: null,
+  event_cooldown_seconds: null,
+}
 const config: CameraConfigRead = {
-  overrides: { target_fps: null, detection_confidence: null },
-  defaults: { target_fps: 10, detection_confidence: 0.25 },
-  effective: { target_fps: 10, detection_confidence: 0.25 },
+  overrides: { target_fps: null, detection_confidence: null, ...timingOverrides },
+  defaults: { target_fps: 10, detection_confidence: 0.25, ...timingDefaults },
+  effective: { target_fps: 10, detection_confidence: 0.25, ...timingDefaults },
 }
 let client: QueryClient
 beforeEach(() => {
@@ -23,6 +33,7 @@ beforeEach(() => {
     ...config,
     overrides: body,
     effective: {
+      ...timingDefaults,
       target_fps: body.target_fps ?? 10,
       detection_confidence: body.detection_confidence ?? 0.25,
     },
@@ -45,7 +56,11 @@ it('saves actual number-input values and shows confirmation', async () => {
   await wrapper.get('input[id=confidence-a]').setValue('0.7')
   await wrapper.get('form').trigger('submit')
   await flushPromises()
-  expect(saveCameraConfig).toHaveBeenCalledWith('a', { target_fps: 4, detection_confidence: 0.7 })
+  expect(saveCameraConfig).toHaveBeenCalledWith('a', {
+    target_fps: 4,
+    detection_confidence: 0.7,
+    ...timingOverrides,
+  })
   expect(wrapper.text()).toContain('Настройки сохранены')
   await wrapper.get('input[id=fps-a]').setValue('5')
   expect(wrapper.text()).not.toContain('Настройки сохранены')
@@ -59,6 +74,7 @@ it('sends null overrides for blank inherited values', async () => {
   expect(saveCameraConfig).toHaveBeenCalledWith('a', {
     target_fps: null,
     detection_confidence: null,
+    ...timingOverrides,
   })
   wrapper.unmount()
 })
@@ -70,5 +86,26 @@ it('rejects values outside the domain even on programmatic submit', async () => 
   await flushPromises()
   expect(saveCameraConfig).not.toHaveBeenCalled()
   expect(wrapper.get('[role=alert]').text()).toContain('от 1 до 30')
+  wrapper.unmount()
+})
+
+it('preserves and edits zone timing overrides with detection settings', async () => {
+  vi.mocked(fetchCameraConfig).mockResolvedValue({
+    ...config,
+    overrides: { ...config.overrides, zone_enter_dwell_seconds: 2 },
+  })
+  const wrapper = render()
+  await flushPromises()
+  expect((wrapper.get('#zone_enter_dwell_seconds-a').element as HTMLInputElement).value).toBe('2')
+  await wrapper.get('#event_cooldown_seconds-a').setValue('6')
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
+  expect(saveCameraConfig).toHaveBeenCalledWith('a', {
+    target_fps: null,
+    detection_confidence: null,
+    zone_enter_dwell_seconds: 2,
+    zone_exit_grace_seconds: null,
+    event_cooldown_seconds: 6,
+  })
   wrapper.unmount()
 })

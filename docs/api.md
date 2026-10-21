@@ -15,6 +15,8 @@
 | HTTP | code | Когда |
 |---|---|---|
 | 404 | `CAMERA_NOT_FOUND` | камеры нет или она удалена |
+| 404 | `ZONE_NOT_FOUND` | зона не найдена в указанной камере |
+| 422 | `UNPROCESSABLE` | больше 16 зон на камеру |
 | 409 | `CAMERA_ALREADY_EXISTS` | имя занято не удалённой камерой |
 | 422 | `CAMERA_LIMIT_REACHED` | уже `MAX_CAMERAS` камер |
 | 422 | `INVALID_CAMERA_SOURCE` | URL не подходит к типу или загруженного файла нет |
@@ -95,7 +97,7 @@
 
 ## Детекция и настройки камеры (Milestone 4)
 
-* `GET /api/v1/cameras/{id}/config` → `{overrides, defaults, effective}`. Каждая часть содержит `target_fps`, `detection_confidence`; только overrides допускает null.
+* `GET /api/v1/cameras/{id}/config` → `{overrides, defaults, effective}`. Каждая часть содержит `target_fps`, `detection_confidence` и (M6) `zone_enter_dwell_seconds`, `zone_exit_grace_seconds`, `event_cooldown_seconds`; только overrides допускает null.
 * `PUT /api/v1/cameras/{id}/config` → тот же ответ. Полная замена: `{}` сбрасывает переопределения. FPS 1–30, confidence >0 и ≤1; лишние поля/ошибочные значения → 422, удалённая/неизвестная камера → 404. Настройки действуют без смены `run_id` и переподключения к источнику.
 * Внутренний `CameraSpec` содержит effective `config`; учётные данные источника не выдаются в публичном API.
 * Runtime камеры дополнен `processed_fps`, `inference_ms` (время батча / количество реальных кадров, мс), `detections_count`, `dropped_frames` (заменённые в latest-frame буфере), `inference_error` (технический текст, UI показывает безопасное объяснение).
@@ -105,8 +107,23 @@
 
 Браузер: `/live/cameras/{UUID}/preview`; напрямую worker: `/cameras/{UUID}/preview`. nginx/Vite удаляют `/live`. Никакого видео через API/Redis/PostgreSQL.
 
-Каждое binary-сообщение — **один согласованный кадр**: 4 байта unsigned big-endian (длина JSON), JSON UTF-8, затем JPEG. JSON: `version=1`, `camera_id`, `run_id`, `frame_id`, `source_ts_ms`, `captured_at` (UTC), `width`, `height` (исходное разрешение), `inference_ms`, `detections: [{bbox:[x1,y1,x2,y2],confidence}]`. Bbox нормализован 0…1, JPEG уменьшен максимум до `PREVIEW_MAX_WIDTH`, без увеличения маленького кадра. Пустой массив детекций — нормальный результат. С Milestone 5 дополнительно передаётся `tracks: [{track_id,bbox,confidence,state,age,hits,missed_frames}]`. Состояние — `NORMAL`/`LOST`, `track_id` положителен и уникален только вместе с camera_id/run_id. Bbox нормализован; у LOST — последнее наблюдение, не текущая рамка. `age` — обработанные кадры с подтверждения, `hits` — совпадения, `missed_frames` — последовательные пропуски. Кандидат до подтверждения остаётся в detections без track ID. Поле additive в версии 1: новый frontend принимает также старые пакеты без tracks. REST/OpenAPI не менялся.
+Каждое binary-сообщение — **один согласованный кадр**: 4 байта unsigned big-endian (длина JSON), JSON UTF-8, затем JPEG. JSON: `version=1`, `camera_id`, `run_id`, `frame_id`, `source_ts_ms`, `captured_at` (UTC), `width`, `height` (исходное разрешение), `inference_ms`, `detections: [{bbox:[x1,y1,x2,y2],confidence}]`. Bbox нормализован 0…1, JPEG уменьшен максимум до `PREVIEW_MAX_WIDTH`, без увеличения маленького кадра. Пустой массив детекций — нормальный результат. С Milestone 5 дополнительно передаётся `tracks: [{track_id,bbox,confidence,state,age,hits,missed_frames}]`. Состояние — `NORMAL`/`IN_DANGER_ZONE`/`LOST` (IN_DANGER_ZONE с M6), `track_id` положителен и уникален только вместе с camera_id/run_id. Bbox нормализован; у LOST — последнее наблюдение, не текущая рамка. `age` — обработанные кадры с подтверждения, `hits` — совпадения, `missed_frames` — последовательные пропуски. Кандидат до подтверждения остаётся в detections без track ID. Поле additive в версии 1: новый frontend принимает также старые пакеты без tracks. В M5 REST/OpenAPI не менялся; M6 добавляет REST зон и интервалы конфигурации.
 
 Только открытые зрители вызывают JPEG-кодирование; частота не выше `PREVIEW_FPS` и частоты обработанных кадров. На камеру не более одного кодирования; на зрителя очередь 1 (latest-only), медленная отправка ограничена 2 с. Остановка/смена сессии закрывает сокет. UI переподключается с backoff 0.5…8 с, не рисует старые рамки на новом кадре, освобождает ImageBitmap и помечает кадр устаревшим через 3 с. Плитки вне viewport не подписываются.
 
 Неизвестная камера или запрещённый Origin → close 1008. Разрешены same-origin и `PREVIEW_ALLOWED_ORIGINS` (JSON-массив). Это защита границы браузера, не авторизация: доступ только в доверенной локальной сети. Авторизация оператора не реализована.
+
+## Опасные зоны (Milestone 6)
+
+| Запрос | Ответ |
+|---|---|
+| `GET /api/v1/cameras/{camera_id}/zones` | `200 [ZoneRead]`, порядок created_at/id |
+| `POST /api/v1/cameras/{camera_id}/zones` | `201 ZoneRead` |
+| `PUT /api/v1/cameras/{camera_id}/zones/{zone_id}` | `200 ZoneRead`, полная замена формы |
+| `DELETE /api/v1/cameras/{camera_id}/zones/{zone_id}` | `204` |
+
+POST/PUT: `{name, points:[{x,y},...], enabled:true}`. Имя 1..100 символов после trim; 3..64 разных точек, координаты 0..1, ненулевая площадь, без самопересечений/самокасаний/наложений. Закрывающая первая точка не повторяется. Ошибки геометрии → 422 VALIDATION_ERROR. Ответ дополнен id/camera_id/created_at/updated_at. Чужой zone_id → 404 ZONE_NOT_FOUND; удалённый родитель → 404 CAMERA_NOT_FOUND. До 16 зон на камеру; сверх лимита → 422 UNPROCESSABLE.
+
+CRUD публикует camera.changed после commit, worker получает обновлённый CameraSpec; потерянное уведомление восстанавливается периодической сверкой. Тот же источник сохраняет run/track IDs. `config` PUT также заменяет три nullable интервала (0..3600 с), не патчит: передавайте все нужные переопределения.
+
+Preview v1 дополнен `zones: [{id,camera_id,name,points,enabled}]` — только включённые зоны из spec этого кадра. Поле additive; старые пакеты без zones принимаются. Состояние IN_DANGER_ZONE отображается красной рамкой, LOST не рисуется. **Отдельного SSE/event API пока нет**: сгенерированный DomainEvent находится в DetectionResult и JSON-логе worker, не является надёжно сохранённой историей.

@@ -62,3 +62,10 @@ class UploadRejectedError(UnprocessableError):
 class UploadTooLargeError(AppError):
     status_code = 413
     code = "UPLOAD_TOO_LARGE"
+
+
+class ZoneNotFoundError(NotFoundError):
+    code = "ZONE_NOT_FOUND"
+
+    def __init__(self) -> None:
+        super().__init__("Zone not found")

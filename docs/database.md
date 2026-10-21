@@ -2,6 +2,8 @@
 
 SQLAlchemy 2.x (async, asyncpg), миграции Alembic (имена на английском). Все `timestamptz` в UTC. UUID генерирует приложение (`uuid4`), для событий — worker. Пишет в БД только backend (REST + ingest).
 
+> Фактически созданы `cameras`, `camera_configs` и `zones` (M6). Остальная схема ниже — целевой план, не существующие таблицы.
+
 ## Схема
 
 ```text
@@ -157,4 +159,10 @@ cameras 1─1 camera_configs
 
 ## Реализовано в Milestone 4
 
-Миграция `b452b4c88e6b` создаёт `camera_configs`: `camera_id UUID PRIMARY KEY REFERENCES cameras(id) ON DELETE CASCADE`, nullable `target_fps FLOAT` (CHECK 1–30), nullable `detection_confidence FLOAT` (CHECK >0…1). Отсутствие строки или NULL — значение API по умолчанию (ADR-031). Остальные ранее описанные настройки добавятся вместе с использующими их этапами; сейчас их в таблице нет. Runtime-метрики остаются в Redis с TTL, кадры/боксы в БД не записываются.
+Миграция `b452b4c88e6b` создаёт `camera_configs`: `camera_id UUID PRIMARY KEY REFERENCES cameras(id) ON DELETE CASCADE`, nullable `target_fps FLOAT` (CHECK 1–30), nullable `detection_confidence FLOAT` (CHECK >0…1). Отсутствие строки или NULL — значение API по умолчанию (ADR-031). В M6 добавлены три интервала зон (ниже); loitering/snapshot добавятся вместе с использующими их этапами. Runtime-метрики остаются в Redis с TTL, кадры/боксы в БД не записываются.
+
+## Реализовано в Milestone 6
+
+Миграция `c631d038af01` (после `b452b4c88e6b`) создаёт `zones`: UUID PK, camera_id FK CASCADE + index, name varchar(100), points JSONB, enabled, UTC created_at/updated_at. CHECK проверяет JSON array и 3..64 точки; полную геометрию валидирует Pydantic. API ограничивает 16 зон на камеру под блокировкой родительской строки.
+
+В `camera_configs` добавлены nullable FLOAT `zone_enter_dwell_seconds`, `zone_exit_grace_seconds`, `event_cooldown_seconds`, каждый с CHECK 0..3600. NULL/отсутствующая строка наследует API default. Downgrade удаляет зоны и эти интервалы, поэтому **нельзя выполнять его на рабочей БД ради обновления**. При обычном обновлении нужен только `upgrade head`. События/кадры/треки в PostgreSQL на M6 ещё не записываются.

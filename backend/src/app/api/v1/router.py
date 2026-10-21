@@ -3,7 +3,7 @@
 from fastapi import APIRouter, status
 
 from app.api.errors import ErrorResponse
-from app.api.v1 import cameras, internal, system, uploads
+from app.api.v1 import cameras, internal, system, uploads, zones
 
 api_v1_router = APIRouter(
     prefix="/api/v1",
@@ -16,3 +16,5 @@ api_v1_router.include_router(system.router)
 api_v1_router.include_router(cameras.router)
 api_v1_router.include_router(uploads.router)
 api_v1_router.include_router(internal.router)
+
+api_v1_router.include_router(zones.router)

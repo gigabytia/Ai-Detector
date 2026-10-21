@@ -4,11 +4,44 @@
 
 ## Текущий этап
 
-**Milestone 5 — person tracking: выполнен.** Следующий — Milestone 6 (danger zone).
+**Milestone 6 — danger zone: выполнен.** Milestone 5 повторно проверен. Следующий — Milestone 7 (event bus, сохранение/доставка событий, SSE/телеметрия и live update).
 
 Реализация заново восстановлена на базе присланного архива Milestone 3 после утраты предыдущего рабочего окружения. Это не побайтовое восстановление незавершённой сессии: использованы сохранённые архитектурные документы, ADR и доступный контекст. Исходный `AI_DETECTOR_v2_MASTER_PROMPT.md` в архиве отсутствовал.
 
-## Milestone 5 — результат текущей сессии
+## Milestone 6 — результат текущей сессии
+
+### Проверка предыдущего этапа
+
+Восстановлен оригинальный архив и Git commit M5 `8e0e842` (Kostya). До изменений M6 повторён полный make check: **122 Python / 64 frontend**, linters/typecheck/build зелёные. В заключительном M6 integration-прогоне также прошли все прежние 11 проверок. M5 не переписан и не переименован задним числом.
+
+### Сделано
+
+* Сохраняемый `zones` CRUD (camera-scoped, 404/422, 16 зон под блокировкой родителя), миграция c631d038af01; простой polygon 3..64 уникальных вершин 0..1, без пересечений/самокасаний/наложений; граница внутри.
+* Per-run SceneRegistry/ZoneEngine в одиночном inference executor после ByteTrack. Нижний anchor, OUTSIDE/ENTERING/INSIDE/EXITING, dwell/grace по source timestamps, LOST замораживает время. Cooldown по Clock на camera/run/track/type, одно событие за визит. Изменённая геометрия сбрасывает только свою зону; loop/reconnect/epoch/size и lifecycle очищают scene.
+* Immutable типизированный DomainEvent PERSON_ENTERED_DANGER_ZONE (UUID, camera/run/track/zone, severity, UTC/source time, mean confidence × stability, metadata). Событие в DetectionResult и структурированном логе только актуального run. **Надёжная доставка и запись в БД ещё не реализованы: это M7.**
+* Hot CameraSpec с zones/effective config без смены run/ID. Nullable camera overrides dwell/grace/cooldown + API defaults; EVENT_MIN_TRACK_HITS и SEVERITY_ZONE_ENTER worker settings. Параметры добавлены в .env.example и compose.
+* UI-редактор первой зоны по ADR-009: рисование на видео/SVG, keyboard coords, undo/clear/cancel, enable, save, delete с подтверждением; черновик не перезаписывает другие зоны и не меняет ID при обновлении query. Учёт letterbox и source coordinates; atomic preview zones/IN_DANGER_ZONE, красная рамка и счётчик в зоне, LOST не рисуется.
+* Seed добавляет пример зоны каждой seed-камере без зон; повторный запуск не дублирует и не затирает существующие зоны. События seed не имитирует. Документация/ADR-033/OpenAPI/TS-типы обновлены.
+
+### Проверено
+
+| Проверка | Результат |
+|---|---|
+| make check | Все linters/format/typecheck/build прошли, **151 Python unit + 82 Vitest**, mypy strict 132 файла |
+| pytest -m integration | **15 passed** на настоящих PostgreSQL/Valkey |
+| Миграции / schema / lock / контракт | Upgrade с пустой БД; downgrade+upgrade на тестовой; alembic check без diff; uv lock --check; повторный OpenAPI совпал |
+| Живой YOLO + ByteTrack + 2 mock + WS | 4 входа на реальном статичном тестовом видео; горячая геометрия/disable/re-enable сохраняют run/IDs и меняют состояние |
+| Chromium | Редактор пишет правильные normalized coords, padding игнорируется, cancel не меняет БД, красные боксы/track IDs, 390px light/dark без overflow/pageerror |
+| Shutdown | Открытый WS закрыт, runtime/heartbeat Redis удалены за **0.82 с** |
+| npm audit --omit=dev | **0 уязвимостей** production |
+
+Логи и скриншоты: [docs/qa/m6/README.md](docs/qa/m6/README.md). Image viewer недоступен: визуальная оценка PNG не заявляется; UI проверен через DOM, координаты, canvas и API. Windows, Docker/CI, GPU/CUDA, реальная RTSP-камера, качество на движущемся CCTV и нагрузка 4/8 камер не проверены. Node в песочнице 24.14.1 ниже заявленного engine — использовать поддерживаемую версию. Старые ограничения ниже остаются актуальными, если здесь не уточнено иначе.
+
+### Следующий шаг — M7
+
+Redis pub/sub + Stream, ingest/идемпотентное сохранение событий в PostgreSQL, SSE, отдельная WS-телеметрия и frontend live update. Сейчас event log не заменяет доставку: события теряются при аварии, история/ACK/false positive не доступны. Snapshot — M8, линии/loitering — позже. Не объявлять M7 реализованным из-за работающего preview WS.
+
+## Milestone 5 — предыдущая сессия
 
 Работа продолжена из последнего пользовательского `Ai-Detector.zip`, HEAD `8a7a28c`. Учтены Windows-настройки PostgreSQL: host `127.0.0.1:15432`, внутри Docker по-прежнему `postgres:5432`. Исходное ТЗ снова предоставлено пользователем и сохранено в [docs/spec/AI_DETECTOR_v2_MASTER_PROMPT.md](docs/spec/AI_DETECTOR_v2_MASTER_PROMPT.md). Новые коммиты оформляются от имени **Kostya** с существующей в репозитории Git-идентичностью.
 
@@ -152,7 +185,7 @@ Milestone 2 проверки (health, отключение Redis, шаги Docke
 * `npm audit`: 4 high в dev-зависимостях (`braces` через eslint-config → fast-glob → micromatch); в production-сборку не попадают. Исправить обновлением, когда выйдет совместимая версия.
 * Публикация файла в RTSP через `ffmpeg -re -stream_loop -1` после первого круга идёт быстрее реального времени — это особенность ffmpeg, не worker'а (см. `docs/development.md`).
 * Сообщение `last_error` от worker'а — английский технический текст; UI показывает его мелко под русским описанием.
-* Seed (§109) создаёт только камеры: зон и событий ещё нет — добавятся в seed на этапах 6–7.
+* Seed (§109) создаёт камеры и пример зоны (M6). События/история — с этапа M7.
 * `StarletteDeprecationWarning` для TestClient (httpx → httpx2) — на работу не влияет.
 * Риски из Milestone 1 актуальны: cooldown без zone_id ([ADR-008](docs/decisions/ADR-008-cooldown.md)), потеря активных треков при аварии worker'а ([ADR-019](docs/decisions/ADR-019-track-persistence.md)).
 

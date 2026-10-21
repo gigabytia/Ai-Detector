@@ -30,6 +30,11 @@ function metadata(detections = [detection], tracks: PersonTrack[] = [track]): Pr
   }
 }
 describe('person overlay', () => {
+  it('keeps confirmed IDs and danger state for red boxes', () => {
+    expect(
+      overlayPeople(metadata([detection], [{ ...track, state: 'IN_DANGER_ZONE' }]))[0],
+    ).toMatchObject({ trackId: 17, inDanger: true })
+  })
   it('labels confirmed detections with their track ID', () => {
     expect(overlayPeople(metadata())[0]?.trackId).toBe(17)
   })

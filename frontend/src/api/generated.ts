@@ -178,6 +178,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cameras/{camera_id}/zones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Zones */
+        get: operations["list_zones_api_v1_cameras__camera_id__zones_get"];
+        put?: never;
+        /** Create Zone */
+        post: operations["create_zone_api_v1_cameras__camera_id__zones_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/zones/{zone_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace Zone */
+        put: operations["replace_zone_api_v1_cameras__camera_id__zones__zone_id__put"];
+        post?: never;
+        /** Delete Zone */
+        delete: operations["delete_zone_api_v1_cameras__camera_id__zones__zone_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -199,6 +235,21 @@ export interface components {
              * @default 0.25
              */
             detection_confidence: number;
+            /**
+             * Zone Enter Dwell Seconds
+             * @default 0.25
+             */
+            zone_enter_dwell_seconds: number;
+            /**
+             * Zone Exit Grace Seconds
+             * @default 0.5
+             */
+            zone_exit_grace_seconds: number;
+            /**
+             * Event Cooldown Seconds
+             * @default 3
+             */
+            event_cooldown_seconds: number;
         };
         /** CameraConfigOverrides */
         CameraConfigOverrides: {
@@ -206,6 +257,12 @@ export interface components {
             target_fps?: number | null;
             /** Detection Confidence */
             detection_confidence?: number | null;
+            /** Zone Enter Dwell Seconds */
+            zone_enter_dwell_seconds?: number | null;
+            /** Zone Exit Grace Seconds */
+            zone_exit_grace_seconds?: number | null;
+            /** Event Cooldown Seconds */
+            event_cooldown_seconds?: number | null;
         };
         /** CameraConfigRead */
         CameraConfigRead: {
@@ -340,6 +397,13 @@ export interface components {
              */
             status: "alive";
         };
+        /** NormalizedPoint */
+        NormalizedPoint: {
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+        };
         /** ReadinessRead */
         ReadinessRead: {
             /**
@@ -401,6 +465,50 @@ export interface components {
             last_seen_at: string;
             /** Uptime Seconds */
             uptime_seconds: number;
+        };
+        /** ZoneRead */
+        ZoneRead: {
+            /** Name */
+            name: string;
+            /** Points */
+            points: components["schemas"]["NormalizedPoint"][];
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Camera Id
+             * Format: uuid
+             */
+            camera_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ZoneShape */
+        ZoneShape: {
+            /** Name */
+            name: string;
+            /** Points */
+            points: components["schemas"]["NormalizedPoint"][];
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
         };
     };
     responses: never;
@@ -1018,6 +1126,210 @@ export interface operations {
             };
             /** @description Request Entity Too Large */
             413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_zones_api_v1_cameras__camera_id__zones_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZoneRead"][];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_zone_api_v1_cameras__camera_id__zones_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZoneShape"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZoneRead"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    replace_zone_api_v1_cameras__camera_id__zones__zone_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: string;
+                zone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZoneShape"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZoneRead"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_zone_api_v1_cameras__camera_id__zones__zone_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: string;
+                zone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

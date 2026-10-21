@@ -9,6 +9,7 @@ from dataclasses import dataclass, replace
 from uuid import UUID
 
 from ai_detector_core.cameras.source import SourceType
+from ai_detector_core.cameras.spec import CameraSpec
 from ai_detector_core.cameras.status import CameraStatus
 from vision_worker.cameras.frame import Frame
 from vision_worker.cameras.manager import CameraManager
@@ -18,6 +19,7 @@ from vision_worker.inference.adapters.scripted import ScriptedPersonDetector
 from vision_worker.inference.detector import PersonDetector
 from vision_worker.pipeline.preview import PreviewHub
 from vision_worker.pipeline.results import DetectionResult
+from vision_worker.rules.registry import SceneRegistry
 from vision_worker.tracking.registry import TrackerRegistry, TrackKey
 
 logger = logging.getLogger(__name__)
@@ -28,6 +30,7 @@ class WorkItem:
     session: CameraSession
     frame: Frame
     confidence: float
+    spec: CameraSpec | None = None
 
 
 class InferenceScheduler:
@@ -39,7 +42,9 @@ class InferenceScheduler:
         batch_size: int = 4,
         max_wait_ms: float = 20,
         trackers: TrackerRegistry | None = None,
+        scenes: SceneRegistry | None = None,
     ) -> None:
+        self._scenes = scenes if scenes is not None else SceneRegistry()
         self._trackers = trackers if trackers is not None else TrackerRegistry()
         self._manager = manager
         self._detector = detector
@@ -77,7 +82,9 @@ class InferenceScheduler:
             if frame is None:
                 continue
             self._next_due[session.run_id] = now + 1 / session.spec.config.target_fps
-            items.append(WorkItem(session, frame, session.spec.config.detection_confidence))
+            items.append(
+                WorkItem(session, frame, session.spec.config.detection_confidence, session.spec)
+            )
             if len(items) == limit:
                 break
         return items
@@ -153,13 +160,21 @@ class InferenceScheduler:
             if isinstance(result, Exception):
                 continue
             try:
-                results[i] = replace(result, tracks=self._trackers.update(result))
+                spec = items[i].spec
+                if spec is None:
+                    spec = items[i].session.spec
+                tracked = replace(result, tracks=self._trackers.update(result), zones=spec.zones)
+                results[i] = self._scenes.update(tracked, spec.config)
             except Exception as exc:
                 logger.exception(
-                    "person tracking failed", extra={"camera_id": str(result.camera_id)}
+                    "person pipeline failed", extra={"camera_id": str(result.camera_id)}
                 )
                 results[i] = exc
         return results
+
+    def _retain(self, active: set[TrackKey]) -> None:
+        self._trackers.retain(active)
+        self._scenes.retain(active)
 
     async def run(self, stop: asyncio.Event) -> None:
         active_keys: set[TrackKey] = set()
@@ -179,7 +194,7 @@ class InferenceScheduler:
                 }
                 if current != active_keys:
                     await asyncio.get_running_loop().run_in_executor(
-                        self._pool, self._trackers.retain, current
+                        self._pool, self._retain, current
                     )
                     active_keys = current
                 items = self.collect(self._batch_size)
@@ -213,13 +228,24 @@ class InferenceScheduler:
                     if isinstance(result, Exception):
                         item.session.record_inference_error(result)
                     else:
+                        for event in result.events:
+                            logger.info(
+                                "person entered danger zone",
+                                extra={
+                                    "event_id": str(event.id),
+                                    "event": event.model_dump(mode="json"),
+                                    "event_type": event.type,
+                                    "camera_id": str(event.camera_id),
+                                    "run_id": str(event.run_id),
+                                    "track_id": event.track_id,
+                                    "zone_id": str(event.zone_id),
+                                },
+                            )
                         item.session.record_result(result)
                         self._preview.offer(result)
         except Exception:
             self.healthy = False
             raise
         finally:
-            await asyncio.get_running_loop().run_in_executor(
-                self._pool, self._trackers.retain, set()
-            )
+            await asyncio.get_running_loop().run_in_executor(self._pool, self._retain, set())
             self._pool.shutdown(wait=True)

@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 def config_overrides(row: CameraConfigModel | None) -> CameraConfigOverrides:
     return CameraConfigOverrides(
+        zone_enter_dwell_seconds=row.zone_enter_dwell_seconds if row else None,
+        zone_exit_grace_seconds=row.zone_exit_grace_seconds if row else None,
+        event_cooldown_seconds=row.event_cooldown_seconds if row else None,
         target_fps=row.target_fps if row else None,
         detection_confidence=row.detection_confidence if row else None,
     )
@@ -58,6 +61,9 @@ class CameraConfigService:
         if row is None:
             row = CameraConfigModel(camera_id=camera_id)
             self._session.add(row)
+        row.zone_enter_dwell_seconds = overrides.zone_enter_dwell_seconds
+        row.zone_exit_grace_seconds = overrides.zone_exit_grace_seconds
+        row.event_cooldown_seconds = overrides.event_cooldown_seconds
         row.target_fps = overrides.target_fps
         row.detection_confidence = overrides.detection_confidence
         await self._session.commit()

@@ -30,6 +30,8 @@ class WorkerSettings(BaseSettings):
     inference_max_wait_ms: float = Field(default=20, ge=0, le=1000)
     inference_threads: int = Field(default=2, ge=1, le=64)
     detection_iou: float = Field(default=0.45, gt=0, le=1)
+    severity_zone_enter: Literal["critical", "warning", "info"] = "critical"
+    event_min_track_hits: int = Field(default=3, ge=1, le=1000)
     person_track_max_age: int = Field(default=25, ge=1, le=1000)
     track_match_iou: float = Field(default=0.5, gt=0, le=1)
     track_activation_confidence: float = Field(default=0.25, gt=0, le=1)

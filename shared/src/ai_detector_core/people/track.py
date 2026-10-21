@@ -9,6 +9,7 @@ from uuid import UUID
 class PersonState(StrEnum):
     NORMAL = "NORMAL"
     LOST = "LOST"
+    IN_DANGER_ZONE = "IN_DANGER_ZONE"
 
 
 @dataclass(frozen=True, slots=True)

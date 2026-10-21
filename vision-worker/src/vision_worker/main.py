@@ -20,6 +20,7 @@ from vision_worker.messaging.commands import CommandListener
 from vision_worker.messaging.heartbeat import HeartbeatPublisher
 from vision_worker.pipeline.preview import PreviewHub
 from vision_worker.pipeline.scheduler import InferenceScheduler
+from vision_worker.rules.registry import SceneRegistry
 from vision_worker.supervisor import Supervisor
 from vision_worker.tracking.bytetrack import ByteTrackPersonTracker
 from vision_worker.tracking.registry import TrackerRegistry
@@ -61,6 +62,9 @@ def build_supervisor(settings: WorkerSettings) -> Supervisor:
             preview,
             settings.inference_batch_size,
             settings.inference_max_wait_ms,
+            scenes=SceneRegistry(
+                clock, settings.event_min_track_hits, settings.severity_zone_enter
+            ),
             trackers=TrackerRegistry(
                 lambda camera_id, run_id: ByteTrackPersonTracker(
                     camera_id,

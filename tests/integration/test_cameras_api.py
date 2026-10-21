@@ -30,7 +30,7 @@ MOCK = {"name": "Склад", "source_type": "mock", "source_url": "mock://walk_
 async def _truncate(url: str) -> None:
     engine = create_async_engine(url)
     async with engine.begin() as conn:
-        await conn.execute(text("TRUNCATE camera_configs, cameras"))
+        await conn.execute(text("TRUNCATE zones, camera_configs, cameras"))
     await engine.dispose()
 
 
@@ -166,11 +166,15 @@ def test_detection_config_defaults_replace_reset_and_spec(
     camera_id = client.post("/api/v1/cameras", json=MOCK).json()["id"]
     url = f"/api/v1/cameras/{camera_id}/config"
     config = client.get(url).json()
-    assert config["overrides"] == {"target_fps": None, "detection_confidence": None}
+    assert config["overrides"] == dict.fromkeys(config["defaults"])
     assert config["effective"] == config["defaults"]
     saved = client.put(url, json={"target_fps": 3, "detection_confidence": 0.8})
     assert saved.status_code == 200
-    assert saved.json()["effective"] == {"target_fps": 3, "detection_confidence": 0.8}
+    assert saved.json()["effective"] == {
+        **config["defaults"],
+        "target_fps": 3,
+        "detection_confidence": 0.8,
+    }
     assert next_command(commands)["type"] == "camera.changed"
     spec = client.get(f"/api/v1/internal/worker/cameras/{camera_id}", headers=AUTH)
     assert spec.status_code == 200
@@ -184,3 +188,95 @@ def test_detection_config_defaults_replace_reset_and_spec(
     client.delete(f"/api/v1/cameras/{camera_id}")
     assert client.get(url).status_code == 404
     assert client.put(url, json={}).status_code == 404
+
+
+ZONE_BODY = {
+    "name": "Проход",
+    "points": [
+        {"x": 0.2, "y": 0.2},
+        {"x": 0.8, "y": 0.2},
+        {"x": 0.8, "y": 0.9},
+        {"x": 0.2, "y": 0.9},
+    ],
+    "enabled": True,
+}
+
+
+def test_zone_crud_and_worker_spec(client: TestClient, commands: redis.client.PubSub) -> None:
+    cid = client.post("/api/v1/cameras", json=MOCK).json()["id"]
+    url = f"/api/v1/cameras/{cid}/zones"
+    assert client.get(url).json() == []
+    response = client.post(url, json=ZONE_BODY)
+    assert response.status_code == 201, response.text
+    zone = response.json()
+    assert zone["camera_id"] == cid and zone["points"] == ZONE_BODY["points"]
+    assert zone["created_at"] and zone["updated_at"]
+    assert next_command(commands)["type"] == "camera.changed"
+    assert client.get(url).json() == [zone]
+    spec_url = f"/api/v1/internal/worker/cameras/{cid}"
+    spec = client.get(spec_url, headers=AUTH).json()
+    assert spec["zones"][0]["id"] == zone["id"]
+    updated = client.put(
+        f"{url}/{zone['id']}", json={**ZONE_BODY, "name": "Новая", "enabled": False}
+    )
+    assert updated.status_code == 200 and not updated.json()["enabled"]
+    assert next_command(commands)["type"] == "camera.changed"
+    assert not client.get(spec_url, headers=AUTH).json()["zones"][0]["enabled"]
+    assert client.delete(f"{url}/{zone['id']}").status_code == 204
+    assert next_command(commands)["type"] == "camera.changed"
+    assert client.get(url).json() == []
+    assert client.get(spec_url, headers=AUTH).json()["zones"] == []
+    assert client.delete(f"{url}/{zone['id']}").status_code == 404
+
+
+def test_zone_camera_scoping_and_deleted_parent(client: TestClient) -> None:
+    cid = client.post("/api/v1/cameras", json=MOCK).json()["id"]
+    other = client.post("/api/v1/cameras", json={**MOCK, "name": "Другой"}).json()["id"]
+    url = f"/api/v1/cameras/{cid}/zones"
+    zid = client.post(url, json=ZONE_BODY).json()["id"]
+    wrong = f"/api/v1/cameras/{other}/zones/{zid}"
+    assert client.put(wrong, json=ZONE_BODY).status_code == 404
+    assert client.delete(wrong).status_code == 404
+    assert len(client.get(url).json()) == 1
+    client.delete(f"/api/v1/cameras/{cid}")
+    assert client.get(url).status_code == 404
+    assert client.post(url, json=ZONE_BODY).status_code == 404
+    assert client.put(f"{url}/{zid}", json=ZONE_BODY).status_code == 404
+    assert client.delete(f"{url}/{zid}").status_code == 404
+
+
+def test_zone_invalid_geometry_and_capacity(client: TestClient) -> None:
+    cid = client.post("/api/v1/cameras", json=MOCK).json()["id"]
+    url = f"/api/v1/cameras/{cid}/zones"
+    for points in [
+        [],
+        [{"x": 0, "y": 0}] * 3,
+        [{"x": 0, "y": 0}, {"x": 1, "y": 1}, {"x": 0, "y": 1}, {"x": 1, "y": 0}],
+        [{"x": -1, "y": 0}, {"x": 1, "y": 0}, {"x": 1, "y": 1}],
+    ]:
+        assert client.post(url, json={**ZONE_BODY, "points": points}).status_code == 422
+    assert client.get(url).json() == []
+    for _ in range(16):
+        assert client.post(url, json=ZONE_BODY).status_code == 201
+    assert client.post(url, json=ZONE_BODY).status_code == 422
+    assert len(client.get(url).json()) == 16
+
+
+def test_zone_timing_overrides_persist_and_resolve(client: TestClient) -> None:
+    cid = client.post("/api/v1/cameras", json=MOCK).json()["id"]
+    url = f"/api/v1/cameras/{cid}/config"
+    timings = {
+        "zone_enter_dwell_seconds": 0,
+        "zone_exit_grace_seconds": 1.5,
+        "event_cooldown_seconds": 8,
+    }
+    response = client.put(url, json=timings)
+    assert response.status_code == 200
+    assert all(response.json()["effective"][k] == v for k, v in timings.items())
+    assert client.get(url).json() == response.json()
+    spec = client.get(f"/api/v1/internal/worker/cameras/{cid}", headers=AUTH).json()
+    assert spec["config"] == response.json()["effective"]
+    for key in timings:
+        assert client.put(url, json={key: -1}).status_code == 422
+    reset = client.put(url, json={}).json()
+    assert reset["effective"] == reset["defaults"]

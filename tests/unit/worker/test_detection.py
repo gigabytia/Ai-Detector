@@ -387,6 +387,7 @@ async def test_scheduler_delivers_confirmed_ids_and_releases_trackers(
         stop.set()
         await asyncio.wait_for(task, 2)
         assert not scheduler._trackers._entries
+        assert not scheduler._scenes._entries
         await hub.close()
         await manager.stop_all()
 

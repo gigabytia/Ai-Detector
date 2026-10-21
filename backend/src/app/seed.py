@@ -1,7 +1,8 @@
 """Development seed: mock cameras so the UI is not empty after the first start (§109).
 
 Idempotent: cameras that already exist by name are left untouched.
-Zones and sample events are added to the seed together with those features.
+Each seed camera without zones receives one example polygon. Existing zones are untouched.
+Sample events and their delivery belong to Milestone 7.
 """
 
 import asyncio
@@ -9,11 +10,14 @@ import logging
 
 from ai_detector_core.cameras.source import SourceType
 from ai_detector_core.ports.clock import SystemClock
+from ai_detector_core.zones.model import ZoneShape
 from app.application.camera_service import CameraService
 from app.application.errors import CameraNameConflictError
+from app.application.zone_service import ZoneService
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.infrastructure.database.repositories.cameras import CameraRepository
+from app.infrastructure.database.repositories.zones import ZoneRepository
 from app.infrastructure.database.session import create_engine, create_session_factory
 from app.infrastructure.redis.cameras import RedisCameraStatusReader, RedisCommandPublisher
 from app.infrastructure.redis.client import create_redis
@@ -50,6 +54,25 @@ async def seed() -> None:
                     logger.info("seed camera created", extra={"camera_name": name})
                 except CameraNameConflictError:
                     logger.info("seed camera exists", extra={"camera_name": name})
+            zones = ZoneService(
+                ZoneRepository(session), RedisCommandPublisher(redis), SystemClock()
+            )
+            seed_names = {name for name, _ in SEED_CAMERAS}
+            for camera in await CameraRepository(session).list_active():
+                if camera.name in seed_names and not await zones.list(camera.id):
+                    await zones.save(
+                        camera.id,
+                        ZoneShape(
+                            name="Опасная зона",
+                            points=[
+                                {"x": 0.4, "y": 0.25},
+                                {"x": 0.8, "y": 0.25},
+                                {"x": 0.8, "y": 0.9},
+                                {"x": 0.4, "y": 0.9},
+                            ],
+                        ),
+                    )
+                    logger.info("seed zone created", extra={"camera_id": str(camera.id)})
     finally:
         await redis.aclose()
         await engine.dispose()

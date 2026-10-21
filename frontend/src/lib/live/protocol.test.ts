@@ -98,3 +98,31 @@ describe('person tracking protocol', () => {
     expect(() => parsePacket(packet({ ...metadata, tracks: [track, track] }), 'camera-1')).toThrow()
   })
 })
+
+const zone = {
+  id: 'z',
+  camera_id: 'camera-1',
+  name: 'Zone',
+  enabled: true,
+  points: [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+    { x: 1, y: 1 },
+  ],
+}
+it('accepts zones and danger tracks in the atomic frame header', () => {
+  expect(
+    parsePacket(
+      packet({ ...metadata, zones: [zone], tracks: [{ ...track, state: 'IN_DANGER_ZONE' }] }),
+      'camera-1',
+    ).metadata.zones,
+  ).toEqual([zone])
+})
+it.each([
+  { ...zone, camera_id: 'other' },
+  { ...zone, points: [] },
+  { ...zone, points: [{ x: 2, y: 0 }, ...zone.points] },
+  { ...zone, enabled: 1 },
+])('rejects invalid zone %j', (bad) => {
+  expect(() => parsePacket(packet({ ...metadata, zones: [bad] }), 'camera-1')).toThrow()
+})

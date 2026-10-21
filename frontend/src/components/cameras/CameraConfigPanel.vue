@@ -18,17 +18,26 @@ const query = useQuery({
 })
 const fps = ref<string | number>('')
 const confidence = ref<string | number>('')
+const timings = ref<Record<string, string>>({})
+const timingKeys = [
+  'zone_enter_dwell_seconds',
+  'zone_exit_grace_seconds',
+  'event_cooldown_seconds',
+] as const
 const saved = ref(false)
 const invalid = ref(false)
 watch(
   query.data,
   (value) => {
+    timings.value = Object.fromEntries(
+      timingKeys.map((k) => [k, value?.overrides[k]?.toString() ?? '']),
+    )
     fps.value = value?.overrides.target_fps?.toString() ?? ''
     confidence.value = value?.overrides.detection_confidence?.toString() ?? ''
   },
   { immediate: true },
 )
-watch([fps, confidence], () => {
+watch([fps, confidence, () => JSON.stringify(timings.value)], () => {
   saved.value = false
   invalid.value = false
 })
@@ -44,6 +53,7 @@ const mutation = useMutation({
 function resetFields() {
   fps.value = ''
   confidence.value = ''
+  timings.value = Object.fromEntries(timingKeys.map((k) => [k, '']))
 }
 function save() {
   const target = String(fps.value).trim() === '' ? null : Number(fps.value)
@@ -55,7 +65,20 @@ function save() {
     invalid.value = true
     return
   }
-  mutation.mutate({ id: props.cameraId, body: { target_fps: target, detection_confidence: score } })
+  const values = Object.fromEntries(
+    timingKeys.map((k) => [
+      k,
+      String(timings.value[k] ?? '').trim() === '' ? null : Number(timings.value[k]),
+    ]),
+  )
+  if (Object.values(values).some((v) => v !== null && (!Number.isFinite(v) || v < 0 || v > 3600))) {
+    invalid.value = true
+    return
+  }
+  mutation.mutate({
+    id: props.cameraId,
+    body: { target_fps: target, detection_confidence: score, ...values },
+  })
 }
 </script>
 
@@ -109,6 +132,25 @@ function save() {
         />
         <p class="text-muted-foreground text-xs">
           {{ t('detection.default', { n: query.data.value.defaults.detection_confidence }) }}
+        </p>
+      </div>
+      <div v-for="k in timingKeys" :key="k" class="space-y-1.5">
+        <label :for="`${k}-${cameraId}`" class="block text-xs font-medium">{{
+          t(`detection.${k}`)
+        }}</label>
+        <input
+          :id="`${k}-${cameraId}`"
+          v-model="timings[k]"
+          type="number"
+          min="0"
+          max="3600"
+          step="any"
+          :placeholder="String(query.data.value.defaults[k])"
+          :disabled="mutation.isPending.value"
+          class="bg-background w-full rounded-md border px-3 py-2 text-sm"
+        />
+        <p class="text-muted-foreground text-xs">
+          {{ t('detection.default', { n: query.data.value.defaults[k] }) }}
         </p>
       </div>
       <p v-if="invalid" class="text-critical text-xs" role="alert">{{ t('detection.invalid') }}</p>

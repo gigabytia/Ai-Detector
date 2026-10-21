@@ -35,6 +35,11 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ai_detector}:${POSTGRES_PASSWORD:-ai_detector}@postgres:5432/${POSTGRES_DB:-ai_detector}
       REDIS_URL: redis://redis:6379/0
       CORS_ORIGINS: http://localhost:8080,http://localhost:5173
+      TARGET_FPS: ${TARGET_FPS:-10}
+      DETECTION_CONFIDENCE: ${DETECTION_CONFIDENCE:-0.25}
+      ZONE_ENTER_DWELL_SECONDS: ${ZONE_ENTER_DWELL_SECONDS:-0.25}
+      ZONE_EXIT_GRACE_SECONDS: ${ZONE_EXIT_GRACE_SECONDS:-0.5}
+      EVENT_COOLDOWN_SECONDS: ${EVENT_COOLDOWN_SECONDS:-3}
       WORKER_API_TOKEN: ${WORKER_API_TOKEN:-dev-worker-token-change-me}
       UPLOAD_PATH: /data/uploads
     volumes: ["uploads:/data/uploads"]
@@ -49,6 +54,11 @@ services:
       APP_ENV: development
       REDIS_URL: redis://redis:6379/0
       WORKER_ID: worker-1
+      EVENT_MIN_TRACK_HITS: ${EVENT_MIN_TRACK_HITS:-3}
+      SEVERITY_ZONE_ENTER: ${SEVERITY_ZONE_ENTER:-critical}
+      PERSON_TRACK_MAX_AGE: ${PERSON_TRACK_MAX_AGE:-25}
+      TRACK_MATCH_IOU: ${TRACK_MATCH_IOU:-0.5}
+      TRACK_ACTIVATION_CONFIDENCE: ${TRACK_ACTIVATION_CONFIDENCE:-0.25}
       API_BASE_URL: http://api:8000
       WORKER_API_TOKEN: ${WORKER_API_TOKEN:-dev-worker-token-change-me}
       UPLOAD_PATH: /data/uploads

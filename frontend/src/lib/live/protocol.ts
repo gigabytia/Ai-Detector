@@ -4,7 +4,7 @@ export interface Detection {
 }
 export interface PersonTrack extends Detection {
   track_id: number
-  state: 'NORMAL' | 'LOST'
+  state: 'NORMAL' | 'LOST' | 'IN_DANGER_ZONE'
   age: number
   hits: number
   missed_frames: number
@@ -21,6 +21,13 @@ export interface PreviewMetadata {
   inference_ms: number
   detections: Detection[]
   tracks?: PersonTrack[]
+  zones?: {
+    id: string
+    camera_id: string
+    name: string
+    enabled: boolean
+    points: { x: number; y: number }[]
+  }[]
 }
 export function parsePacket(
   data: ArrayBuffer,
@@ -72,7 +79,7 @@ export function parsePacket(
         !Number.isSafeInteger(track.track_id) ||
         track.track_id < 1 ||
         ids.has(track.track_id) ||
-        !['NORMAL', 'LOST'].includes(track.state) ||
+        !['NORMAL', 'LOST', 'IN_DANGER_ZONE'].includes(track.state) ||
         !Number.isSafeInteger(track.age) ||
         track.age < 1 ||
         !Number.isSafeInteger(track.hits) ||
@@ -81,7 +88,7 @@ export function parsePacket(
         !Number.isSafeInteger(track.missed_frames) ||
         track.missed_frames < 0 ||
         track.missed_frames >= track.age ||
-        (track.state === 'NORMAL' ? track.missed_frames !== 0 : track.missed_frames === 0) ||
+        (track.state !== 'LOST' ? track.missed_frames !== 0 : track.missed_frames === 0) ||
         !Array.isArray(track.bbox) ||
         track.bbox.length !== 4 ||
         !track.bbox.every((n) => Number.isFinite(n) && n >= 0 && n <= 1) ||
@@ -93,6 +100,35 @@ export function parsePacket(
       )
         throw new Error('Invalid track')
       ids.add(track.track_id)
+    }
+  }
+  if (m.zones !== undefined) {
+    if (!Array.isArray(m.zones) || m.zones.length > 16) throw new Error('Invalid zones')
+    const ids = new Set<string>()
+    for (const z of m.zones) {
+      if (
+        !z ||
+        typeof z.id !== 'string' ||
+        ids.has(z.id) ||
+        z.camera_id !== cameraId ||
+        typeof z.name !== 'string' ||
+        typeof z.enabled !== 'boolean' ||
+        !Array.isArray(z.points) ||
+        z.points.length < 3 ||
+        z.points.length > 64 ||
+        !z.points.every(
+          (p) =>
+            p &&
+            Number.isFinite(p.x) &&
+            Number.isFinite(p.y) &&
+            p.x >= 0 &&
+            p.x <= 1 &&
+            p.y >= 0 &&
+            p.y <= 1,
+        )
+      )
+        throw new Error('Invalid zone')
+      ids.add(z.id)
     }
   }
   return { metadata: m, jpeg: new Blob([data.slice(4 + size)], { type: 'image/jpeg' }) }
