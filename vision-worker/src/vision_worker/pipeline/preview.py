@@ -38,6 +38,19 @@ def encode_packet(result: DetectionResult, max_width: int) -> bytes:
             "width": width,
             "height": height,
             "inference_ms": result.inference_ms,
+            "tracks": [
+                {
+                    "track_id": t.track_id,
+                    "bbox": [x1 / width, y1 / height, x2 / width, y2 / height],
+                    "confidence": t.confidence,
+                    "state": t.state.value,
+                    "age": t.age,
+                    "hits": t.hits,
+                    "missed_frames": t.missed_frames,
+                }
+                for t in result.tracks
+                for x1, y1, x2, y2 in [t.bbox]
+            ],
             "detections": [
                 {
                     "bbox": [x1 / width, y1 / height, x2 / width, y2 / height],

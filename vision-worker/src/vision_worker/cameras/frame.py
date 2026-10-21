@@ -18,6 +18,9 @@ class Frame:
     # True for the first frame after the source jumped back (file loop): trackers must reset.
     discontinuity: bool = False
 
+    # Durable scene generation: unlike a one-frame flag, survives latest-frame dropping.
+    source_epoch: int = 0
+
     @property
     def size(self) -> tuple[int, int]:
         height, width = self.image.shape[:2]

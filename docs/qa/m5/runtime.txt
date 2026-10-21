@@ -1,0 +1,19 @@
+smoke
+Camera response type list
+camera b5a0fe40-ceed-4706-9faa-9744bb31504f packets 51 stable adjacent IDs 48 first/last IDs [1, 2, 3, 4] [5, 6, 7, 8]
+camera fa0f5d28-ccd0-448f-92bc-7a728d62c2a0 packets 18 stable adjacent IDs 11 first/last IDs [1] [2]
+camera 35274c11-81fb-48b4-915d-06033a73e21e packets 18 stable adjacent IDs 17 first/last IDs [1, 2] [1, 2]
+Real model + ByteTrack + 2 mocks + Vite WebSocket OK
+
+
+lifecycle
+Hot FPS/confidence: same run, same IDs [25, 26, 27, 28]
+Restart: new run, independent IDs starting at 1
+
+
+browser
+{"canvases":[{"w":640,"h":853,"lit":true},{"w":640,"h":360,"lit":true},{"w":640,"h":360,"lit":true}],"labels":["Человек #17 87%","Человек #18 86%","Человек #19 85%","Человек #20 66%"],"pageerrors":[],"mobileOverflow":false}
+
+
+shutdown
+SIGTERM with active WS: closed; Redis runtime keys cleared in 1.11 seconds

@@ -33,3 +33,4 @@
 | [ADR-029](ADR-029-detector-per-source.md) | Детектор по источнику и fail-fast модель |
 | [ADR-030](ADR-030-torch-cpu-and-opencv.md) | CPU PyTorch и headless OpenCV |
 | [ADR-031](ADR-031-camera-config-defaults.md) | Переопределения настроек камеры |
+| [ADR-032](ADR-032-bytetrack-runtime.md) | ByteTrack: параметры, идентичность и сброс сцены |

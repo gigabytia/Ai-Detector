@@ -60,3 +60,41 @@ describe('preview protocol', () => {
     expect(() => parsePacket(packet({ ...metadata, ...patch }), 'camera-1')).toThrow()
   })
 })
+
+const track = {
+  track_id: 17,
+  bbox: [0.1, 0.1, 0.8, 0.9],
+  confidence: 0.95,
+  state: 'NORMAL',
+  age: 4,
+  hits: 4,
+  missed_frames: 0,
+}
+describe('person tracking protocol', () => {
+  it('accepts tracks and retained lost observations', () => {
+    const tracks = [track, { ...track, track_id: 18, state: 'LOST', hits: 2, missed_frames: 2 }]
+    expect(parsePacket(packet({ ...metadata, tracks }), 'camera-1').metadata.tracks).toEqual(tracks)
+  })
+  it('accepts an empty registry', () => {
+    expect(parsePacket(packet({ ...metadata, tracks: [] }), 'camera-1').metadata.tracks).toEqual([])
+  })
+  it.each([
+    { track_id: -1 },
+    { track_id: 0 },
+    { track_id: 1.5 },
+    { state: 'unknown' },
+    { age: 0 },
+    { hits: 5 },
+    { missed_frames: 1 },
+    { state: 'LOST' },
+    { bbox: [0, 0, 1.1, 1] },
+    { confidence: null },
+  ])('rejects invalid track %j', (patch) => {
+    expect(() =>
+      parsePacket(packet({ ...metadata, tracks: [{ ...track, ...patch }] }), 'camera-1'),
+    ).toThrow()
+  })
+  it('rejects duplicate IDs in the same frame', () => {
+    expect(() => parsePacket(packet({ ...metadata, tracks: [track, track] }), 'camera-1')).toThrow()
+  })
+})

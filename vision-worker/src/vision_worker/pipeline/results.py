@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
+from ai_detector_core.people.track import PersonTrack
 from vision_worker.cameras.frame import Frame
 from vision_worker.inference.detector import PersonDetection
 
@@ -14,3 +15,4 @@ class DetectionResult:
     frame: Frame
     detections: tuple[PersonDetection, ...]
     inference_ms: float
+    tracks: tuple[PersonTrack, ...] = ()

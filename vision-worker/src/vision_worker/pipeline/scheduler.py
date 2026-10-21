@@ -5,7 +5,7 @@ import logging
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from uuid import UUID
 
 from ai_detector_core.cameras.source import SourceType
@@ -18,6 +18,7 @@ from vision_worker.inference.adapters.scripted import ScriptedPersonDetector
 from vision_worker.inference.detector import PersonDetector
 from vision_worker.pipeline.preview import PreviewHub
 from vision_worker.pipeline.results import DetectionResult
+from vision_worker.tracking.registry import TrackerRegistry, TrackKey
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,9 @@ class InferenceScheduler:
         preview: PreviewHub,
         batch_size: int = 4,
         max_wait_ms: float = 20,
+        trackers: TrackerRegistry | None = None,
     ) -> None:
+        self._trackers = trackers if trackers is not None else TrackerRegistry()
         self._manager = manager
         self._detector = detector
         self._preview = preview
@@ -143,9 +146,42 @@ class InferenceScheduler:
             )
             self.healthy = self._model_failures < 3
 
+    def _process(self, items: list[WorkItem]) -> list[DetectionResult | Exception]:
+        results = self._infer(items)
+        self._record_batch_health(items, results)
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                continue
+            try:
+                results[i] = replace(result, tracks=self._trackers.update(result))
+            except Exception as exc:
+                logger.exception(
+                    "person tracking failed", extra={"camera_id": str(result.camera_id)}
+                )
+                results[i] = exc
+        return results
+
     async def run(self, stop: asyncio.Event) -> None:
+        active_keys: set[TrackKey] = set()
         try:
             while not stop.is_set():
+                current = {
+                    (s.camera_id, s.run_id)
+                    for s in self._manager.sessions
+                    if isinstance(s, CameraSession)
+                    and s.state
+                    in (
+                        CameraStatus.RUNNING,
+                        CameraStatus.DEGRADED,
+                        CameraStatus.RECONNECTING,
+                        CameraStatus.STARTING,
+                    )
+                }
+                if current != active_keys:
+                    await asyncio.get_running_loop().run_in_executor(
+                        self._pool, self._trackers.retain, current
+                    )
+                    active_keys = current
                 items = self.collect(self._batch_size)
                 if not items:
                     await asyncio.sleep(0.005)
@@ -165,9 +201,8 @@ class InferenceScheduler:
                 if stop.is_set():
                     break
                 results = await asyncio.get_running_loop().run_in_executor(
-                    self._pool, self._infer, items
+                    self._pool, self._process, items
                 )
-                self._record_batch_health(items, results)
                 active = {s.run_id for s in self._manager.sessions if isinstance(s, CameraSession)}
                 for item, result in zip(items, results, strict=True):
                     if item.session.run_id not in active or item.session.state not in (
@@ -184,4 +219,7 @@ class InferenceScheduler:
             self.healthy = False
             raise
         finally:
+            await asyncio.get_running_loop().run_in_executor(
+                self._pool, self._trackers.retain, set()
+            )
             self._pool.shutdown(wait=True)

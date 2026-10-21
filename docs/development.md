@@ -106,3 +106,19 @@ uv run alembic -c backend/alembic.ini upgrade head
 Docker: каталог `./models` монтируется в worker read-only. Подготовьте веса на хосте, затем `docker compose up --build`. За reverse proxy используйте same-origin `/live/`, убедитесь, что WebSocket Upgrade не удаляется. При отдельном origin добавьте его в JSON-массив `PREVIEW_ALLOWED_ORIGINS`; не отключайте проверку для публичного доступа. Стенд не имеет авторизации оператора и не предназначен для открытого Интернета.
 
 Новые unit-тесты не скачивают модель, не требуют GPU/сети. Проверка настоящей модели выполняется отдельно на предоставленном видео либо `ultralytics/assets/bus.jpg`; это smoke-тест наличия person-боксов, не оценка качества на вашем наборе данных. Интеграционные тесты по-прежнему требуют PostgreSQL и Redis и не пропускаются при отсутствии сервисов.
+
+
+## Проверка трекинга (Milestone 5)
+
+Отдельных сервисов/команд для трекера нет: запускается в существующем worker. После обновления зависимостей (`uv sync`) порядок запуска прежний. Параметры `.env`: `PERSON_TRACK_MAX_AGE=25`, `TRACK_MATCH_IOU=0.5`, `TRACK_ACTIVATION_CONFIDENCE=0.25`; их смена требует перезапуска worker. Камерные FPS/confidence по-прежнему меняются горячо в UI.
+
+Детерминированные тесты готового ByteTrack без весов и сервисов (PowerShell и bash одинаково):
+
+```sh
+uv run pytest tests/unit/worker/test_tracking.py tests/unit/worker/test_camera_session.py tests/unit/worker/test_detection.py
+npm --prefix frontend test
+```
+
+Для ручной проверки: запустить mock/file, открыть «Мониторинг» или focus. После подтверждения появляются `Человек #ID`; между соседними наблюдениями ID сохраняется. При цикле видео ID меняется, run сохраняется; после restart ID может снова начинаться с 1, потому что run новый. Это не уникальные посетители и не межкамерное распознавание. Подробности — [ADR-032](decisions/ADR-032-bytetrack-runtime.md).
+
+Исходники закреплены с LF в `.gitattributes`, чтобы Prettier не падал после Windows checkout из-за CRLF. Это не изменение поведения приложения.

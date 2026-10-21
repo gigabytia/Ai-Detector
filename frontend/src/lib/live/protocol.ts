@@ -2,6 +2,13 @@ export interface Detection {
   bbox: [number, number, number, number]
   confidence: number
 }
+export interface PersonTrack extends Detection {
+  track_id: number
+  state: 'NORMAL' | 'LOST'
+  age: number
+  hits: number
+  missed_frames: number
+}
 export interface PreviewMetadata {
   version: 1
   camera_id: string
@@ -13,6 +20,7 @@ export interface PreviewMetadata {
   height: number
   inference_ms: number
   detections: Detection[]
+  tracks?: PersonTrack[]
 }
 export function parsePacket(
   data: ArrayBuffer,
@@ -54,6 +62,38 @@ export function parsePacket(
       d.confidence > 1
     )
       throw new Error('Invalid detection')
+  }
+  if (m.tracks !== undefined) {
+    if (!Array.isArray(m.tracks)) throw new Error('Invalid tracks')
+    const ids = new Set<number>()
+    for (const track of m.tracks) {
+      if (
+        !track ||
+        !Number.isSafeInteger(track.track_id) ||
+        track.track_id < 1 ||
+        ids.has(track.track_id) ||
+        !['NORMAL', 'LOST'].includes(track.state) ||
+        !Number.isSafeInteger(track.age) ||
+        track.age < 1 ||
+        !Number.isSafeInteger(track.hits) ||
+        track.hits < 1 ||
+        track.hits > track.age ||
+        !Number.isSafeInteger(track.missed_frames) ||
+        track.missed_frames < 0 ||
+        track.missed_frames >= track.age ||
+        (track.state === 'NORMAL' ? track.missed_frames !== 0 : track.missed_frames === 0) ||
+        !Array.isArray(track.bbox) ||
+        track.bbox.length !== 4 ||
+        !track.bbox.every((n) => Number.isFinite(n) && n >= 0 && n <= 1) ||
+        track.bbox[2] <= track.bbox[0] ||
+        track.bbox[3] <= track.bbox[1] ||
+        !Number.isFinite(track.confidence) ||
+        track.confidence < 0 ||
+        track.confidence > 1
+      )
+        throw new Error('Invalid track')
+      ids.add(track.track_id)
+    }
   }
   return { metadata: m, jpeg: new Blob([data.slice(4 + size)], { type: 'image/jpeg' }) }
 }

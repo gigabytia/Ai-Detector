@@ -194,4 +194,12 @@ class EventRule(Protocol):
 * `CameraConfigService`, `CameraConfigModel`: сохраняемые переопределения и effective конфигурация в `CameraSpec`.
 * Frontend `lib/live/`: протокол и `CameraImageSource`/`WsPreviewSource`; `useCameraLive`: отдельное `shallowRef`-состояние и явное освобождение bitmap на камеру; `CameraLiveView`: canvas кадра и боксов в одном requestAnimationFrame, подписка только при видимой работающей камере; `CameraFocusView`: крупный просмотр и `CameraConfigPanel`.
 
-Трекинг и правила ещё не подключены: интерфейс показывает детекции кадра, а не track ID/события. ONNX/WebRTC — дальнейшие adapters, не заглушки работающей функции.
+## Milestone 5: трекинг людей
+
+* `shared/people/track.py`: immutable `PersonTrack`, `PersonState` (`NORMAL`/`LOST`), center и anchor. Нет зависимости от CV-библиотек.
+* `tracking/tracker.py`: `PersonTracker.update(frame, detections)` / `reset`; `bytetrack.py`: adapter к готовому ByteTrack; `registry.py`: отдельный экземпляр на `(camera_id, run_id)`, сброс сцены по epoch/разрешению, очистка остановленных камер.
+* `_process` в том же одиночном inference executor: детекция → обновление трекера, в том числе с `[]` → immutable результат. JPEG и event loop не обращаются к изменяемому tracker state. CPU-трекинг не блокирует asyncio loop.
+* `DetectionResult.tracks` — immutable snapshot именно этого кадра. Preview v1 дополнен `tracks`; canvas подписывает подтверждённые детекции ID, не рисует LOST. Детекции-кандидаты пока без ID.
+* Параметры worker'а: `PERSON_TRACK_MAX_AGE`, `TRACK_MATCH_IOU`, `TRACK_ACTIVATION_CONFIDENCE`; конкретная семантика — [ADR-032](decisions/ADR-032-bytetrack-runtime.md).
+
+Зоны/линии/события, запись track sessions, аналитика и уникальные посетители ещё не подключены. ONNX/WebRTC — дальнейшие adapters, не заглушки работающей функции.

@@ -357,3 +357,95 @@ async def test_scripted_success_does_not_mask_repeated_model_failure(
     finally:
         scheduler._pool.shutdown()
         await hub.close()
+
+
+async def test_scheduler_delivers_confirmed_ids_and_releases_trackers(
+    sessions: list[CameraSession],
+) -> None:
+    session = make_session(sessions)
+    manager = CameraManager(lambda _: session)
+    manager._sessions[session.camera_id] = session
+    hub = PreviewHub(fps=30)
+    queue = hub.subscribe(session.camera_id)
+    scheduler = InferenceScheduler(manager, FakeDetector(), hub, max_wait_ms=0)
+    stop = asyncio.Event()
+    task = asyncio.create_task(scheduler.run(stop))
+    try:
+        await asyncio.wait_for(queue.get(), 2)
+        from dataclasses import replace
+
+        assert session._result is not None
+        session.buffer.put(replace(make_frame(2), source_epoch=session._result.frame.source_epoch))
+        packet = await asyncio.wait_for(queue.get(), 2)
+        size = struct.unpack("!I", packet[:4])[0]
+        header = json.loads(packet[4 : 4 + size])
+        assert header["frame_id"] == 2
+        assert header["tracks"]
+        assert all(t["track_id"] > 0 for t in header["tracks"])
+        assert all(t["state"] == "NORMAL" for t in header["tracks"])
+    finally:
+        stop.set()
+        await asyncio.wait_for(task, 2)
+        assert not scheduler._trackers._entries
+        await hub.close()
+        await manager.stop_all()
+
+
+def test_scheduler_passes_empty_detections_to_tracking(sessions: list[CameraSession]) -> None:
+    from vision_worker.tracking.registry import TrackerRegistry
+
+    class EmptyDetector(FakeDetector):
+        def detect(self, frames: Sequence[Frame], confidence: float) -> list[list[PersonDetection]]:
+            return [[] for _ in frames]
+
+    class RecordingRegistry(TrackerRegistry):
+        def __init__(self) -> None:
+            super().__init__()
+            self.seen: list[DetectionResult] = []
+
+        def update(self, result: DetectionResult) -> tuple[()]:
+            self.seen.append(result)
+            return ()
+
+    session = make_session(sessions)
+    hub = PreviewHub()
+    registry = RecordingRegistry()
+    scheduler = InferenceScheduler(
+        CameraManager(lambda _: session), EmptyDetector(), hub, trackers=registry
+    )
+    try:
+        output = scheduler._process([WorkItem(session, make_frame(1), 0.25)])
+        assert len(registry.seen) == 1 and registry.seen[0].detections == ()
+        assert isinstance(output[0], DetectionResult)
+    finally:
+        scheduler._pool.shutdown()
+        hub._pool.shutdown()
+
+
+async def test_tracking_failure_is_isolated_and_not_a_model_failure(
+    sessions: list[CameraSession],
+) -> None:
+    from ai_detector_core.people.track import PersonTrack
+    from vision_worker.tracking.registry import TrackerRegistry
+
+    broken = make_session(sessions)
+    healthy = make_session(sessions)
+
+    class FailingRegistry(TrackerRegistry):
+        def update(self, result: DetectionResult) -> tuple[PersonTrack, ...]:
+            if result.camera_id == broken.camera_id:
+                raise RuntimeError("test tracker failure")
+            return super().update(result)
+
+    hub = PreviewHub()
+    scheduler = InferenceScheduler(
+        CameraManager(lambda _: broken), FakeDetector(), hub, trackers=FailingRegistry()
+    )
+    try:
+        output = scheduler._process([WorkItem(s, make_frame(1), 0.25) for s in [broken, healthy]])
+        assert isinstance(output[0], RuntimeError)
+        assert isinstance(output[1], DetectionResult)
+        assert scheduler.healthy  # Detector readiness is independent of a camera tracker failure.
+    finally:
+        scheduler._pool.shutdown()
+        await hub.close()

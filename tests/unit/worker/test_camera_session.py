@@ -122,3 +122,31 @@ def test_unexpected_exception_is_reported_as_error(make_session: SessionFactory)
     session.start()
     wait_for(lambda: session.state is CameraStatus.ERROR)
     assert session.status().last_error == "bug"
+
+
+def test_scene_epoch_survives_dropped_loop_frame_and_reconnect(
+    make_session: SessionFactory,
+) -> None:
+    from dataclasses import replace
+
+    source = ScriptedSource()
+    session = make_session(source)
+    session.start()
+    source.items.put(make_frame(1))
+    wait_for(lambda: session.status().last_frame_at is not None)
+    first = session.buffer.take()
+    assert first is not None
+    source.items.put(replace(make_frame(2), discontinuity=True))
+    source.items.put(make_frame(3))
+    wait_for(lambda: source.items.empty())
+    # Wait for the capture thread to publish, not merely consume, the last queue item.
+    wait_for(lambda: session.buffer.dropped >= 1)
+    looped = session.buffer.take()
+    assert looped is not None and looped.frame_id == 3 and not looped.discontinuity
+    assert looped.source_epoch > first.source_epoch
+    source.items.put(SourceUnavailableError("interrupted"))
+    wait_for(lambda: source.starts == 2)
+    source.items.put(make_frame(4))
+    wait_for(lambda: session.state is CameraStatus.RUNNING)
+    recovered = session.buffer.take()
+    assert recovered is not None and recovered.source_epoch > looped.source_epoch

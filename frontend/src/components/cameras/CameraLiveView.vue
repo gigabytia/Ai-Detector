@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import type { Camera } from '@/api/cameras'
 import { useCameraLive } from '@/composables/useCameraLive'
 import { useNow } from '@/composables/useNow'
+import { overlayPeople } from '@/lib/live/overlay'
 
 const props = defineProps<{ camera: Camera }>()
 const { t } = useI18n()
@@ -50,7 +51,7 @@ function draw() {
       ctx.fillStyle = '#6ee7b7'
       ctx.lineWidth = 2 * scale
       ctx.font = `${12 * scale}px Arial`
-      for (const d of value.metadata.detections) {
+      for (const d of overlayPeople(value.metadata)) {
         const [x1, y1, x2, y2] = d.bbox
         ctx.strokeRect(
           x1 * target.width,
@@ -58,7 +59,8 @@ function draw() {
           (x2 - x1) * target.width,
           (y2 - y1) * target.height,
         )
-        const label = `${t('live.person')} ${Math.round(d.confidence * 100)}%`
+        const identity = d.trackId === undefined ? '' : ` #${d.trackId}`
+        const label = `${t('live.person')}${identity} ${Math.round(d.confidence * 100)}%`
         const x = x1 * target.width
         const y = Math.max(16 * scale, y1 * target.height)
         const width = ctx.measureText(label).width + 8 * scale

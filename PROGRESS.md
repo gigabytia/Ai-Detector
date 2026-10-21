@@ -4,11 +4,52 @@
 
 ## Текущий этап
 
-**Milestone 4 — детекция людей и визуализация: выполнен.** Следующий — Milestone 5 (person tracking).
+**Milestone 5 — person tracking: выполнен.** Следующий — Milestone 6 (danger zone).
 
 Реализация заново восстановлена на базе присланного архива Milestone 3 после утраты предыдущего рабочего окружения. Это не побайтовое восстановление незавершённой сессии: использованы сохранённые архитектурные документы, ADR и доступный контекст. Исходный `AI_DETECTOR_v2_MASTER_PROMPT.md` в архиве отсутствовал.
 
-## Сделано
+## Milestone 5 — результат текущей сессии
+
+Работа продолжена из последнего пользовательского `Ai-Detector.zip`, HEAD `8a7a28c`. Учтены Windows-настройки PostgreSQL: host `127.0.0.1:15432`, внутри Docker по-прежнему `postgres:5432`. Исходное ТЗ снова предоставлено пользователем и сохранено в [docs/spec/AI_DETECTOR_v2_MASTER_PROMPT.md](docs/spec/AI_DETECTOR_v2_MASTER_PROMPT.md). Новые коммиты оформляются от имени **Kostya** с существующей в репозитории Git-идентичностью.
+
+### Сделано
+
+* Типизированный immutable `PersonTrack`, `PersonState` NORMAL/LOST, center и anchor, UTC/source timestamps, возраст, hits и последовательные пропуски.
+* `PersonTracker`, adapter к готовому ByteTrack (`trackers 2.6.1`, `supervision 0.31.1`), реестр на `(camera_id, run_id)` в одиночном inference executor. Библиотечные объекты не выходят в домен или preview. Собственного association/Kalman, re-ID, лиц, объектов и pose нет.
+* Update на каждом обработанном кадре, включая `[]`. При пропуске — LOST; при возврате до истечения — тот же ID. Удаление строго на 25-м последовательном пропуске (настраивается), без воскрешения просроченного tracklet. Ошибка inference не подменяется пустой детекцией; ошибка tracker изолирована по камере с логом и сбросом повреждённой сцены.
+* При loop/reconnect/разрешении сцена сбрасывается, публичные ID внутри run не переиспользуются. `source_epoch` переживает вытеснение первого кадра после разрыва из latest-frame буфера. Stop/delete/ERROR/restart/shutdown очищают tracker registry, даже без новых кадров; история старых ID не накапливается.
+* Worker settings: `PERSON_TRACK_MAX_AGE=25`, `TRACK_MATCH_IOU=0.5`, `TRACK_ACTIVATION_CONFIDENCE=0.25`. IoU проверен как настоящий порог перекрытия, без confidence fusion. Камерные FPS/confidence по-прежнему применяются горячо без смены run/ID.
+* Preview v1 дополнен tracks из того же кадра; frontend проверяет поля и уникальность ID. Подпись `Человек #ID` только у подтверждённой детекции; LOST bbox не рисуется и не добавляется в счётчик людей. Старые пакеты без tracks также принимаются. REST/OpenAPI и схема БД не менялись.
+* `.gitattributes` закрепляет LF для исходников, чтобы Windows checkout не ломал Prettier. Обновлены README, behavior, architecture, data-flow, API/development docs, индекс ADR. [ADR-032](docs/decisions/ADR-032-bytetrack-runtime.md) уточняет устаревший библиотечный путь из ADR-003: ByteTrack перенесён upstream в пакет trackers.
+
+### Проверено сейчас
+
+Linux x86_64, Python 3.12.15, Node 24.14.1 (ниже заявленного engine; использовать поддерживаемый Node), PostgreSQL 17.10, Valkey 9.0.5, CPU. Lock модели/torch сохранён; добавлены trackers 2.6.1 и supervision 0.31.1, версии проверены по PyPI и установленному коду.
+
+| Проверка | Результат |
+|---|---|
+| `make check` | Все проверки прошли: ruff check/format, mypy strict (120 source files), ESLint, Prettier, vue-tsc, тесты и production build |
+| `uv run pytest` | **122 passed**, 11 integration deselected. В том числе стабильность/перестановка ID, пустые кадры, восстановление, ровно 25 пропусков, N=1, confidence 0.25, настоящий IoU, независимость камер/run, loop/reconnect/разрешение, очистка памяти, изоляция ошибок |
+| `uv run pytest -m integration` | **11 passed** на настоящих PostgreSQL/Valkey, миграции применены с пустой БД |
+| `npm --prefix frontend test` | **64 passed** в 9 файлах, включая контракт tracks и overlay без LOST/выдуманных ID |
+| `uv lock --check`, `alembic check`, экспорт OpenAPI | Lock согласован, новых миграционных операций нет; экспорт JSON совпадает с frontend/openapi.json |
+| YOLO + ByteTrack + 2 mock через Vite WebSocket | Реальная модель на 12-секундном MP4 из статичного официального bus.jpg: 51 согласованный JPEG/metadata пакет за ~15 с; стабильные ID на соседних кадрах, после цикла новые возрастающие ID при том же run. Оба mock обрабатываются параллельно |
+| Горячие настройки / restart | Смена FPS/confidence сохраняет run и ID; restart создаёт другой run с собственной нумерацией от 1 |
+| Chromium/Playwright | 3 непустых canvas; перехвачены реальные fillText `Человек #ID`; monitoring/focus, 390px, светлая/тёмная темы; pageerror нет, горизонтального overflow нет. Скриншоты в docs/qa/m5; image-viewer песочницы не смог их открыть, визуальная оценка через него не заявляется |
+| SIGTERM при открытом WS | Соединение закрыто, runtime-ключи Redis удалены за ~1.11 с; процессы приложения завершились |
+| `npm audit --omit=dev` | Production: **0 уязвимостей**. Полный dev-audit на этом этапе не повторялся; прежний риск указан ниже |
+
+Логи проверок и описание QA — [docs/qa/m5/README.md](docs/qa/m5/README.md).
+
+### Ограничения и следующий шаг
+
+* Windows, Docker compose/CI, CUDA/GPU и реальная RTSP/IP-камера **не проверялись** в этой сессии. Сервисы запущены нативно на Linux, не в Docker. Проверка reconnect — детерминированным источником, не реальным сетевым обрывом.
+* Реальная модель проверена на статичном тестовом ролике, а движение/пропуски/IoU — синтетическими детекциями готового ByteTrack. Это не оценка IDF1/качества на настоящем движущемся CCTV и не benchmark 4/8 камер. Наблюдавшаяся скорость preview не является обещанием целевого FPS.
+* Новый кандидат подтверждается следующим совпадением; first_seen/age/hits начинаются с подтверждения. При низком FPS/резких движениях/долгой окклюзии ID может измениться: биометрической идентификации нет.
+* Треки пока только runtime: PostgreSQL/track sessions/аналитика/уникальные посетители не добавлены. Состояние теряется при аварии worker'а (ADR-019).
+* Следующий этап — **Milestone 6: danger zone**, нормализованный polygon, anchor point-in-polygon, dwell и событие по плану ТЗ. Зоны/линии/события раньше своих этапов не имитируются.
+
+## Сделано ранее
 
 ### Milestone 4 — детекция людей и визуализация
 * `PersonDetector`/`PersonDetection`, Ultralytics adapter: YOLO26 nano, только COCO person, боксы в пикселях исходного изображения. Manifest (backend, веса, SHA-256, вход 640, класс, лицензия), явная атомарная загрузка `uv run ai-detector-model` / `make model`, проверка целостности и warmup до HTTP. При ошибке модели/устройства — CRITICAL и exit 1; скачивания и тихого scripted fallback на старте нет.
@@ -20,7 +61,7 @@
 * Frontend: `CameraImageSource`/`WsPreviewSource`, bounded latest-only decode, backoff; отдельное shallow-состояние на камеру, явное освобождение bitmap. Canvas кадров и нормализованных боксов, подписка только для видимой работающей камеры, устаревший кадр помечается. Плитка открывает крупный просмотр `/monitoring/:cameraId`, редактор FPS/порога с наследованием, валидацией, сбросом и сохранением. Трекинг и уникальные посетители не имитируются.
 * Обновлены OpenAPI/TS-типы, README, `.env.example`, Makefile, Docker mount моделей и `.dockerignore` (без host node_modules/venv в контексте), docs и ADR-029…031; ADR-016/028 уточнены. CPU PyTorch и единственная headless-сборка OpenCV; веса и лицензионные сведения включены в передаваемый архив.
 
-## Проверено сейчас — Milestone 4
+## Проверено на этапе Milestone 4 (история)
 
 Окружение: Linux x86_64, Python 3.12.15 (uv), Node 24.14.1, PostgreSQL 17.10, Valkey 9.0.5, CPU. Node в песочнице ниже заявленного в package.json engine >=24.15.0; для своего запуска используйте поддерживаемую версию Node. Реальная модель: Ultralytics 8.4.177, torch 2.14.1+cpu, torchvision 0.29.1+cpu, numpy 2.5.3, OpenCV headless 5.0.0.93.
 
@@ -115,6 +156,6 @@ Milestone 2 проверки (health, отключение Redis, шаги Docke
 * `StarletteDeprecationWarning` для TestClient (httpx → httpx2) — на работу не влияет.
 * Риски из Milestone 1 актуальны: cooldown без zone_id ([ADR-008](docs/decisions/ADR-008-cooldown.md)), потеря активных треков при аварии worker'а ([ADR-019](docs/decisions/ADR-019-track-persistence.md)).
 
-## Следующий шаг
+## Следующий шаг после Milestone 4 (история, выполнено выше)
 
 Milestone 5 — person tracking: интерфейс `PersonTracker`, ByteTrack adapter, registry и track_id в пределах камеры/run_id, update на каждом обработанном кадре (включая пустые детекции), сброс при discontinuity, отрисовка track ID. Зоны/линии/события пока не добавлять раньше своих этапов.

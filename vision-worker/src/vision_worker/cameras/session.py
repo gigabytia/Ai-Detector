@@ -4,6 +4,7 @@ import logging
 import threading
 import time
 import uuid
+from dataclasses import replace
 from datetime import datetime
 
 from ai_detector_core.cameras.spec import CameraSpec
@@ -34,6 +35,7 @@ class CameraSession:
         self.run_id = uuid.uuid4()
         self.buffer = LatestFrameBuffer()
         self._source = source
+        self._source_epoch = 0
         self._backoff = Backoff(backoff)
         self._worker_id = worker_id
         self._clock = clock
@@ -153,6 +155,9 @@ class CameraSession:
     def _read_frames(self) -> None:
         first = True
         while not self._stop.is_set() and (frame := self._source.read()) is not None:
+            if first or frame.discontinuity:
+                self._source_epoch += 1
+            frame = replace(frame, source_epoch=self._source_epoch)
             if first:
                 first = False
                 self._backoff.reset()
