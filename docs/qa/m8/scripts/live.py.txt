@@ -1,0 +1,50 @@
+import asyncio,json,hashlib
+from pathlib import Path
+import cv2,numpy as np,httpx,websockets
+ROOT=Path('/data/work-m7/Ai-Detector')
+async def main():
+ async with httpx.AsyncClient(base_url='http://127.0.0.1:18000',timeout=30) as c:
+  cameras=(await c.get('/api/v1/cameras')).json()
+  events=(await c.get('/api/v1/events',params={'limit':200})).json()['items']
+  real=next(camera for camera in cameras if camera['source_type']=='file' and camera['enabled'])
+  mock=next(camera for camera in cameras if camera['source_type']=='mock' and camera['enabled'])
+  selected=next(e for e in events if e['camera_id']==real['id'] and e['snapshot_url'])
+  for camera in [real,mock]:
+   item=next(e for e in events if e['camera_id']==camera['id'] and e['snapshot_url'])
+   response=await c.get(item['snapshot_url']);response.raise_for_status()
+   img=cv2.imdecode(np.frombuffer(response.content,np.uint8),cv2.IMREAD_COLOR)
+   assert img is not None and img.shape[:2]==(item['snapshot_height'],item['snapshot_width'])
+   assert max(img.shape[:2])>640
+   async with websockets.connect(f"ws://127.0.0.1:18001/cameras/{camera['id']}/preview") as ws:
+    preview=await asyncio.wait_for(ws.recv(),5)
+    header=int.from_bytes(preview[:4], "big")
+    small=cv2.imdecode(np.frombuffer(preview[4+header:],np.uint8),cv2.IMREAD_COLOR)
+    assert small is not None and small.shape[1]<=640
+   print(json.dumps({'kind':camera['source_type'],'event':item['id'],'snapshot':[img.shape[1],img.shape[0]],'preview':[small.shape[1],small.shape[0]],'jpeg_sha256':hashlib.sha256(response.content).hexdigest()}),flush=True)
+  # Toggle config without restarting a camera run, then wait for later alarms.
+  camera=mock['id'];start=max(e['occurred_at'] for e in events if e['camera_id']==camera)
+  run=next(e['run_id'] for e in events if e['camera_id']==camera)
+  old_config=(await c.get(f'/api/v1/cameras/{camera}/config')).json()['overrides']
+  response=await c.put(f'/api/v1/cameras/{camera}/config',json={**old_config,'snapshot_enabled':False});response.raise_for_status()
+  assert response.json()['effective']['snapshot_enabled'] is False
+  # allow command propagation and avoid frames already in the writer
+  await asyncio.sleep(2)
+  boundary=(await c.get('/api/v1/events',params={'camera_id':camera})).json()['items'][0]['occurred_at']
+  disabled=None
+  for _ in range(80):
+   rows=(await c.get('/api/v1/events',params={'camera_id':camera})).json()['items']
+   disabled=next((e for e in rows if e['occurred_at']>boundary and not e['snapshot_id']),None)
+   if disabled:break
+   await asyncio.sleep(.25)
+  assert disabled and disabled['run_id']==run
+  (await c.put(f'/api/v1/cameras/{camera}/config',json={**old_config,'snapshot_enabled':True})).raise_for_status()
+  restored=None
+  for _ in range(100):
+   rows=(await c.get('/api/v1/events',params={'camera_id':camera})).json()['items']
+   restored=next((e for e in rows if e['occurred_at']>disabled['occurred_at'] and e['snapshot_id']),None)
+   if restored:break
+   await asyncio.sleep(.25)
+  assert restored and restored['run_id']==run
+  print(json.dumps({'hot_toggle':True,'run_preserved':run,'without_snapshot':disabled['id'],'restored_snapshot':restored['id']}),flush=True)
+  (ROOT/'docs/qa/m8/targets.json').write_text(json.dumps({'snapshot_event':selected['id'],'no_snapshot_event':disabled['id'],'camera':camera,'real_camera':real['id']}))
+asyncio.run(main())

@@ -3,6 +3,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
 import httpx
@@ -311,3 +312,286 @@ async def test_conflicting_operators_are_serialized(
         assert sorted(r.status_code for r in responses) == [200, 409]
         final = (await client.get(f"/api/v1/events/{event.id}")).json()
         assert bool(final["acknowledged_at"]) != bool(final["false_positive_at"])
+
+
+async def test_snapshot_delivery_rest_replay_and_missing_file(
+    transport: tuple[Redis, async_sessionmaker[AsyncSession], Settings],
+    tmp_path: Path,
+) -> None:
+    import cv2
+    import numpy as np
+
+    from ai_detector_core.events.transport import EventMessage, SnapshotMetadata
+    from ai_detector_core.storage.snapshots import LocalSnapshotStorage, snapshot_key
+    from app.infrastructure.database.models import SnapshotModel
+
+    redis, sessions, configured = transport
+    configured = configured.model_copy(update={"snapshot_path": tmp_path})
+    original = await make_event(sessions)
+    snapshot_id = uuid4()
+    key = snapshot_key(original.camera_id, original.occurred_at, snapshot_id)
+    ok, encoded = cv2.imencode(".jpg", np.full((240, 400, 3), 100, np.uint8))
+    assert ok
+    data = encoded.tobytes()
+    storage = LocalSnapshotStorage(tmp_path)
+    storage.put(key, data)
+    attachment = SnapshotMetadata(
+        id=snapshot_id,
+        event_id=original.id,
+        storage_key=key,
+        width=400,
+        height=240,
+        size_bytes=len(data),
+        created_at=datetime.now(UTC),
+    )
+    message = EventMessage(**original.model_dump(), snapshot=attachment)
+    publisher = EventPublisher(redis)
+    await publisher.publish(message)
+    ingest = EventIngest(redis, sessions)
+    batch = await read_batch(ingest)
+    await ingest.process(batch)
+    # Lost ACK / replay is idempotent for metadata too.
+    await ingest.process(batch)
+    async with sessions() as session:
+        assert len(list(await session.scalars(select(SnapshotModel)))) == 1
+        assert len(list(await session.scalars(select(EventModel)))) == 1
+    app = create_app(configured)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client,
+    ):
+        url = f"/api/v1/snapshots/{snapshot_id}"
+        detail = (await client.get(f"/api/v1/events/{original.id}")).json()
+        assert detail["snapshot_url"] == url and detail["snapshot_width"] == 400
+        assert detail["snapshot_height"] == 240 and "storage_key" not in detail
+        assert (await client.get("/api/v1/events")).json()["items"][0]["snapshot_id"] == str(
+            snapshot_id
+        )
+        image = await client.get(url)
+        assert image.status_code == 200 and image.content == data
+        assert image.headers["content-type"] == "image/jpeg"
+        assert image.headers["x-content-type-options"] == "nosniff"
+        assert image.headers["cache-control"] == "private, no-store"
+        await client.patch(
+            f"/api/v1/events/{original.id}",
+            json={"status": "ACKNOWLEDGED", "note": "снимок проверен"},
+        )
+        await publisher.publish(message)
+        # The API background consumer can race this test consumer; either path commits.
+        for _ in range(100):
+            if await redis.xlen(INGEST_STREAM) == 0:
+                break
+            await asyncio.sleep(0.01)
+        detail = (await client.get(f"/api/v1/events/{original.id}")).json()
+        assert detail["status"] == "ACKNOWLEDGED" and detail["note"] == "снимок проверен"
+        assert (await client.delete(f"/api/v1/cameras/{original.camera_id}")).status_code == 204
+        assert (await client.get(url)).content == data
+        storage.delete(key)
+        missing = await client.get(url)
+        assert (
+            missing.status_code == 404 and missing.json()["error"]["code"] == "SNAPSHOT_NOT_FOUND"
+        )
+        assert (await client.get(f"/api/v1/snapshots/{uuid4()}")).status_code == 404
+        assert (await client.get("/api/v1/snapshots/not-a-uuid")).status_code == 422
+
+
+async def test_bad_optional_snapshot_never_discards_alarm(
+    transport: tuple[Redis, async_sessionmaker[AsyncSession], Settings],
+) -> None:
+    from app.infrastructure.database.models import SnapshotModel
+
+    redis, sessions, _ = transport
+    original = await make_event(sessions)
+    payload = original.model_dump(mode="json")
+    payload["snapshot"] = {"storage_key": "../../etc/passwd"}
+    import json
+
+    await redis.xadd(INGEST_STREAM, {"event": json.dumps(payload)})
+    ingest = EventIngest(redis, sessions)
+    await ingest.process(await read_batch(ingest))
+    async with sessions() as session:
+        assert await session.get(EventModel, original.id)
+        assert not list(await session.scalars(select(SnapshotModel)))
+    assert await redis.xlen(DEAD_STREAM) == 0
+
+
+async def test_retention_keeps_events_recent_files_and_failed_deletions(
+    transport: tuple[Redis, async_sessionmaker[AsyncSession], Settings],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import os
+    from datetime import timedelta
+
+    from ai_detector_core.events.transport import EventMessage, SnapshotMetadata
+    from ai_detector_core.storage.snapshots import LocalSnapshotStorage, snapshot_key
+    from app.infrastructure.database.models import SnapshotModel
+    from app.infrastructure.storage.snapshot_retention import LOCK, SnapshotRetention
+
+    redis, sessions, _ = transport
+    storage = LocalSnapshotStorage(tmp_path)
+    ingest = EventIngest(redis, sessions, retention_days=365)
+    cutoff = datetime.now(UTC) - timedelta(days=30)
+    old = cutoff - timedelta(days=1)
+    ids, keys = [], []
+    for at in [old, old, datetime.now(UTC)]:
+        original = await make_event(sessions)
+        snapshot_id = uuid4()
+        key = snapshot_key(original.camera_id, original.occurred_at, snapshot_id)
+        storage.put(key, b"jpeg")
+        metadata = SnapshotMetadata(
+            id=snapshot_id,
+            event_id=original.id,
+            storage_key=key,
+            width=10,
+            height=20,
+            size_bytes=4,
+            created_at=at,
+        )
+        await EventPublisher(redis).publish(
+            EventMessage(**original.model_dump(), snapshot=metadata)
+        )
+        ids.append((original.id, snapshot_id))
+        keys.append(key)
+    await ingest.process(await read_batch(ingest))
+    orphan = snapshot_key(uuid4(), old, uuid4())
+    storage.put(orphan, b"orphan")
+    path = tmp_path / orphan.removeprefix("snapshots/")
+    os.utime(path, (old.timestamp(), old.timestamp()))
+    temp = path.parent / ".snapshot-crash.part"
+    temp.write_bytes(b"partial")
+    os.utime(temp, (old.timestamp(), old.timestamp()))
+    original_delete = storage.delete
+
+    def fail_one(key: str) -> None:
+        if key == keys[1]:
+            raise PermissionError("readonly disk")
+        original_delete(key)
+
+    monkeypatch.setattr(storage, "delete", fail_one)
+    retention = SnapshotRetention(redis, sessions, storage)
+    await retention.clean(cutoff)
+    async with sessions() as session:
+        assert await session.get(SnapshotModel, ids[0][1]) is None
+        assert await session.get(SnapshotModel, ids[1][1]) is not None
+        assert await session.get(SnapshotModel, ids[2][1]) is not None
+        assert len(list(await session.scalars(select(EventModel)))) == 3
+    assert not path.exists() and not temp.exists()
+    with storage.open(keys[2]) as file:
+        assert file.read() == b"jpeg"
+    await redis.set(LOCK, "other-api", ex=120)
+    assert not await retention.once()
+    assert await redis.get(LOCK) == b"other-api"
+    await redis.delete(LOCK)
+    monkeypatch.setattr(storage, "delete", original_delete)
+    assert await retention.once()
+    assert await redis.get(LOCK) is None
+    async with sessions() as session:
+        assert await session.get(SnapshotModel, ids[1][1]) is None
+        assert len(list(await session.scalars(select(EventModel)))) == 3
+
+
+async def test_snapshot_insert_failure_rolls_back_event_before_ack(
+    transport: tuple[Redis, async_sessionmaker[AsyncSession], Settings],
+) -> None:
+    from sqlalchemy import event as sql_event
+
+    from ai_detector_core.events.transport import EventMessage, SnapshotMetadata
+    from ai_detector_core.storage.snapshots import snapshot_key
+    from app.infrastructure.database.models import SnapshotModel
+
+    redis, sessions, _ = transport
+    original = await make_event(sessions)
+    snapshot_id = uuid4()
+    metadata = SnapshotMetadata(
+        id=snapshot_id,
+        event_id=original.id,
+        storage_key=snapshot_key(original.camera_id, original.occurred_at, snapshot_id),
+        width=10,
+        height=20,
+        size_bytes=4,
+        created_at=datetime.now(UTC),
+    )
+    await EventPublisher(redis).publish(EventMessage(**original.model_dump(), snapshot=metadata))
+    ingest = EventIngest(redis, sessions)
+    batch = await read_batch(ingest)
+    engine = sessions.kw["bind"]
+
+    def fail_snapshot(
+        conn: object,
+        cursor: object,
+        statement: str,
+        parameters: object,
+        context: object,
+        executemany: bool,
+    ) -> None:
+        if statement.startswith("INSERT INTO snapshots"):
+            raise OSError("disk/connection failed while inserting snapshot")
+
+    sql_event.listen(engine.sync_engine, "before_cursor_execute", fail_snapshot)
+    try:
+        with pytest.raises(OSError):
+            await ingest.process(batch)
+    finally:
+        sql_event.remove(engine.sync_engine, "before_cursor_execute", fail_snapshot)
+    async with sessions() as session:
+        assert await session.get(EventModel, original.id) is None
+        assert await session.get(SnapshotModel, snapshot_id) is None
+    assert (await redis.xpending(INGEST_STREAM, INGEST_GROUP))["pending"] == 1
+    await ingest.process(batch)
+    async with sessions() as session:
+        assert await session.get(EventModel, original.id)
+        assert await session.get(SnapshotModel, snapshot_id)
+
+
+async def test_expired_replay_does_not_resurrect_metadata_and_live_payload_is_private(
+    transport: tuple[Redis, async_sessionmaker[AsyncSession], Settings],
+) -> None:
+    from datetime import timedelta
+
+    from ai_detector_core.events.transport import EventMessage, SnapshotMetadata
+    from ai_detector_core.storage.snapshots import snapshot_key
+    from ai_detector_core.telemetry.event_bus import EVENTS_LIVE
+    from app.infrastructure.database.models import SnapshotModel
+
+    redis, sessions, _ = transport
+    original = await make_event(sessions)
+    snapshot_id = uuid4()
+    metadata = SnapshotMetadata(
+        id=snapshot_id,
+        event_id=original.id,
+        storage_key=snapshot_key(original.camera_id, original.occurred_at, snapshot_id),
+        width=10,
+        height=20,
+        size_bytes=4,
+        created_at=datetime.now(UTC) - timedelta(days=31),
+    )
+    message = EventMessage(**original.model_dump(), snapshot=metadata)
+    async with redis.pubsub() as pubsub:
+        await pubsub.subscribe(EVENTS_LIVE)
+        await pubsub.get_message(timeout=1)  # subscribe confirmation
+        await EventPublisher(redis).publish(message)
+        packet = await pubsub.get_message(ignore_subscribe_messages=True, timeout=2)
+        assert packet and b"storage_key" not in packet["data"] and b"snapshot" not in packet["data"]
+    ingest = EventIngest(redis, sessions)
+    batch = await read_batch(ingest)
+    await ingest.process(batch)
+    await ingest.process(batch)
+    async with sessions() as session:
+        assert await session.get(EventModel, original.id)
+        assert await session.get(SnapshotModel, snapshot_id) is None
+
+
+async def test_retention_lease_cannot_renew_or_release_another_owners_lock(
+    transport: tuple[Redis, async_sessionmaker[AsyncSession], Settings],
+) -> None:
+    from app.infrastructure.storage.snapshot_retention import LOCK, RELEASE, RENEW
+
+    redis, _, _ = transport
+    await redis.set(LOCK, "new-owner", ex=50)
+    assert await redis.eval(RENEW, 1, LOCK, "old-owner") == 0
+    assert await redis.eval(RELEASE, 1, LOCK, "old-owner") == 0
+    assert await redis.get(LOCK) == b"new-owner"
+    assert await redis.eval(RENEW, 1, LOCK, "new-owner") == 1
+    assert await redis.ttl(LOCK) >= 119
+    assert await redis.eval(RELEASE, 1, LOCK, "new-owner") == 1

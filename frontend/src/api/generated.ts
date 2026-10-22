@@ -90,6 +90,23 @@ export interface paths {
         patch: operations["update_event_api_v1_events__event_id__patch"];
         trace?: never;
     };
+    "/api/v1/snapshots/{snapshot_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Snapshot */
+        get: operations["get_snapshot_api_v1_snapshots__snapshot_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/status": {
         parameters: {
             query?: never;
@@ -278,6 +295,11 @@ export interface components {
         /** CameraConfig */
         CameraConfig: {
             /**
+             * Snapshot Enabled
+             * @default true
+             */
+            snapshot_enabled: boolean;
+            /**
              * Target Fps
              * @default 10
              */
@@ -305,6 +327,8 @@ export interface components {
         };
         /** CameraConfigOverrides */
         CameraConfigOverrides: {
+            /** Snapshot Enabled */
+            snapshot_enabled?: boolean | null;
             /** Target Fps */
             target_fps?: number | null;
             /** Detection Confidence */
@@ -517,6 +541,14 @@ export interface components {
             acknowledged_at: string | null;
             /** False Positive At */
             false_positive_at: string | null;
+            /** Snapshot Id */
+            snapshot_id?: string | null;
+            /** Snapshot Url */
+            snapshot_url?: string | null;
+            /** Snapshot Width */
+            snapshot_width?: number | null;
+            /** Snapshot Height */
+            snapshot_height?: number | null;
         };
         /** EventUpdate */
         EventUpdate: {
@@ -968,6 +1000,55 @@ export interface operations {
             };
             /** @description Service Unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_snapshot_api_v1_snapshots__snapshot_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

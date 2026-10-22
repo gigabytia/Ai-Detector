@@ -1,6 +1,6 @@
 # Архитектура AI Detector v2
 
-> Реализован Milestone 7: камеры, детекция, ByteTrack, preview, зоны, event bus/хранение тревог, SSE, операторские статусы и отдельная WS-телеметрия. Snapshot — M8, линии/loitering/аналитика — позже. Целевая архитектура ниже шире текущего состава; актуальная реализация — PROGRESS.md и ADR-034.
+> Реализован Milestone 8: камеры, детекция, ByteTrack, preview, зоны, event bus/история/SSE, статусы, WS-телеметрия, event snapshots/detail и snapshot retention. Линии/loitering/аналитика — позже. Целевая архитектура ниже шире реализации; актуальная граница — PROGRESS.md, ADR-034/035.
 
 Система видеонаблюдения: находит **людей** на видеопотоках, отслеживает их (track ID внутри камеры) и сообщает оператору о входе в опасную зону, пересечении линии и долгом нахождении в зоне. Объекты, перенос груза и pose estimation в эту версию не входят (ТЗ §2, §27).
 
@@ -219,3 +219,7 @@ class EventRule(Protocol):
 * events + миграция 14d6499b16a2. FK зон SET NULL, история soft-deleted камер сохраняется. track_sessions/snapshots/analytics таблиц пока нет.
 * Один frontend useRealtime, bounded volatile alarm store, пагинированный EventsView/карточки с заметкой и ACK/FP. useTelemetry только для focus, preview остаётся независимым.
 * Точные гарантии и остаточные риски — [ADR-034](decisions/ADR-034-event-delivery-realtime.md). M6-граница выше описывает историю этапа, а не текущее отсутствие доставки.
+
+## Добавлено в Milestone 8
+
+Shared stdlib LocalSnapshotStorage, отдельный bounded SnapshotWriter/thread pool worker, optional EventMessage snapshot, одна DB-транзакция event+metadata, UUID JPEG endpoint и event detail Vue. API retention имеет независимую maintenance task (не включена в event_delivery readiness probe), Redis lease renewal и safe ownership release. Shutdown worker дожидается capture/encode до остановки publisher. См. [ADR-035](decisions/ADR-035-event-snapshots.md).

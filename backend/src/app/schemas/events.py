@@ -1,4 +1,4 @@
-"""Event REST and live schemas; no snapshots until M8."""
+"""Event REST and live schemas; snapshots are optional and may expire."""
 
 from datetime import datetime
 from typing import Literal
@@ -29,6 +29,10 @@ class EventRead(BaseModel):
     updated_at: datetime
     acknowledged_at: datetime | None
     false_positive_at: datetime | None
+    snapshot_id: UUID | None = None
+    snapshot_url: str | None = None
+    snapshot_width: int | None = None
+    snapshot_height: int | None = None
 
 
 class EventPage(BaseModel):

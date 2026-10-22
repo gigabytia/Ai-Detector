@@ -166,3 +166,7 @@ cameras 1─1 camera_configs
 Миграция `c631d038af01` (после `b452b4c88e6b`) создаёт `zones`: UUID PK, camera_id FK CASCADE + index, name varchar(100), points JSONB, enabled, UTC created_at/updated_at. CHECK проверяет JSON array и 3..64 точки; полную геометрию валидирует Pydantic. API ограничивает 16 зон на камеру под блокировкой родительской строки.
 
 В `camera_configs` добавлены nullable FLOAT `zone_enter_dwell_seconds`, `zone_exit_grace_seconds`, `event_cooldown_seconds`, каждый с CHECK 0..3600. NULL/отсутствующая строка наследует API default. Downgrade удаляет зоны и эти интервалы, поэтому **нельзя выполнять его на рабочей БД ради обновления**. При обычном обновлении нужен только `upgrade head`. События/кадры/треки в PostgreSQL на M6 ещё не записываются.
+
+## Реализовано в Milestone 8
+
+Миграция `48f1a410c0ce` после `14d6499b16a2`: snapshots с UUID PK, event_id UNIQUE FK CASCADE, storage_key UNIQUE varchar(200), content_type CHECK image/jpeg, positive width/height/size_bytes, UTC created_at index. CameraConfig nullable boolean snapshot_enabled. Событие и metadata пишутся одной ingest-транзакцией (ON CONFLICT DO NOTHING), файл — до доставки, не часть PostgreSQL transaction. Retention удаляет metadata только после успешного unlink/missing file; event остаётся. Повтор старше текущего retention cutoff не воскрешает metadata. Downgrade M8 удаляет snapshots/config override, но не events; физические файлы не удаляются миграцией. Не использовать downgrade как обновление.

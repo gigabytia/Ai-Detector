@@ -9,11 +9,13 @@ import CameraConfigPanel from './CameraConfigPanel.vue'
 
 vi.mock('@/api/cameras', () => ({ fetchCameraConfig: vi.fn(), saveCameraConfig: vi.fn() }))
 const timingDefaults = {
+  snapshot_enabled: true,
   zone_enter_dwell_seconds: 0.25,
   zone_exit_grace_seconds: 0.5,
   event_cooldown_seconds: 3,
 }
 const timingOverrides = {
+  snapshot_enabled: null,
   zone_enter_dwell_seconds: null,
   zone_exit_grace_seconds: null,
   event_cooldown_seconds: null,
@@ -106,6 +108,27 @@ it('preserves and edits zone timing overrides with detection settings', async ()
     zone_enter_dwell_seconds: 2,
     zone_exit_grace_seconds: null,
     event_cooldown_seconds: 6,
+    snapshot_enabled: null,
   })
   wrapper.unmount()
+})
+
+it('persists snapshot on/off override and resets it to inheritance', async () => {
+  const wrapper = render()
+  await flushPromises()
+  await wrapper.get('select[id=snapshot-a]').setValue('false')
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
+  expect(saveCameraConfig).toHaveBeenLastCalledWith(
+    'a',
+    expect.objectContaining({ snapshot_enabled: false }),
+  )
+  const reset = wrapper.findAll('button').find((b) => b.text().includes('Сбросить'))!
+  await reset.trigger('click')
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
+  expect(saveCameraConfig).toHaveBeenLastCalledWith(
+    'a',
+    expect.objectContaining({ snapshot_enabled: null }),
+  )
 })

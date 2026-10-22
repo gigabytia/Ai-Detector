@@ -41,8 +41,12 @@ services:
       ZONE_EXIT_GRACE_SECONDS: ${ZONE_EXIT_GRACE_SECONDS:-0.5}
       EVENT_COOLDOWN_SECONDS: ${EVENT_COOLDOWN_SECONDS:-3}
       WORKER_API_TOKEN: ${WORKER_API_TOKEN:-dev-worker-token-change-me}
+      SNAPSHOT_PATH: /data/snapshots
+      SNAPSHOT_ENABLED: ${SNAPSHOT_ENABLED:-true}
+      SNAPSHOT_RETENTION_DAYS: ${SNAPSHOT_RETENTION_DAYS:-30}
+      SNAPSHOT_CLEANUP_INTERVAL_SECONDS: ${SNAPSHOT_CLEANUP_INTERVAL_SECONDS:-3600}
       UPLOAD_PATH: /data/uploads
-    volumes: ["uploads:/data/uploads"]
+    volumes: ["uploads:/data/uploads", "snapshots:/data/snapshots"]
     ports: ["8000:8000"]
     depends_on:
       postgres: { condition: service_healthy }
@@ -61,8 +65,9 @@ services:
       TRACK_ACTIVATION_CONFIDENCE: ${TRACK_ACTIVATION_CONFIDENCE:-0.25}
       API_BASE_URL: http://api:8000
       WORKER_API_TOKEN: ${WORKER_API_TOKEN:-dev-worker-token-change-me}
+      SNAPSHOT_PATH: /data/snapshots
       UPLOAD_PATH: /data/uploads
-    volumes: ["uploads:/data/uploads:ro", "./models:/app/models:ro"]
+    volumes: ["uploads:/data/uploads:ro", "./models:/app/models:ro", "snapshots:/data/snapshots"]
     ports: ["8001:8001"]
     depends_on:
       redis: { condition: service_healthy }
@@ -83,3 +88,4 @@ volumes:
   postgres-data:
   redis-data:
   uploads:
+  snapshots:

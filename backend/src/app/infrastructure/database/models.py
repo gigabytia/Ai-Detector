@@ -17,7 +17,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.database.base import Base
 
@@ -75,6 +75,7 @@ class CameraConfigModel(Base):
     camera_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("cameras.id", ondelete="CASCADE"), primary_key=True
     )
+    snapshot_enabled: Mapped[bool | None] = mapped_column(Boolean)
     target_fps: Mapped[float | None] = mapped_column(Float)
     detection_confidence: Mapped[float | None] = mapped_column(Float)
 
@@ -129,3 +130,23 @@ class EventModel(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     false_positive_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    snapshot: Mapped["SnapshotModel | None"] = relationship(lazy="selectin", uselist=False)
+
+
+class SnapshotModel(Base):
+    __tablename__ = "snapshots"
+    __table_args__ = (
+        CheckConstraint("width > 0 AND height > 0 AND size_bytes > 0", name="dimensions"),
+        CheckConstraint("content_type = 'image/jpeg'", name="content_type"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("events.id", ondelete="CASCADE"), unique=True
+    )
+    storage_key: Mapped[str] = mapped_column(String(200), unique=True)
+    content_type: Mapped[str] = mapped_column(String(32))
+    width: Mapped[int] = mapped_column(Integer)
+    height: Mapped[int] = mapped_column(Integer)
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)

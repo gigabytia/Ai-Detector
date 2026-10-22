@@ -4,11 +4,47 @@
 
 ## Текущий этап
 
-**Milestone 7 — realtime/event history: выполнен.** Следующий — Milestone 8 (snapshot storage, снимок события и event detail). История M6/M5 и их проверки сохранены ниже.
+**Milestone 8 — snapshots/event detail: выполнен.** Следующий — Milestone 9 (линия и crossing detection). Полная история Git и результаты M7/M6/M5 сохранены.
 
 Реализация заново восстановлена на базе присланного архива Milestone 3 после утраты предыдущего рабочего окружения. Это не побайтовое восстановление незавершённой сессии: использованы сохранённые архитектурные документы, ADR и доступный контекст. Исходный `AI_DETECTOR_v2_MASTER_PROMPT.md` в архиве отсутствовал.
 
-## Milestone 7 — результат текущей сессии
+## Milestone 8 — результат текущей сессии
+
+База — полный M7, HEAD `2d6aca3` (Kostya). Реальная полная `.git` и цепочка M4 → M5 → M6 → M7 сохранены; новый архив содержит и M8. Прежние результаты ниже — история этапов, не описание текущих ограничений, если M8 их явно снимает.
+
+### Сделано
+
+* Shared stdlib SnapshotStorage/LocalSnapshotStorage, полный исходный JPEG качества 90 без графики. Atomic temp+fsync+replace, UUID/UTC key, canonical path validation, отказ от symlink-компонентов; worker пишет, API читает/чистит один private directory/volume.
+* SnapshotWriter: отдельный thread pool (2), максимум 4 ожидающих/обрабатываемых задания. Снимок только при событии, inference не ждёт JPEG/диск/Redis. При disabled/overflow/codec/disk error публикуется сама тревога без снимка. Shutdown сначала останавливает inference, затем дожидается снимков, затем завершает event delivery.
+* EventMessage с optional SnapshotMetadata. Один ingest payload, event + metadata одной транзакцией PostgreSQL; ACK после commit. Legacy M7 payload и повреждённый optional snapshot не теряют валидную тревогу. Повтор не меняет status/note, expired metadata не воскрешается. Pub/sub отдаёт только DomainEvent, без storage_key.
+* Миграция `48f1a410c0ce`: snapshots (unique event_id, file metadata), nullable camera_configs.snapshot_enabled. API defaults + hot three-state camera override (inherit/on/off), без смены run. Shared SNAPSHOT_PATH, compose volume, retention 30 дней по умолчанию.
+* UUID-only JPEG API `/api/v1/snapshots/{id}`, 404 missing/expired, nosniff/private no-store; EventRead дополняется snapshot id/url/width/height. История старых и soft-deleted камер сохраняется.
+* API retention под token-owned Redis lease с renewal/compare-delete. Batches 100; сначала файл, потом metadata, ошибка удаления остаётся retryable; события не удаляются. Старые orphan JPEG и atomic temp очищаются консервативно по mtime.
+* `/events/:eventId`: исходный кадр, переключаемые исторические bbox/anchor поверх него, status/note и метаданные; явные empty/missing/error/loading states, retry. Не подставляется текущая геометрия камеры. Journal links, mobile/light/dark, OpenAPI/TS/ADR-035 и upgrade guide.
+
+### Проверено
+
+| Проверка | Результат |
+|---|---|
+| make check | ruff/format, strict mypy **150 файлов**, ESLint/Prettier/vue-tsc, **177 Python unit + 103 Vitest**, production build |
+| Real PostgreSQL/Valkey integration | **29 passed**: прежние API, snapshot transaction rollback/retry, duplicate/operator state, REST JPEG/404/soft delete, bad optional attachment fallback, retention/orphans/failed delete, no expired resurrection, private live payload, lock ownership |
+| Живые камеры | YOLO/ByteTrack MP4: snapshot **810×1080**, preview **640×853**; mock: **1280×720**, preview **640×360**. Hot off/on даёт события без/со снимком в том же run |
+| PostgreSQL полностью остановлена | SSE alarm + файл до ingest, PATCH 409; после возврата тот же event UUID/snapshot UUID и SHA-256 JPEG, backlog 0 |
+| Redis остановлен на 21 с | worker not ready, run IDs сохранены; **13 событий и 13 снимков** доставлены после восстановления, backlog 0 |
+| Chromium | Историческая рамка совпадает с image/normalized coordinates, overlay toggle, note save, no-snapshot и missing-file retry, event404 и journal navigation; 390px без overflow, pageerror 0. PNG сохранены; visual image viewer не использован |
+| Контракты/миграции/зависимости | M7→M8, downgrade/upgrade на тестовой БД, alembic check без diff, frozen lock/OpenAPI match; production audit 0 vulnerabilities |
+
+Shutdown: worker **0.66 с**, API с открытым SSE **3.18 с**, runtime keys удалены/Stream0; JPEG читаются после остановки worker. Доказательства и скрипты — [docs/qa/m8/README.md](docs/qa/m8/README.md). Обновление — [UPDATE_MILESTONE_8.md](UPDATE_MILESTONE_8.md).
+
+### Ограничения и следующий этап
+
+Файл и PostgreSQL не являются одной распределённой транзакцией: авария до XADD может оставить orphan, позднее удаляемый retention. RAM-outbox и AOF everysec имеют прежние окна потери. Задания JPEG bounded, но сам локальный disk syscall не имеет гарантированного deadline; зависший filesystem может задержать drain. Storage root должен быть доверенным, не writable для посторонних; это не sandbox против adversarial filesystem races. API и worker на разных хостах требуют shared mount/будущий другой SnapshotStorage. Backup БД и файлов согласовывать; это не HA object storage.
+
+Retaining files требует мониторинга диска/Stream/cleanup logs; metadata может временно ссылаться на отсутствующий файл — UI это обрабатывает. Retention — техническое удаление снимков, а не настройка срока хранения всей истории. Текущая зона не рисуется на старом кадре: сохранены bbox/anchor, не polygon/name snapshot. Автоматического before/after, CSV, авторизации, track sessions и dashboard ещё нет.
+
+Следующий — **Milestone 9: линия, crossing detection и событие**. Windows, Docker/CI, GPU, RTSP, moving-CCTV quality и 4/8-camera нагрузка не проверены. Sandbox Node 24.14.1 ниже package engine; использовать поддерживаемый Node. Все прежние ограничения сохраняются, если выше явно не сняты.
+
+## Milestone 7 — результат предыдущей сессии
 
 База: проверенный полный архив M6, SHA-256 `45cded322ea60069a4a53e87f7e093ebe403ace34afa2976606874e5c958f909`, HEAD `4995cae`. Полная `.git` восстановлена и сохраняется в новом архиве. Коммит оформляется от **Kostya** с исходной Git-идентичностью.
 

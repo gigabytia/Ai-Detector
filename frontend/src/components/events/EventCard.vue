@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { ApiError } from '@/api/http'
 import { useRealtimeStore } from '@/stores/realtime'
 
-const props = defineProps<{ event: EventRead | LiveEvent; cameraName: string }>()
+const props = defineProps<{ event: EventRead | LiveEvent; cameraName: string; detail?: boolean }>()
 const { t } = useI18n()
 const client = useQueryClient()
 const realtime = useRealtimeStore()
@@ -84,6 +84,9 @@ async function save(next?: 'ACKNOWLEDGED' | 'FALSE_POSITIVE') {
         @input="dirty = true"
       />
     </label>
+    <RouterLink v-if="!detail" :to="`/events/${event.id}`" class="inline-block text-sm underline">{{
+      t('snapshots.details')
+    }}</RouterLink>
     <div class="flex flex-wrap gap-2">
       <Button v-if="status === 'NEW'" size="sm" :disabled="busy" @click="save('ACKNOWLEDGED')">{{
         t('events.ack')

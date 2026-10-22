@@ -144,4 +144,8 @@ REST зоны → PostgreSQL commit → camera.changed → internal CameraSpec (
 
 `DetectionResult.events → bounded EventPublisher → Lua XADD(event JSON) + PUBLISH → два независимых пути: LiveHub/SSE и EventIngest/PostgreSQL`. ACK/XDEL только после commit; UUID conflict не обновляет операторские поля. Pub/sub не читает БД, поэтому тревоги идут при её отказе. REST status commit → event.updated; потерянные live уведомления исправляет REST reconciliation. Подробности, включая PEL reclaim, dead letter, outbox-loss и AOF everysec — [ADR-034](decisions/ADR-034-event-delivery-realtime.md).
 
-Граница M6 в предыдущем разделе — историческая. SnapshotWriter, track sessions и analytics из целевой схемы ещё не реализованы. Нет записи каждого кадра в БД/Stream и нет сохранения telemetry: только доменные события. Реальный wire M7 — [api.md](api.md#события-и-realtime-milestone-7).
+Граница M6 в предыдущем разделе — историческая. В M8 SnapshotWriter реализован; track sessions и analytics из целевой схемы ещё не реализованы. Нет записи каждого кадра в БД/Stream и нет сохранения telemetry: только доменные события. Реальный wire M7 — [api.md](api.md#события-и-realtime-milestone-7).
+
+## Реализованный поток M8
+
+DetectionResult.frame (без рисования) → bounded SnapshotWriter → JPEG/storage.put → EventMessage(snapshot?) → существующий RAM-outbox/Lua XADD+PUBLISH → ingest event+snapshot в одной DB-транзакции → ACK/XDEL. Pub/sub содержит только DomainEvent, не storage_key. При ошибке optional capture — обычное событие. Browser получает URL по REST, не файл из Stream/SSE. Retention удаляет файл, затем metadata, сохраняя events; orphan scan по mtime старше retention window. Очереди JPEG (4) и event outbox (1000+inflight) имеют разные ограничения.

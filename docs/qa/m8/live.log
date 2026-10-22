@@ -1,0 +1,3 @@
+{"kind": "file", "event": "d5c7fffe-e220-4316-b04d-eeacf0cbecfc", "snapshot": [810, 1080], "preview": [640, 853], "jpeg_sha256": "a2b6fb1e29a2d6918fb20a9e44b9348672a5b6ec6a0e52912b8aab150546ac38"}
+{"kind": "mock", "event": "492724fe-0b6e-475a-a65f-6471dbfb249d", "snapshot": [1280, 720], "preview": [640, 360], "jpeg_sha256": "9afa40e62a19d32b722d3c31aa85f76e247dee0f96a59928bdab36ed388447c3"}
+{"hot_toggle": true, "run_preserved": "c3b3c1d1-c251-4575-af75-5339a6c8b702", "without_snapshot": "3ed63b40-8261-4d65-8fbc-4e6c1bff9e93", "restored_snapshot": "3a0a972c-1957-47a1-8dde-de7ceb6d1b4d"}

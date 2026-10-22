@@ -11,6 +11,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from ai_detector_core.ports.clock import Clock, SystemClock
+from ai_detector_core.storage.snapshots import LocalSnapshotStorage
 from app.application.system_service import SystemService
 from app.core.config import Settings
 from app.infrastructure.database.session import (
@@ -26,6 +27,7 @@ from app.infrastructure.redis.client import (
 from app.infrastructure.redis.ingest import EventIngest
 from app.infrastructure.redis.live import LiveHub
 from app.infrastructure.redis.tasks import EventTasksProbe, report_task_failure
+from app.infrastructure.storage.snapshot_retention import SnapshotRetention
 from app.infrastructure.storage.uploads import LocalUploadStorage
 
 logger = logging.getLogger(__name__)
@@ -87,12 +89,25 @@ def make_lifespan(settings: Settings) -> Callable[[FastAPI], AbstractAsyncContex
         stop = asyncio.Event()
         tasks = [
             asyncio.create_task(
-                EventIngest(resources.redis, resources.session_factory).run(stop),
+                EventIngest(
+                    resources.redis, resources.session_factory, settings.snapshot_retention_days
+                ).run(stop),
                 name="event-ingest",
             ),
             asyncio.create_task(resources.live.run(stop), name="event-live"),
         ]
         resources.event_tasks.tasks = tasks
+        maintenance = asyncio.create_task(
+            SnapshotRetention(
+                resources.redis,
+                resources.session_factory,
+                LocalSnapshotStorage(settings.snapshot_path),
+                settings.snapshot_retention_days,
+                settings.snapshot_cleanup_interval_seconds,
+            ).run(stop),
+            name="snapshot-retention",
+        )
+        tasks = [*tasks, maintenance]
         for task in tasks:
             task.add_done_callback(report_task_failure)
         logger.info("api started", extra={"app_env": settings.app_env})

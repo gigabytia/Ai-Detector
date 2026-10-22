@@ -15,6 +15,7 @@ from vision_worker.messaging.heartbeat import HeartbeatPublisher
 from vision_worker.pipeline.preview import PreviewHub
 from vision_worker.pipeline.scheduler import InferenceScheduler
 from vision_worker.pipeline.telemetry import TelemetryHub
+from vision_worker.storage.snapshot_writer import SnapshotWriter
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,11 @@ class Supervisor:
         detector_info: dict[str, str],
         events: EventPublisher | None = None,
         telemetry: TelemetryHub | None = None,
+        snapshots: SnapshotWriter | None = None,
     ) -> None:
+        self.snapshots = snapshots
+        self._delivery_stop = asyncio.Event()
+        self._event_task: asyncio.Task[None] | None = None
         self.events = events
         self.telemetry = telemetry or TelemetryHub()
         self.scheduler = scheduler
@@ -60,6 +65,7 @@ class Supervisor:
 
     async def start(self) -> None:
         self._stop.clear()
+        self._delivery_stop.clear()
         loops: dict[str, Loop] = {
             "inference": self.scheduler.run,
             "heartbeat": self._heartbeat.run,
@@ -67,17 +73,19 @@ class Supervisor:
             "camera-status": self._camera_status.run,
         }
         if self.events is not None:
-            loops["events"] = self.events.run
+            self._event_task = asyncio.create_task(
+                self.events.run(self._delivery_stop), name="events"
+            )
+            self._event_task.add_done_callback(_report_crash)
+            self._event_task.add_done_callback(self._event_delivery_finished)
         for name, loop in loops.items():
             task = asyncio.create_task(loop(self._stop), name=name)
             task.add_done_callback(_report_crash)
-            if name == "events":
-                task.add_done_callback(self._event_delivery_finished)
             self._tasks.append(task)
         logger.info("worker started")
 
     def _event_delivery_finished(self, task: asyncio.Task[None]) -> None:
-        if not self._stop.is_set() and self.events is not None:
+        if not self._delivery_stop.is_set() and self.events is not None:
             self.events.healthy = False
 
     async def stop(self) -> None:
@@ -85,6 +93,12 @@ class Supervisor:
         self._stop.set()
         await asyncio.gather(*self._tasks, return_exceptions=True)
         self._tasks.clear()
+        if self.snapshots is not None:
+            await self.snapshots.close()
+        self._delivery_stop.set()
+        if self._event_task is not None:
+            await asyncio.gather(self._event_task, return_exceptions=True)
+            self._event_task = None
         await self._manager.stop_all()
         await self.preview.close()
         await self.telemetry.close()

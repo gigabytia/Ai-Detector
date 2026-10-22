@@ -53,6 +53,7 @@ def get_camera_service(resources: Resources, session: Session) -> CameraService:
 
 def get_config_defaults(resources: Resources) -> CameraConfig:
     return CameraConfig(
+        snapshot_enabled=resources.settings.snapshot_enabled,
         zone_enter_dwell_seconds=resources.settings.zone_enter_dwell_seconds,
         zone_exit_grace_seconds=resources.settings.zone_exit_grace_seconds,
         event_cooldown_seconds=resources.settings.event_cooldown_seconds,

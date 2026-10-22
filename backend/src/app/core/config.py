@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     event_cooldown_seconds: float = Field(default=3, ge=0, le=3600)
     target_fps: float = Field(default=10, ge=1, le=30)
     detection_confidence: float = Field(default=0.25, gt=0, le=1)
+    snapshot_enabled: bool = True
+    snapshot_path: Path = Path("data/snapshots")
+    snapshot_retention_days: int = Field(default=30, ge=1, le=3650)
+    snapshot_cleanup_interval_seconds: int = Field(default=3600, ge=10, le=86400)
     max_cameras: int = Field(default=8, ge=1)
     upload_path: Path = Path("data/uploads")
     upload_max_bytes: int = Field(default=2 * 1024**3, ge=1)

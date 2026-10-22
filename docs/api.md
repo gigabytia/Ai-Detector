@@ -140,7 +140,7 @@ M7 реализует доставку событий, описанных выш
 | `GET /api/v1/events/stream` | text/event-stream; без зависимости от PostgreSQL для live alarms |
 | WS `/live/cameras/{id}/telemetry` | отдельный metadata JSON, напрямую worker без `/live` |
 
-EventRead: поля DomainEvent (`id, camera_id, run_id, track_id, zone_id, type, severity, occurred_at, source_ts_ms, detector_confidence, event_confidence, message, metadata`) и `status, note, created_at, updated_at, acknowledged_at, false_positive_at`. zone_id nullable после удаления зоны. В M7 только PERSON_ENTERED_DANGER_ZONE. Snapshot полей пока нет.
+EventRead: поля DomainEvent (`id, camera_id, run_id, track_id, zone_id, type, severity, occurred_at, source_ts_ms, detector_confidence, event_confidence, message, metadata`) и `status, note, created_at, updated_at, acknowledged_at, false_positive_at`. zone_id nullable после удаления зоны. В M7 только PERSON_ENTERED_DANGER_ZONE. Исторический контракт M7; additive snapshot поля появились в M8 (ниже).
 
 NEW → ACKNOWLEDGED или FALSE_POSITIVE. Повтор текущего финального статуса не меняет audit-время; другой финальный → 409 EVENT_STATUS_CONFLICT. Заметка ≤2000, редактируется в любом статусе; пропущенная note сохраняется, null очищает. Не записанный published UUID → 409 EVENT_NOT_PERSISTED_YET, неизвестный → 404. При недоступности истории — 503 SERVICE_UNAVAILABLE. События удалённой камеры доступны в истории, камера мягко удаляется.
 
@@ -149,3 +149,12 @@ SSE: `event.created` (DomainEvent), `event.updated` (EventRead), `camera.status`
 Telemetry JSON v1: `camera_id,run_id,frame_id,captured_at,source_ts_ms,inference_ms,persons,persons_in_zone,tracks:[{track_id,state,confidence,bbox}]`. Bbox нормализован 0…1; LOST не считается в зоне. До 5 Гц, очередь 1, без JPEG и без отдельной записи в PostgreSQL. Focus UI stale через 3 с. Рамки рисуются только из preview-пакета того же кадра.
 
 Worker readiness дополнительно учитывает publisher/backpressure, API readiness — живость ingest/pubsub задач (`event_delivery`). Redis AOF/очередь/восстановление/ограничения — [ADR-034](decisions/ADR-034-event-delivery-realtime.md). Экспорт CSV и дополнительные фильтры type/severity/period ещё не реализованы.
+
+## Снимки и детали (Milestone 8)
+
+* EventRead: nullable `snapshot_id`, `snapshot_url`, `snapshot_width`, `snapshot_height`; одно изображение на event, загрузка metadata select-in без N+1. URL `/api/v1/snapshots/{uuid}`; storage_key наружу не отдаётся. Старые события возвращают null. Retention/missing disk не уничтожают событие.
+* GET `/snapshots/{uuid}` → `image/jpeg`, private/no-store, nosniff, inline UUID filename; 404 SNAPSHOT_NOT_FOUND для отсутствующих metadata/файла, 422 для не-UUID. API открывает безопасный local file в thread, отдаёт chunks и закрывает дескриптор. Arbitrary path/download URL от пользователя не принимается. Range/resized thumbnails не реализованы.
+* PUT `/cameras/{id}/config` включает nullable boolean `snapshot_enabled`; null наследует `SNAPSHOT_ENABLED`. Как и раньше PUT заменяет все overrides: клиент должен передать остальные значения, которые хочет сохранить. Worker получает effective setting горячо через CameraSpec.
+* `/events/:eventId` — frontend route, не новый event API. Poll раз в 5 с, retry и заглушка для image failure. Исторический overlay использует bbox/anchor event.metadata, не current camera zones; оригинальный JPEG не изменяется.
+
+Авторизации пока нет: API и storage доступны только в доверенной локальной сети; HTTPS/reverse-proxy/доступ к источникам настраивает оператор.

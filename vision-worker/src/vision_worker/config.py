@@ -23,6 +23,7 @@ class WorkerSettings(BaseSettings):
 
     api_base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8000")
     worker_api_token: SecretStr | None = None
+    snapshot_path: Path = Path("data/snapshots")
     upload_path: Path = Path("data/uploads")
     model_manifest_path: Path = Path("models/person-detector/manifest.yaml")
     inference_device: Literal["auto", "cpu", "cuda"] = "auto"

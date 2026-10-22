@@ -7,6 +7,7 @@ Poison input is copied to a bounded dead stream before ACK in one transaction.
 import asyncio
 import contextlib
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import cast
 from uuid import UUID, uuid4
 
@@ -19,13 +20,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ai_detector_core.events.domain import DomainEvent
+from ai_detector_core.events.transport import EventMessage
 from ai_detector_core.telemetry.event_bus import (
     DEAD_STREAM,
     INGEST_GROUP,
     INGEST_STREAM,
     pending_event_key,
 )
-from app.infrastructure.database.models import CameraModel, EventModel, ZoneModel
+from app.infrastructure.database.models import CameraModel, EventModel, SnapshotModel, ZoneModel
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,10 @@ def stream_messages(result: object) -> list[tuple[bytes, dict[bytes, bytes]]]:
 
 
 class EventIngest:
-    def __init__(self, redis: Redis, sessions: async_sessionmaker[AsyncSession]) -> None:
+    def __init__(
+        self, redis: Redis, sessions: async_sessionmaker[AsyncSession], retention_days: int = 30
+    ) -> None:
+        self.retention_days = retention_days
         self.redis = redis
         self.sessions = sessions
         self.consumer = f"api-{uuid4()}"
@@ -51,14 +56,23 @@ class EventIngest:
 
     async def process(self, messages: list[tuple[bytes, dict[bytes, bytes]]]) -> None:
         persisted: list[UUID] = []
-        valid: list[tuple[bytes, DomainEvent]] = []
+        valid: list[tuple[bytes, EventMessage]] = []
         dead: list[tuple[bytes, dict[bytes, bytes], str]] = []
         for message_id, fields in messages:
             try:
                 raw = fields[b"event"]
                 if len(raw) > 65536:
                     raise ValueError("event exceeds 64 KiB")
-                valid.append((message_id, DomainEvent.model_validate_json(raw)))
+                # A corrupt optional attachment must never discard a valid alarm.
+                domain = DomainEvent.model_validate_json(raw)
+                try:
+                    envelope = EventMessage.model_validate_json(raw)
+                except ValidationError:
+                    logger.warning(
+                        "invalid snapshot metadata ignored", extra={"event_id": str(domain.id)}
+                    )
+                    envelope = EventMessage(**domain.model_dump())
+                valid.append((message_id, envelope))
             except (KeyError, ValidationError, ValueError) as exc:
                 dead.append((message_id, fields, type(exc).__name__))
         async with self.sessions() as session, session.begin():
@@ -81,6 +95,8 @@ class EventIngest:
                     ).all()
                 )
                 rows = []
+                snapshots = []
+                cutoff = datetime.now(UTC) - timedelta(days=self.retention_days)
                 for message_id, event in valid:
                     if event.camera_id not in cameras:
                         dead.append(
@@ -91,7 +107,9 @@ class EventIngest:
                             )
                         )
                         continue
-                    row = event.model_dump()
+                    row = event.model_dump(exclude={"snapshot"})
+                    if event.snapshot is not None and event.snapshot.created_at >= cutoff:
+                        snapshots.append(event.snapshot.model_dump())
                     row["zone_id"] = (
                         event.zone_id if zones.get(event.zone_id) == event.camera_id else None
                     )
@@ -104,6 +122,12 @@ class EventIngest:
                         .values(rows)
                         .on_conflict_do_nothing(index_elements=["id"])
                     )
+                    if snapshots:
+                        await session.execute(
+                            insert(cast(Table, SnapshotModel.__table__))
+                            .values(snapshots)
+                            .on_conflict_do_nothing()
+                        )
         # DB commit succeeded. Lost ACK causes retry, UUID prevents another insert.
         async with self.redis.pipeline(transaction=True) as pipe:
             for message_id, fields, reason in dead:

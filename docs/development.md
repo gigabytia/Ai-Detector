@@ -142,3 +142,9 @@ npm --prefix frontend test
 5. `make check`, затем `make test-integration`. Интеграционные тесты **трут тестовые таблицы**; test_events дополнительно очищает выделенную Redis DB 13. Никогда не запускайте их на рабочей БД/Redis DB 13 с полезными данными.
 
 Диагностика: `XLEN ad:ingest`, `XPENDING ad:ingest api-ingest`, `XLEN ad:ingest:dead`, health API (`event_delivery`)/worker. Входной Stream не обрезается: контролировать память/диск. Bounded UI хранит только последние live alarms, полная история — REST pagination. При добавлении второго durable consumer group нельзя сохранять текущий XDEL после единственного ACK. [ADR-034](decisions/ADR-034-event-delivery-realtime.md).
+
+## Проверка M8
+
+Обновить .env по UPDATE_MILESTONE_8.md, убедиться, что SNAPSHOT_PATH совпадает у API и worker и доступен для записи. После `upgrade head` ждать событие mock до ~15 с, открыть «Детали события»: исходное разрешение, overlay toggle, заметка. Отключить снимки в config камеры: новая тревога остаётся без изображения; повторное включение не меняет run_id. Не трогать runtime data ради обновления.
+
+`make check`; integration только на отдельной тестовой БД: очищаются snapshots/events/cameras/zones, Redis DB13. Retention тесты используют временные каталоги и искусственно старые даты. Fault-скрипты docs/qa/m8/scripts реально останавливают QA-сервисы и не предназначены для production.

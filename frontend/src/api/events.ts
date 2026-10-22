@@ -19,6 +19,10 @@ export function fetchEvents(
   return apiGet<EventPage>(`/api/v1/events?${params}`, { signal })
 }
 
+export function fetchEvent(id: string, signal?: AbortSignal) {
+  return apiGet<EventRead>(`/api/v1/events/${encodeURIComponent(id)}`, { signal })
+}
+
 // A live alarm can arrive while PostgreSQL is unavailable. Retry only the explicit 409.
 export async function updateEvent(id: string, body: EventUpdate): Promise<EventRead> {
   for (let attempt = 0; ; attempt++) {

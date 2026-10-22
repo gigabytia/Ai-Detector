@@ -1,0 +1,41 @@
+import asyncio,json,os,subprocess,time
+import httpx
+from redis.asyncio import Redis
+ROOT='/data/m7-services/usr/bin'
+async def main():
+ r=Redis.from_url('redis://127.0.0.1:16379/0')
+ async with httpx.AsyncClient(timeout=5) as http:
+  before=(await http.get('http://127.0.0.1:18001/status')).json()['cameras']
+  start=time.time();subprocess.run([ROOT+'/valkey-cli','-p','16379','shutdown'],check=True,stdout=subprocess.DEVNULL)
+  try:
+   await asyncio.sleep(21)
+   health=(await http.get('http://127.0.0.1:18001/health/ready'))
+   assert health.status_code==503
+  finally:
+   subprocess.run([ROOT+'/valkey-server','--port','16379','--bind','127.0.0.1','--daemonize','yes','--dir','/data/m7-runtime','--appendonly','yes','--logfile','/data/m7-runtime/valkey.log'],check=True)
+  for _ in range(60):
+   try:
+    if (await http.get('http://127.0.0.1:18001/health/ready')).status_code==200 and await r.xlen('ad:ingest')==0:break
+   except Exception:pass
+   await asyncio.sleep(.25)
+  after=(await http.get('http://127.0.0.1:18001/status')).json()['cameras']
+  assert {c['camera_id']:c['run_id'] for c in before}=={c['camera_id']:c['run_id'] for c in after}
+  log=open('/data/m7-runtime/worker-m8.log').read().splitlines();events=[]
+  for line in log:
+   try:x=json.loads(line)
+   except Exception:continue
+   if x.get('event') and __import__('datetime').datetime.fromisoformat(x['timestamp']).timestamp()>=start:events.append(x['event']['id'])
+  assert events
+  snapshots=[]
+  for event_id in events:
+   response=await http.get('http://127.0.0.1:18000/api/v1/events/'+event_id)
+   assert response.status_code==200,(event_id,response.text)
+   detail=response.json()
+   if detail.get('snapshot_url'):
+    image=await http.get('http://127.0.0.1:18000'+detail['snapshot_url']);assert image.status_code==200 and image.content[:2]==b'\xff\xd8'
+    snapshots.append(detail['snapshot_id'])
+  assert snapshots
+  assert await r.xlen('ad:ingest')==0
+  print(json.dumps({'redis_outage_seconds':21,'worker_not_ready_during_outage':True,'same_run_ids':True,'generated_and_persisted_events':events,'snapshot_ids_delivered':snapshots,'backlog':0}))
+ await r.aclose()
+asyncio.run(main())

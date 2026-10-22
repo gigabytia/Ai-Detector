@@ -1,0 +1,47 @@
+import asyncio,json,os,subprocess,hashlib
+from pathlib import Path
+import httpx
+from redis.asyncio import Redis
+ROOT='/data/m7-services';ENV={**os.environ,'LD_LIBRARY_PATH':ROOT+'/usr/lib64'}
+def pg(args):subprocess.run([ROOT+'/usr/bin/pg_ctl','-D','/data/m7-runtime/postgres','-l','/data/m7-runtime/postgres.log',*args],env=ENV,check=True,stdout=subprocess.DEVNULL)
+async def main():
+ redis=Redis.from_url('redis://127.0.0.1:16379/0')
+ async with httpx.AsyncClient(base_url='http://127.0.0.1:18000',timeout=30) as c:
+  alarms=asyncio.Queue();ready=asyncio.Event()
+  async def listen():
+   async with c.stream('GET','/api/v1/events/stream') as response:
+    kind=''
+    async for line in response.aiter_lines():
+     if line.startswith('event: '):kind=line[7:];ready.set()
+     if line.startswith('data: ') and kind=='event.created':await alarms.put(json.loads(line[6:]))
+  task=asyncio.create_task(listen());await asyncio.wait_for(ready.wait(),5)
+  pg(['stop','-m','fast'])
+  try:
+   for _ in range(20):
+    alarm=await asyncio.wait_for(alarms.get(),25)
+    assert 'snapshot' not in alarm and 'storage_key' not in alarm
+    rows=await redis.xrange('ad:ingest')
+    payload=next((json.loads(fields[b'event']) for _,fields in rows if json.loads(fields[b'event'])['id']==alarm['id']),None)
+    if payload and payload.get('snapshot'):break
+   else:raise AssertionError('no snapshot-bearing alarm')
+   metadata=payload['snapshot'];file=Path('/data/work-m7/Ai-Detector/data/snapshots')/metadata['storage_key'].removeprefix('snapshots/')
+   before=hashlib.sha256(file.read_bytes()).hexdigest()
+   pending=await c.patch('/api/v1/events/'+alarm['id'],json={'status':'ACKNOWLEDGED'})
+   assert pending.status_code==409
+   print(json.dumps({'postgres_offline':True,'live_uuid':alarm['id'],'image_written_before_ingest':True,'snapshot_id':metadata['id'],'pending_patch':pending.status_code,'live_storage_key_leaked':False}),flush=True)
+  finally:pg(['start','-o','-h 127.0.0.1 -p 15432 -k /data/m7-runtime'])
+  for _ in range(100):
+   r=await c.get('/api/v1/events/'+alarm['id'])
+   if r.status_code==200:break
+   await asyncio.sleep(.1)
+  r.raise_for_status();detail=r.json();assert detail['snapshot_id']==metadata['id']
+  image=await c.get(detail['snapshot_url']);image.raise_for_status()
+  assert hashlib.sha256(image.content).hexdigest()==before
+  for _ in range(50):
+   if await redis.xlen('ad:ingest')==0:break
+   await asyncio.sleep(.1)
+  assert await redis.xlen('ad:ingest')==0
+  print(json.dumps({'postgres_recovered':True,'same_event':detail['id'],'same_snapshot':detail['snapshot_id'],'same_jpeg_sha256':before,'stream_backlog':0}),flush=True)
+  task.cancel();await asyncio.gather(task,return_exceptions=True)
+ await redis.aclose()
+asyncio.run(main())

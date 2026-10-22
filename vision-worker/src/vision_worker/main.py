@@ -7,6 +7,7 @@ from redis.asyncio import Redis
 
 from ai_detector_core.observability.json_logging import configure_json_logging
 from ai_detector_core.ports.clock import SystemClock
+from ai_detector_core.storage.snapshots import LocalSnapshotStorage
 from vision_worker import __version__
 from vision_worker.cameras.factory import CameraSessionFactory
 from vision_worker.cameras.manager import CameraManager
@@ -23,6 +24,7 @@ from vision_worker.pipeline.preview import PreviewHub
 from vision_worker.pipeline.scheduler import InferenceScheduler
 from vision_worker.pipeline.telemetry import TelemetryHub
 from vision_worker.rules.registry import SceneRegistry
+from vision_worker.storage.snapshot_writer import SnapshotWriter
 from vision_worker.supervisor import Supervisor
 from vision_worker.tracking.bytetrack import ByteTrackPersonTracker
 from vision_worker.tracking.registry import TrackerRegistry
@@ -59,7 +61,9 @@ def build_supervisor(settings: WorkerSettings) -> Supervisor:
     preview = PreviewHub(settings.preview_fps, settings.preview_max_width)
     events = EventPublisher(redis)
     telemetry = TelemetryHub()
+    snapshots = SnapshotWriter(LocalSnapshotStorage(settings.snapshot_path), events)
     return Supervisor(
+        snapshots=snapshots,
         events=events,
         telemetry=telemetry,
         scheduler=InferenceScheduler(
@@ -68,6 +72,7 @@ def build_supervisor(settings: WorkerSettings) -> Supervisor:
             preview,
             settings.inference_batch_size,
             settings.inference_max_wait_ms,
+            snapshots=snapshots,
             events=events,
             telemetry=telemetry,
             scenes=SceneRegistry(

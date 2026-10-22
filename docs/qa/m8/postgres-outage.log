@@ -1,0 +1,2 @@
+{"postgres_offline": true, "live_uuid": "5c9cac4b-cea4-4963-8186-eee6283174bf", "image_written_before_ingest": true, "snapshot_id": "7ad2903d-3347-539c-b8e6-8183929f06e4", "pending_patch": 409, "live_storage_key_leaked": false}
+{"postgres_recovered": true, "same_event": "5c9cac4b-cea4-4963-8186-eee6283174bf", "same_snapshot": "7ad2903d-3347-539c-b8e6-8183929f06e4", "same_jpeg_sha256": "a2b6fb1e29a2d6918fb20a9e44b9348672a5b6ec6a0e52912b8aab150546ac38", "stream_backlog": 0}

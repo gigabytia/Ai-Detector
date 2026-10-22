@@ -12,9 +12,22 @@ from app.schemas.events import EventRead
 
 def event_read(model: EventModel) -> EventRead:
     values = {
-        field: getattr(model, field) for field in EventRead.model_fields if field != "metadata"
+        field: getattr(model, field)
+        for field in EventRead.model_fields
+        if field
+        not in {"metadata", "snapshot_id", "snapshot_url", "snapshot_width", "snapshot_height"}
     }
-    return EventRead.model_validate({**values, "metadata": model.event_metadata})
+    snapshot = model.snapshot
+    return EventRead.model_validate(
+        {
+            **values,
+            "metadata": model.event_metadata,
+            "snapshot_id": snapshot.id if snapshot else None,
+            "snapshot_url": f"/api/v1/snapshots/{snapshot.id}" if snapshot else None,
+            "snapshot_width": snapshot.width if snapshot else None,
+            "snapshot_height": snapshot.height if snapshot else None,
+        }
+    )
 
 
 class EventRepository:

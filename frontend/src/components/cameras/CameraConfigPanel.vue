@@ -18,6 +18,7 @@ const query = useQuery({
 })
 const fps = ref<string | number>('')
 const confidence = ref<string | number>('')
+const snapshot = ref('')
 const timings = ref<Record<string, string>>({})
 const timingKeys = [
   'zone_enter_dwell_seconds',
@@ -32,12 +33,13 @@ watch(
     timings.value = Object.fromEntries(
       timingKeys.map((k) => [k, value?.overrides[k]?.toString() ?? '']),
     )
+    snapshot.value = value?.overrides.snapshot_enabled?.toString() ?? ''
     fps.value = value?.overrides.target_fps?.toString() ?? ''
     confidence.value = value?.overrides.detection_confidence?.toString() ?? ''
   },
   { immediate: true },
 )
-watch([fps, confidence, () => JSON.stringify(timings.value)], () => {
+watch([fps, confidence, snapshot, () => JSON.stringify(timings.value)], () => {
   saved.value = false
   invalid.value = false
 })
@@ -51,6 +53,7 @@ const mutation = useMutation({
   },
 })
 function resetFields() {
+  snapshot.value = ''
   fps.value = ''
   confidence.value = ''
   timings.value = Object.fromEntries(timingKeys.map((k) => [k, '']))
@@ -77,7 +80,12 @@ function save() {
   }
   mutation.mutate({
     id: props.cameraId,
-    body: { target_fps: target, detection_confidence: score, ...values },
+    body: {
+      target_fps: target,
+      detection_confidence: score,
+      ...values,
+      snapshot_enabled: snapshot.value === '' ? null : snapshot.value === 'true',
+    },
   })
 }
 </script>
@@ -96,6 +104,29 @@ function save() {
       }}</Button>
     </div>
     <form v-else-if="query.data.value" class="mt-5 space-y-4" @submit.prevent="save">
+      <div class="space-y-1.5">
+        <label :for="`snapshot-${cameraId}`" class="block text-xs font-medium">{{
+          t('snapshots.setting')
+        }}</label>
+        <select
+          :id="`snapshot-${cameraId}`"
+          v-model="snapshot"
+          :disabled="mutation.isPending.value"
+          class="bg-background w-full rounded-md border px-3 py-2 text-sm"
+        >
+          <option value="">
+            {{
+              t('snapshots.inherit', {
+                value: t(
+                  query.data.value.defaults.snapshot_enabled ? 'snapshots.on' : 'snapshots.off',
+                ),
+              })
+            }}
+          </option>
+          <option value="true">{{ t('snapshots.on') }}</option>
+          <option value="false">{{ t('snapshots.off') }}</option>
+        </select>
+      </div>
       <div class="space-y-1.5">
         <label :for="`fps-${cameraId}`" class="block text-xs font-medium">{{
           t('detection.fps')

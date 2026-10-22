@@ -21,6 +21,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/CameraFocusView.vue'),
   },
   { path: '/events', name: 'events', component: () => import('@/views/EventsView.vue') },
+  {
+    path: '/events/:eventId',
+    name: 'event-detail',
+    component: () => import('@/views/EventDetailView.vue'),
+  },
   { path: '/analytics', name: 'analytics', component: () => import('@/views/AnalyticsView.vue') },
   { path: '/cameras', name: 'cameras', component: () => import('@/views/CamerasView.vue') },
   { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },

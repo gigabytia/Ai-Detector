@@ -36,3 +36,4 @@
 | [ADR-032](ADR-032-bytetrack-runtime.md) | ByteTrack: параметры, идентичность и сброс сцены |
 | [ADR-033](ADR-033-danger-zone-runtime.md) | Danger zone: геометрия, правила, редактор и граница M6 |
 | [ADR-034](ADR-034-event-delivery-realtime.md) | Event bus, идемпотентный ingest, SSE и WS-телеметрия |
+| [ADR-035](ADR-035-event-snapshots.md) | Снимки событий, безопасное local storage, event detail и retention |

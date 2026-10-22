@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 PUBLISH = """
 local id = redis.call('XADD', KEYS[1], '*', 'event', ARGV[1])
 redis.call('SET', KEYS[3], '1', 'EX', 86400)
-redis.call('PUBLISH', KEYS[2], ARGV[1])
+redis.call('PUBLISH', KEYS[2], ARGV[2])
 return id
 """
 
@@ -50,6 +50,7 @@ class EventPublisher:
             EVENTS_LIVE,
             pending_event_key(event.id),
             event.model_dump_json(),
+            DomainEvent.model_validate(event.model_dump()).model_dump_json(),
         )
 
     async def run(self, stop: asyncio.Event) -> None:

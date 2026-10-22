@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 def config_overrides(row: CameraConfigModel | None) -> CameraConfigOverrides:
     return CameraConfigOverrides(
+        snapshot_enabled=row.snapshot_enabled if row else None,
         zone_enter_dwell_seconds=row.zone_enter_dwell_seconds if row else None,
         zone_exit_grace_seconds=row.zone_exit_grace_seconds if row else None,
         event_cooldown_seconds=row.event_cooldown_seconds if row else None,
@@ -61,6 +62,7 @@ class CameraConfigService:
         if row is None:
             row = CameraConfigModel(camera_id=camera_id)
             self._session.add(row)
+        row.snapshot_enabled = overrides.snapshot_enabled
         row.zone_enter_dwell_seconds = overrides.zone_enter_dwell_seconds
         row.zone_exit_grace_seconds = overrides.zone_exit_grace_seconds
         row.event_cooldown_seconds = overrides.event_cooldown_seconds

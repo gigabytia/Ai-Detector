@@ -22,6 +22,7 @@ from vision_worker.pipeline.preview import PreviewHub
 from vision_worker.pipeline.results import DetectionResult
 from vision_worker.pipeline.telemetry import TelemetryHub
 from vision_worker.rules.registry import SceneRegistry
+from vision_worker.storage.snapshot_writer import SnapshotWriter
 from vision_worker.tracking.registry import TrackerRegistry, TrackKey
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,9 @@ class InferenceScheduler:
         scenes: SceneRegistry | None = None,
         events: EventPublisher | None = None,
         telemetry: TelemetryHub | None = None,
+        snapshots: SnapshotWriter | None = None,
     ) -> None:
+        self._snapshots = snapshots
         self._events = events
         self._telemetry = telemetry
         self._scenes = scenes if scenes is not None else SceneRegistry()
@@ -237,7 +240,12 @@ class InferenceScheduler:
                         item.session.record_inference_error(result)
                     else:
                         for event in result.events:
-                            if self._events is not None:
+                            if self._snapshots is not None:
+                                spec = item.spec if item.spec is not None else item.session.spec
+                                self._snapshots.offer(
+                                    event, result.frame, spec.config.snapshot_enabled
+                                )
+                            elif self._events is not None:
                                 self._events.offer(event)
                             logger.info(
                                 "person entered danger zone",
