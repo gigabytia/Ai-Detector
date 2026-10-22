@@ -86,6 +86,7 @@ def build_supervisor(settings: WorkerSettings) -> Supervisor:
                 settings.severity_zone_enter,
                 settings.line_hysteresis,
                 settings.severity_line_cross,
+                settings.severity_loitering,
             ),
             trackers=TrackerRegistry(
                 lambda camera_id, run_id: ByteTrackPersonTracker(

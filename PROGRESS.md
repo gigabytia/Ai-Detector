@@ -4,11 +4,46 @@
 
 ## Текущий этап
 
-**Milestone 10 — dashboard/статистика/track timeline: выполнен.** Следующий — M11: loitering и CSV. Полная настоящая `.git` M4 → M5 → M6 → M7 → M8 → M9 → M10, без git init. Обновление: UPDATE_MILESTONE_10.md. Ниже результаты прежних этапов исторические; текущие ограничения — в разделе M10.
+**Milestone 11 — loitering и CSV: выполнен.** Следующий — M12: измерения и оптимизация. Настоящая полная `.git` M4 → M5 → M6 → M7 → M8 → M9 → M10 → M11, без git init. База M10 `1f01891`, автор Kostya. Обновление — UPDATE_MILESTONE_11.md. Результаты прежних этапов ниже исторические.
 
 Реализация заново восстановлена на базе присланного архива Milestone 3 после утраты предыдущего рабочего окружения. Это не побайтовое восстановление незавершённой сессии: использованы сохранённые архитектурные документы, ADR и доступный контекст. Исходный `AI_DETECTOR_v2_MASTER_PROMPT.md` в архиве отсутствовал.
 
-## Milestone 10 — результат текущей сессии
+## Milestone 11 — результат текущей сессии
+
+База — полный M10 `1f01891` (Kostya); Git не пересоздавался. В новом архиве настоящая `.git`, исходники, веса, QA и инструкция обновления.
+
+### Сделано
+
+* Loitering внутри существующей membership machine пары track/zone, без нового PersonState. Source timestamps, strict duration>threshold, entry dwell включён, одна попытка на confirmed visit. Таймер непрерывного наблюдения сбрасывается на outside/LOST/backward timestamp/gap>2с; fired marker сохраняется при jitter/occlusion до подтверждённого выхода. Геометрия/disable/removal/epoch/size/run/lifecycle сбрасывают соответствующие визиты. Независимый type/track cooldown по ADR-008, не блокируется cooldown входа.
+* Typed LoiteringMetadata: историческое zone_name, bbox/anchor, duration/threshold/stability; тип PERSON_LOITERING_IN_DANGER_ZONE проходит прежний UUID/publish/ingest/SSE/snapshot/operator state и dashboard by_type. Снимок необязателен, его ошибка не отменяет тревогу.
+* API default LOITERING_THRESHOLD_SECONDS=10, nullable override камеры0..3600 с горячим применением без смены run; worker SEVERITY_LOITERING=warning. Миграция b6b7cfcd87c5 добавляет только nullable camera_configs.loitering_threshold_seconds с CHECK. Compose env mappings добавлены, сами контейнеры не запускались.
+* GET /api/v1/events/export: единый predicate builder с list (camera/status/type/aware start/end [start,end)), все persisted matching rows, включая soft-deleted камеры, deterministic order. Один projected SQL SELECT, не N+1; statement timeout15с, formatting вне event loop. Полный bounded CSV до50000строк/20МиБ, иначе422 EXPORT_TOO_LARGE без частичного200; PG error503 JSON до download.
+* UTF-8 BOM/comma/CRLF/UTC, multiline quotes, null→empty, JSON metadata, numeric scores/IDs, без source credentials/storage_key. Spreadsheet formula mitigation апострофом. UI type/period filters общие list/live/export; frozen period + refresh, busy/error/retry, Blob download/revoke/cancel on unmount. Новый event label/toast/detail + duration/threshold, camera setting/i18n/OpenAPI/TS, ADR-038.
+
+### Проверено
+
+| Проверка | Результат |
+|---|---|
+| make check | **241 Python unit +129 Vitest**, strict mypy170 файлов, ruff/format/ESLint/Prettier/vue-tsc и production build на Node24.15.0 |
+| PostgreSQL17/Valkey9 integration | **41 passed**: прежние37 + loitering delivery/replay/operator state, CSV71 строк при странице50/half-open/FP/type/archived/formula/empty/invalid, cap/503 JSON, config default/override/inherit/validation/internal worker spec |
+| Живой pipeline | default10с mock → duration10.066666666666668с, один alarm того же track/visit с entry и JPEG1280×720. CPU YOLO на статичном bus MP4 →8 loitering events на точке проверки; hot threshold без смены run. Это не moving-CCTV accuracy benchmark |
+| CSV/Chromium | скачанный CSV совпал с history IDs,19 столбцов/Unicode/BOM/quoted multiline/formula-note проверены csv+pandas. Browser filters/download/retry503/detail/UI threshold2с,390px light/dark без overflow/pageerror0; PNG/DOM, без экспертной оценки изображений |
+| PostgreSQL outage | новый loitering alarm по SSE при offline DB, CSV503/JSON без attachment; после восстановления те же event/snapshot UUID и JPEG SHA-256, recovered event в CSV, оба backlog0 |
+| Миграции/контракты | empty UTF8 DB, M10→M11, test-only downgrade/upgrade, no schema diff, lock/OpenAPI match, production npm audit0; Compose YAML/env проверены статически |
+
+Graceful shutdown: worker0.54с/API с SSE3.22с, оба backlog0,7 новых completed sessions и5 читаемых JPEG после worker stop. Все доказательства — [docs/qa/m11/README.md](docs/qa/m11/README.md).
+
+### Ограничения и следующий этап
+
+Loitering консервативен при пропусках: LOST и gap>2с не считаются непрерывным пребыванием. Уже сработавший визит не создаёт повтор после короткого occlusion/jitter; cooldown без zone_id может подавить одновременный alarm другой зоны. Hot decrease может сработать на следующем кадре, но не перевооружает fired visit. Stability1 означает текущий непрерывный observed interval, не вероятность истинности события.
+
+CSV — синхронная bounded выгрузка, не background job/stream unlimited. DB projection≤50001 rows, buffered result/CSV потребляют память; codec в thread, но много параллельных exports отдельно не нагрузочно тестировалось. Caps проверены также уменьшенными тестовыми пределами, не50k-row стресс-прогоном. Содержит operator notes/metadata: хранить как служебные данные. Апостроф — mitigation для spreadsheet imports, не гарантия поведения всех Excel/importers. Native Excel/LibreOffice import не проверялся. При смене фильтров во время download используется snapshot фильтров на момент клика. CSV не содержит снимки или live-pending, snapshot_id может отсутствовать/истечь. Нет авторизации, trusted-network only.
+
+Прежние RAM/AOF/active-track crash/storage/analytics-retention ограничения сохраняются. Redis outage отдельно для M11 не повторялся (M10 coverage остаётся), Docker/CI/Windows/GPU/RTSP/4–8-camera performance и реальная moving-CCTV accuracy не проверены. Lazy ECharts chunk ~557kB/~189kB gzip по-прежнему предупреждает о размере, production build успешен. Dev audit4high прежнего дерева не исправлялись; production0.
+
+Следующий — **M12: сначала измерить latency/FPS/GPU/CPU/RAM/queue depth, затем оптимизировать** (§172), не обещать throughput без замеров.
+
+## Milestone 10 — результат предыдущей сессии
 
 База — полный M9, `c30a4d8` (Kostya), восстановленный из проверенного полного архива. История не пересоздана. Исходники, веса, QA и настоящая `.git` включены в новый архив.
 

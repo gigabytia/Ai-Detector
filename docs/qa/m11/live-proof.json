@@ -1,0 +1,15 @@
+{
+  "default_mock_threshold": 10,
+  "observed_duration": 10.066666666666668,
+  "one_loiter_event_for_visit": 1,
+  "same_entry_loiter_track": true,
+  "snapshot_width": 1280,
+  "snapshot_height": 720,
+  "snapshot_sha256": "e8bacf502f6ee9a66a3d9dacee4b04183dcb1d23f19e20e566c8182f711e0e8e",
+  "csv_rows": 1,
+  "csv_matches_history_ids": true,
+  "formula_note_escaped": true,
+  "cpu_yolo_loiter_events": 8,
+  "hot_threshold_keeps_run": true,
+  "analytics_backlog": 0
+}

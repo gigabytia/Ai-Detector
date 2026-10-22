@@ -149,3 +149,9 @@ OUTSIDE ──anchor внутри──► ENTERING ──внутри ≥ dwell
 Период UTC [start,end), default24ч, REST≤31д, UI1ч/24ч/7д с ручным обновлением. Events включают false positives, current status; среднее событий делится на все зарегистрированные выбранные камеры, включая архивные/нулевые. Active cameras — сейчас (RUNNING/DEGRADED), Redis error неизвестно/null. Нет PostgreSQL →503/повторить, не нулевые KPI.
 
 People sampled1Hz latest, max не frame peak, mean не frame weighted. Missing observations не zero. Observed duration суммирует gaps≤2с без extrapolation; gap>2с исключён и в retained track timeline обозначается LOST. Треки camera/run/track, не физические уникальные люди, только завершённые, полные сессии при overlap периода. Collector4096/cap2048segments/truncated, outbox1000; caps — implementation safety, не новые env settings. Нет automatic analytics retention. См. ADR-037.
+
+## M11 — loitering / CSV
+
+LOITERING_THRESHOLD_SECONDS=10 в API, camera override nullable0..3600; worker SEVERITY_LOITERING=warning. Strict source duration>threshold, entry dwell включён, но outside/LOST/backward/gap>2с сбрасывает непрерывный таймер. Fired visit сохраняется до confirmed exit, затем cooldown/re-entry. Не меняет M6 entry/grace или PersonState. Подробнее ADR-038.
+
+CSV current camera/status/type/aware [start,end) filters, весь persisted набор, не page50/live-pending. All-time либо UI fixed1ч/24ч/7д+refresh. 50000rows/20MiB cap→422 без truncation, DB/timeout→503 без download. UTC/UTF8BOM/comma/CRLF, formula mitigation; native Excel import не проверен.

@@ -6,7 +6,7 @@ export interface LiveEvent {
   track_id: number
   zone_id: string | null
   line_id?: string | null
-  type: 'PERSON_ENTERED_DANGER_ZONE' | 'PERSON_CROSSED_LINE'
+  type: 'PERSON_ENTERED_DANGER_ZONE' | 'PERSON_CROSSED_LINE' | 'PERSON_LOITERING_IN_DANGER_ZONE'
   severity: 'critical' | 'warning' | 'info'
   occurred_at: string
   detector_confidence: number
@@ -22,12 +22,16 @@ export function parseLiveEvent(raw: string): LiveEvent | null {
     )
       return null
     if (
-      !['PERSON_ENTERED_DANGER_ZONE', 'PERSON_CROSSED_LINE'].includes(e.type) ||
+      ![
+        'PERSON_ENTERED_DANGER_ZONE',
+        'PERSON_CROSSED_LINE',
+        'PERSON_LOITERING_IN_DANGER_ZONE',
+      ].includes(e.type) ||
       !['critical', 'warning', 'info'].includes(e.severity)
     )
       return null
     if (
-      e.type === 'PERSON_ENTERED_DANGER_ZONE'
+      e.type !== 'PERSON_CROSSED_LINE'
         ? !uuid.test(e.zone_id ?? '') || e.line_id != null
         : !uuid.test(e.line_id ?? '') || e.zone_id != null
     )

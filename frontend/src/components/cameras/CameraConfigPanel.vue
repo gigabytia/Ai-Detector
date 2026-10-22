@@ -21,6 +21,7 @@ const confidence = ref<string | number>('')
 const snapshot = ref('')
 const timings = ref<Record<string, string>>({})
 const timingKeys = [
+  'loitering_threshold_seconds',
   'zone_enter_dwell_seconds',
   'zone_exit_grace_seconds',
   'event_cooldown_seconds',

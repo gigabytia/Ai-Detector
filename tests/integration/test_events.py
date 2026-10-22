@@ -749,3 +749,157 @@ async def test_cross_camera_line_reference_becomes_null_not_a_wrong_fk(
     async with sessions() as session:
         saved = await session.get(EventModel, event.id)
         assert saved and saved.line_id is None and saved.type == "PERSON_CROSSED_LINE"
+
+
+async def test_loitering_transport_roundtrip_duplicate_operator_state(
+    transport: tuple[Redis, async_sessionmaker[AsyncSession], Settings],
+) -> None:
+    from ai_detector_core.events.domain import LoiteringMetadata
+
+    redis, sessions, settings = transport
+    base = await make_event(sessions)
+    event = DomainEvent.model_validate(
+        {
+            **base.model_dump(),
+            "type": "PERSON_LOITERING_IN_DANGER_ZONE",
+            "severity": "warning",
+            "metadata": LoiteringMetadata(
+                bbox=(0.1, 0.1, 0.5, 0.5),
+                anchor=(0.3, 0.5),
+                stability=1,
+                zone_name="Зона",
+                duration_seconds=10.1,
+                threshold_seconds=10,
+            ),
+        }
+    )
+    ingest = EventIngest(redis, sessions)
+    publisher = EventPublisher(redis)
+    await publisher.publish(event)
+    await ingest.process(await read_batch(ingest))
+    app = create_app(settings)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client,
+    ):
+        response = await client.get(f"/api/v1/events/{event.id}")
+        assert response.status_code == 200
+        assert response.json()["metadata"]["duration_seconds"] == 10.1
+        assert (
+            await client.patch(
+                f"/api/v1/events/{event.id}", json={"status": "FALSE_POSITIVE", "note": "Заметка"}
+            )
+        ).status_code == 200
+        await publisher.publish(event)
+        await ingest.process(await read_batch(ingest))
+        row = (await client.get(f"/api/v1/events/{event.id}")).json()
+        assert row["status"] == "FALSE_POSITIVE" and row["note"] == "Заметка"
+
+
+async def test_csv_complete_filters_boundaries_archived_formula_and_empty(
+    transport: tuple[Redis, async_sessionmaker[AsyncSession], Settings],
+) -> None:
+    import csv
+    import io
+    from datetime import timedelta
+
+    from sqlalchemy import update
+
+    redis, sessions, settings = transport
+    event = await make_event(sessions)
+    async with sessions() as session, session.begin():
+        await session.execute(
+            update(CameraModel)
+            .where(CameraModel.id == event.camera_id)
+            .values(name="=1+1", deleted_at=datetime.now(UTC))
+        )
+    ingest = EventIngest(redis, sessions)
+    events = [event.model_copy(update={"id": uuid4()}) for _ in range(71)]
+    events.append(
+        event.model_copy(
+            update={"id": uuid4(), "occurred_at": event.occurred_at + timedelta(seconds=1)}
+        )
+    )
+    await ingest.process(
+        [(str(i).encode(), {b"event": e.model_dump_json().encode()}) for i, e in enumerate(events)]
+    )
+    app = create_app(settings)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client,
+    ):
+        first = events[0]
+        await client.patch(
+            f"/api/v1/events/{first.id}",
+            json={"status": "FALSE_POSITIVE", "note": ' =1+1\n"Заметка",да'},
+        )
+        params = {
+            "camera_id": str(event.camera_id),
+            "event_type": event.type,
+            "start": event.occurred_at.isoformat(),
+            "end": (event.occurred_at + timedelta(seconds=1)).isoformat(),
+        }
+        history = (await client.get("/api/v1/events", params=params)).json()
+        assert len(history["items"]) == 50 and history["next_cursor"]
+        result = await client.get("/api/v1/events/export", params=params)
+        assert (
+            result.status_code == 200
+            and result.headers["content-type"] == "text/csv; charset=utf-8"
+        )
+        assert (
+            "attachment" in result.headers["content-disposition"]
+            and result.headers["cache-control"] == "private, no-store"
+        )
+        rows = list(csv.DictReader(io.StringIO(result.content.decode("utf-8-sig"), newline="")))
+        assert len(rows) == 71 and {r["id"] for r in rows} == {str(e.id) for e in events[:-1]}
+        assert all(r["camera_name"] == "'=1+1" for r in rows)
+        assert next(r for r in rows if r["id"] == str(first.id))["note"].startswith("' =1+1")
+        assert "storage_key" not in result.text
+        fp = await client.get(
+            "/api/v1/events/export", params={**params, "status": "FALSE_POSITIVE"}
+        )
+        assert len(list(csv.DictReader(io.StringIO(fp.content.decode("utf-8-sig"))))) == 1
+        empty = await client.get(
+            "/api/v1/events/export", params={**params, "event_type": "PERSON_CROSSED_LINE"}
+        )
+        assert len(list(csv.DictReader(io.StringIO(empty.content.decode("utf-8-sig"))))) == 0
+        for bad in (
+            {"start": "2026-01-01"},
+            {"event_type": "other"},
+            {"status": "other"},
+            {"start": params["end"], "end": params["start"]},
+        ):
+            assert (await client.get("/api/v1/events/export", params=bad)).status_code == 422
+
+
+async def test_csv_oversize_and_database_failure_are_json_not_partial_download(
+    transport: tuple[Redis, async_sessionmaker[AsyncSession], Settings],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.application import event_export, event_service
+    from app.infrastructure.database.repositories.events import EventRepository
+
+    redis, sessions, settings = transport
+    event = await make_event(sessions)
+    ingest = EventIngest(redis, sessions)
+    await ingest.process([(b"1-0", {b"event": event.model_dump_json().encode()})])
+    app = create_app(settings)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client,
+    ):
+        monkeypatch.setattr(event_export, "MAX_EXPORT_ROWS", 0)
+        monkeypatch.setattr(event_service, "MAX_EXPORT_ROWS", 0)
+        response = await client.get("/api/v1/events/export")
+        assert (
+            response.status_code == 422 and response.json()["error"]["code"] == "EXPORT_TOO_LARGE"
+        )
+        assert "content-disposition" not in response.headers
+
+        async def fail(*args: object, **kwargs: object) -> None:
+            raise OperationalError("SELECT", {}, Exception("offline"))
+
+        monkeypatch.setattr(EventRepository, "export_rows", fail)
+        response = await client.get("/api/v1/events/export")
+        assert response.status_code == 503
+        assert response.headers["content-type"] == "application/json"

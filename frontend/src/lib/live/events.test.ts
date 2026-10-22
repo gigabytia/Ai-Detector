@@ -50,3 +50,10 @@ it('accepts line crossing with line reference and rejects mixed/wrong references
   expect(parseLiveEvent(JSON.stringify({ ...crossing, line_id: null }))).toBeNull()
   expect(parseLiveEvent(JSON.stringify({ ...crossing, zone_id: event.zone_id }))).toBeNull()
 })
+
+it('accepts loitering as a zone alarm, not a line event', () => {
+  const loiter = { ...event, type: 'PERSON_LOITERING_IN_DANGER_ZONE' }
+  expect(parseLiveEvent(JSON.stringify(loiter))?.type).toBe(loiter.type)
+  expect(parseLiveEvent(JSON.stringify({ ...loiter, zone_id: null }))).toBeNull()
+  expect(parseLiveEvent(JSON.stringify({ ...loiter, line_id: event.zone_id }))).toBeNull()
+})

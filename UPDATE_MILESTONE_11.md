@@ -1,0 +1,12 @@
+# Обновление M10 → M11
+
+Полный архив с настоящей `.git` M4 → … → M10 → M11, исходниками, весами и QA. Не выполнять git init. `.env`, окружения, node_modules и runtime uploads/snapshots исключены, не копировать поверх рабочей data directory.
+
+1. Backup PostgreSQL, Redis/AOF и файлов снимков/uploads; сохранить свои изменения/.env, остановить API/worker. Распаковать в новую папку, проверить git status/log/fsck. Для существующего clone — fetch/ff из распакованного репозитория, не новая история.
+2. Перенести свой .env/mounts. PostgreSQL UTF8, Python3.12, Node ^22.22.2 либо >=24.15.0 (QA24.15.0). `uv sync --frozen`; `npm --prefix frontend ci`. Новых библиотек относительно M10 нет.
+3. `uv run alembic -c backend/alembic.ini upgrade head`. Новая b6b7cfcd87c5 добавляет nullable camera_configs.loitering_threshold_seconds0..3600, старые данные сохраняются. Default API LOITERING_THRESHOLD_SECONDS=10, worker SEVERITY_LOITERING=warning; Compose env mapping добавлен. Downgrade — только test/осознанная потеря override, не способ обновления production.
+4. API/worker/frontend обновить согласованно: старый API/UI может не принять новый event type, старый strict worker не знает нового effective-config поля. Исторические M11 events остаются даже при downgrade config schema, поэтому откат бинарников требует отдельного плана. Данные не удалять.
+5. Камера → настройки → «Порог долгого нахождения». Пусто наследует default; hot update не меняет run. Нужен подтверждённый track в зоне и **source duration строго больше threshold**. Время входного dwell включено, но lost/outside/gap>2с сбрасывает continuous timer. Повтор — только после confirmed exit/re-entry с учётом cooldown; короткий jitter не даёт второй alarm. Для demo default10с нужна достаточно широкая зона/длинный проход, не снижать порог production ради теста.
+6. В «Событиях» выбрать camera/status/type/period и «Скачать CSV». Все matching persisted строки, не только loaded50; no live-pending. UTC ISO8601, UTF8 BOM/comma/CRLF; текст формул может иметь защитный апостроф. До50000 строк/20МиБ, иначе422 и сузить фильтры; PG error503 не скачивает error-file. Период фиксирован, «Обновить период» сдвигает окно.
+
+QA integration чистит отдельную test DB/Redis13. Outage/shutdown скрипты останавливают сервисы — не production. Backup/retention/analytics growth мониторинг прежний; auth ещё нет. Подробности PROGRESS.md, docs/qa/m11/README.md и ADR-038. Следующий M12 — измерения, затем оптимизация.

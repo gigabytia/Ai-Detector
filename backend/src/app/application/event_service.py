@@ -1,9 +1,10 @@
 """Event application service: history, status transitions and audit."""
 
+import asyncio
 import base64
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from redis.asyncio import Redis
@@ -18,6 +19,7 @@ from app.application.errors import (
     ServiceUnavailableError,
     UnprocessableError,
 )
+from app.application.event_export import MAX_EXPORT_ROWS, encode_export
 from app.infrastructure.database.repositories.events import EventRepository, event_read
 from app.schemas.events import EventPage, EventRead, EventUpdate
 
@@ -43,12 +45,31 @@ class EventService:
         self.redis = redis
         self.clock = clock
 
+    @staticmethod
+    def window(
+        start: datetime | None, end: datetime | None
+    ) -> tuple[datetime | None, datetime | None]:
+        if start is not None and end is not None and start >= end:
+            raise UnprocessableError("Choose an ordered event period")
+        return start.astimezone(UTC) if start else None, end.astimezone(UTC) if end else None
+
     async def list(
-        self, limit: int, camera_id: UUID | None, status: str | None, cursor: str | None
+        self,
+        limit: int,
+        camera_id: UUID | None,
+        status: str | None,
+        cursor: str | None,
+        *,
+        event_type: str | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
     ) -> EventPage:
+        start, end = self.window(start, end)
         before = decode_cursor(cursor)
         try:
-            rows = await self.repository.list(limit + 1, camera_id, status, before)
+            rows = await self.repository.list(
+                limit + 1, camera_id, status, before, event_type=event_type, start=start, end=end
+            )
         except (SQLAlchemyError, OSError) as exc:
             raise ServiceUnavailableError("Event history temporarily unavailable") from exc
         next_cursor = None
@@ -58,6 +79,23 @@ class EventService:
                 json.dumps([last.occurred_at.isoformat(), str(last.id)]).encode()
             ).decode()
         return EventPage(items=[event_read(row) for row in rows[:limit]], next_cursor=next_cursor)
+
+    async def export(
+        self,
+        camera_id: UUID | None,
+        status: str | None,
+        event_type: str | None,
+        start: datetime | None,
+        end: datetime | None,
+    ) -> bytes:
+        start, end = self.window(start, end)
+        try:
+            rows = await self.repository.export_rows(
+                MAX_EXPORT_ROWS + 1, camera_id, status, event_type, start, end
+            )
+            return await asyncio.to_thread(encode_export, rows)
+        except (SQLAlchemyError, OSError) as exc:
+            raise ServiceUnavailableError("CSV export temporarily unavailable") from exc
 
     async def get(self, event_id: UUID) -> EventRead:
         try:

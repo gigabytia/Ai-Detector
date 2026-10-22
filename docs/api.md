@@ -176,3 +176,11 @@ Worker readiness дополнительно учитывает publisher/backpre
 Aware UTC-normalized [start,end), default24ч, max31д; invalid order/naive time/cursor→422. PostgreSQL unavailable→503. Неизвестный camera UUID даёт пустой набор200. События по occurred_at, FP включены/текущий статус, архивные камеры включены в by_camera/denominator. Active cameras now из Redis, при отказе null, исторические данные остаются. People buckets только для одной выбранной камеры; среднее сохранённых last-in-second samples, no zero-fill. Observed duration не uptime; completed_tracks не unique people. Подробности ADR-037. Контракт OpenAPI/TS regenerated.
 
 API readiness содержит отдельный `analytics_ingest` probe. Worker readiness дополнен analytics_ok/analytics_dropped; это состояние RAM/Redis publisher, не подтверждение DB commit. Невосстановимый analytics overflow логируется и не выключает inference/alarm.
+
+## M11 — loitering и экспорт
+
+EventRead/DomainEvent теперь принимают `PERSON_LOITERING_IN_DANGER_ZONE`, zone event (zone_id, не line_id). Metadata: normalized bbox/anchor, zone_name, duration_seconds, threshold_seconds, stability. В истории удалённая FK может стать null, историческое имя/metadata остаются. Config GET/PUT/internal worker spec: nullable override `loitering_threshold_seconds`0..3600, effective default10.
+
+`GET /api/v1/events` дополнен optional `event_type`, `start`, `end` (aware ISO8601). Те же camera_id/status/type/time predicates в `GET /api/v1/events/export`. [start,end), start<end, invalid/naive/date order→422. Export без pagination: все matching persisted rows, включая archived camera и FP если не отфильтрованы. Header-only200 при пустом наборе.
+
+Success `text/csv; charset=utf-8`, attachment events.csv, private no-store/nosniff, UTF8 BOM/comma/CRLF, UTC Z и19 columns. Формулы текста получают защитный апостроф; multiline RFC-style quoting. Не содержит source credentials/storage_key/JPEG; snapshot_id nullable. До50000rows/20MiB, overflow422 EXPORT_TOO_LARGE без attachment; SQL timeout15с/PG error503 JSON до download. Не stream partial CSV, codec off event loop. Общие filters snapshot at click; live-pending не включены. Подробности ADR-038.

@@ -9,12 +9,14 @@ import CameraConfigPanel from './CameraConfigPanel.vue'
 
 vi.mock('@/api/cameras', () => ({ fetchCameraConfig: vi.fn(), saveCameraConfig: vi.fn() }))
 const timingDefaults = {
+  loitering_threshold_seconds: 10,
   snapshot_enabled: true,
   zone_enter_dwell_seconds: 0.25,
   zone_exit_grace_seconds: 0.5,
   event_cooldown_seconds: 3,
 }
 const timingOverrides = {
+  loitering_threshold_seconds: null,
   snapshot_enabled: null,
   zone_enter_dwell_seconds: null,
   zone_exit_grace_seconds: null,
@@ -100,11 +102,13 @@ it('preserves and edits zone timing overrides with detection settings', async ()
   await flushPromises()
   expect((wrapper.get('#zone_enter_dwell_seconds-a').element as HTMLInputElement).value).toBe('2')
   await wrapper.get('#event_cooldown_seconds-a').setValue('6')
+  await wrapper.get('#loitering_threshold_seconds-a').setValue('1.5')
   await wrapper.get('form').trigger('submit')
   await flushPromises()
   expect(saveCameraConfig).toHaveBeenCalledWith('a', {
     target_fps: null,
     detection_confidence: null,
+    loitering_threshold_seconds: 1.5,
     zone_enter_dwell_seconds: 2,
     zone_exit_grace_seconds: null,
     event_cooldown_seconds: 6,

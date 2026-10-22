@@ -1,0 +1,11 @@
+{
+  "postgres_offline_loitering_sse": true,
+  "export_during_outage": 503,
+  "json_error_not_download": true,
+  "same_event_id_after_recovery": "e60d0357-03bb-478c-b0c3-3e13b7c765ce",
+  "same_snapshot_id": "0855608f-3233-5a1e-9c5f-605a13fdb9d9",
+  "snapshot_sha256_matches": "9161d4a2c340a4b86dcdeaa91d7bb0abf58f7d546a5e98ede52d6185f84f104d",
+  "csv_contains_recovered_event": true,
+  "event_backlog": 0,
+  "analytics_backlog": 0
+}

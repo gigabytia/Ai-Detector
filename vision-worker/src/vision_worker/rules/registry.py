@@ -27,11 +27,13 @@ class SceneRegistry:
         severity: Literal["critical", "warning", "info"] = "critical",
         line_hysteresis: float = 0.01,
         line_severity: Literal["critical", "warning", "info"] = "warning",
+        loitering_severity: Literal["critical", "warning", "info"] = "warning",
     ) -> None:
         self._line_hysteresis, self._line_severity = line_hysteresis, line_severity
         self._clock = clock if clock is not None else SystemClock()
         self._min_hits = min_hits
         self._severity = severity
+        self._loitering_severity = loitering_severity
         self._entries: dict[TrackKey, Entry] = {}
 
     def retain(self, active: set[TrackKey]) -> None:
@@ -49,7 +51,7 @@ class SceneRegistry:
             or entry.size != frame.size
         ):
             entry = Entry(
-                ZoneEngine(self._clock, self._min_hits, self._severity),
+                ZoneEngine(self._clock, self._min_hits, self._severity, self._loitering_severity),
                 LineEngine(self._clock, self._min_hits, self._line_hysteresis, self._line_severity),
                 frame.source_epoch,
                 frame.size,

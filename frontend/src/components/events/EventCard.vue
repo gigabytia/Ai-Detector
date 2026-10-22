@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { eventLabel } from '@/lib/eventLabel'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQueryClient } from '@tanstack/vue-query'
@@ -53,7 +54,7 @@ async function save(next?: 'ACKNOWLEDGED' | 'FALSE_POSITIVE') {
     <div class="flex flex-wrap items-start justify-between gap-2">
       <div class="min-w-0">
         <p class="text-sm font-semibold">
-          {{ t(event.type === 'PERSON_CROSSED_LINE' ? 'lines.crossed' : 'events.entered') }}
+          {{ t(eventLabel(event.type)) }}
         </p>
         <RouterLink
           :to="`/monitoring/${event.camera_id}`"

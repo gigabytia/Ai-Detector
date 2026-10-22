@@ -65,6 +65,21 @@ const cameraName = computed(
         </p>
         <p class="text-muted-foreground text-xs">{{ t('lines.directionHint') }}</p>
       </div>
+      <div
+        v-if="event.type === 'PERSON_LOITERING_IN_DANGER_ZONE'"
+        class="bg-card space-y-2 rounded-lg border p-4 text-sm"
+      >
+        <p class="font-semibold">{{ t('events.loitering') }}</p>
+        <p class="break-words">{{ event.metadata.zone_name }}</p>
+        <p>
+          {{
+            t('events.loiteringDuration', {
+              duration: Number(event.metadata.duration_seconds).toFixed(2),
+              threshold: event.metadata.threshold_seconds,
+            })
+          }}
+        </p>
+      </div>
       <dl class="bg-card space-y-3 rounded-lg border p-4 text-xs">
         <div>
           <dt class="text-muted-foreground">{{ t('snapshots.eventId') }}</dt>

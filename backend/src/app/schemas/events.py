@@ -6,6 +6,10 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
+EventType = Literal[
+    "PERSON_ENTERED_DANGER_ZONE", "PERSON_CROSSED_LINE", "PERSON_LOITERING_IN_DANGER_ZONE"
+]
+
 EventStatus = Literal["NEW", "ACKNOWLEDGED", "FALSE_POSITIVE"]
 
 
@@ -16,7 +20,7 @@ class EventRead(BaseModel):
     track_id: int
     zone_id: UUID | None
     line_id: UUID | None = None
-    type: Literal["PERSON_ENTERED_DANGER_ZONE", "PERSON_CROSSED_LINE"]
+    type: EventType
     severity: Literal["critical", "warning", "info"]
     status: EventStatus
     occurred_at: AwareDatetime

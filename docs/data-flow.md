@@ -157,3 +157,7 @@ CRUD линии → hot CAMERA_CHANGED/reconcile → CameraSpec.lines. Посл�
 ## M10 — наблюдения и завершённые треки
 
 Collector вызывается на event loop после проверки актуального run. Flush прошлого секундного bucket, последний sample при stop; финальная track session при removal/retain/shutdown. Independent RAM outbox → analytics Stream → validated ingest/DB commit → ACK/XDEL. При PG outage backlog сохраняется, при Redis outage живой worker retry через bounded RAM. Overflow/crash может терять analytics, не блокируя alarm pipeline. Сегменты gap>2с явно LOST, завершённые сессии появляются с задержкой. Dashboard SQL не читает frames и не суммирует asynchronous multicamera occupancy. Полная семантика ADR-037; данные не backfill до M10.
+
+## M11: loitering и CSV
+
+Matched inside source timestamps → existing ZoneEngine Visit → strict threshold once → DomainEvent/LoiteringMetadata → existing event outbox/live/ingest/JPEG → UI history/detail/dashboard. LOST/outside/gap reset observed timer, не создаёт фиктивной непрерывности. CSV использует те же SQL predicates, что history, не live buffer или loaded page; complete bounded bytes после query/codec, потом200 attachment. Ошибка до200 остаётся JSON. См. ADR-038.

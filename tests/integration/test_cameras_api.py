@@ -349,3 +349,39 @@ def test_line_limit_is_per_camera(client: TestClient) -> None:
     assert client.post(path, json=shape).status_code == 422
     first = client.get(path).json()[0]["id"]
     assert client.put(path + "/" + first, json={**shape, "enabled": False}).status_code == 200
+
+
+def test_loitering_config_default_override_inheritance_validation_and_worker_spec(
+    client: TestClient,
+) -> None:
+    camera = client.post("/api/v1/cameras", json=MOCK).json()
+    cid = camera["id"]
+    config = client.get(f"/api/v1/cameras/{cid}/config").json()
+    assert (
+        config["defaults"]["loitering_threshold_seconds"] == 10
+        and config["effective"]["loitering_threshold_seconds"] == 10
+    )
+    overrides = {**config["overrides"], "loitering_threshold_seconds": 1.5}
+    assert (
+        client.put(f"/api/v1/cameras/{cid}/config", json=overrides).json()["effective"][
+            "loitering_threshold_seconds"
+        ]
+        == 1.5
+    )
+    spec = client.get(f"/api/v1/internal/worker/cameras/{cid}", headers=AUTH)
+    assert spec.status_code == 200 and spec.json()["config"]["loitering_threshold_seconds"] == 1.5
+    for bad in [-1, 3601, "NaN"]:
+        assert (
+            client.put(
+                f"/api/v1/cameras/{cid}/config",
+                json={**overrides, "loitering_threshold_seconds": bad},
+            ).status_code
+            == 422
+        )
+    overrides["loitering_threshold_seconds"] = None
+    assert (
+        client.put(f"/api/v1/cameras/{cid}/config", json=overrides).json()["effective"][
+            "loitering_threshold_seconds"
+        ]
+        == 10
+    )

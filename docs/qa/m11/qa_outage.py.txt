@@ -1,0 +1,57 @@
+import asyncio,csv,hashlib,io,json,subprocess
+from pathlib import Path
+from datetime import UTC,datetime
+import httpx
+from redis.asyncio import Redis
+ROOT=Path('/data/m10/runtime');OUT=Path('/data/m10/Ai-Detector/docs/qa/m11');TARGET=json.loads((OUT/'targets.json').read_text());KIND='PERSON_LOITERING_IN_DANGER_ZONE'
+PG=['pg_ctl','-D',str(ROOT/'postgres'),'-l',str(ROOT/'postgres.log')]
+def pg(args):subprocess.run(PG+args,check=True,stdout=subprocess.DEVNULL)
+async def main():
+ redis=Redis.from_url('redis://127.0.0.1:16379/0');alarms=[];ready=asyncio.Event();cid=TARGET['camera']
+ async with httpx.AsyncClient(base_url='http://127.0.0.1:18000',timeout=15) as c:
+  for cam in (await c.get('/api/v1/cameras')).json():(await c.post(f"/api/v1/cameras/{cam['id']}/stop")).raise_for_status()
+  config=(await c.get(f'/api/v1/cameras/{cid}/config')).json();(await c.put(f'/api/v1/cameras/{cid}/config',json={**config['overrides'],'loitering_threshold_seconds':2})).raise_for_status();await asyncio.sleep(1)
+  async def stream():
+   async with c.stream('GET','/api/v1/events/stream') as response:
+    async for line in response.aiter_lines():
+     if line.startswith('event:'):ready.set()
+     if line.startswith('data:'):
+      value=json.loads(line[5:])
+      if value.get('type')==KIND and value.get('camera_id')==cid:alarms.append(value)
+  task=asyncio.create_task(stream());await asyncio.wait_for(ready.wait(),3);boundary=datetime.now(UTC).isoformat()
+  try:
+   (await c.post(f'/api/v1/cameras/{cid}/start')).raise_for_status()
+   for _ in range(50):
+    raw=await redis.get(f'ad:camera:{cid}:status')
+    if raw and json.loads(raw)['status']=='RUNNING':break
+    await asyncio.sleep(.1)
+   pg(['stop','-m','fast'])
+   try:
+    for _ in range(80):
+     if alarms:break
+     await asyncio.sleep(.1)
+    assert alarms,'No loitering alarm while PostgreSQL offline';alarm=alarms[0]
+    result=await c.get('/api/v1/events/export',params={'camera_id':cid});assert result.status_code==503 and result.headers['content-type']=='application/json' and 'content-disposition' not in result.headers
+    pending=[json.loads(fields[b'event']) for _,fields in await redis.xrange('ad:ingest')]
+    envelope=next(x for x in pending if x['id']==alarm['id']);snapshot=envelope['snapshot']
+    image=(Path('/data/m10/Ai-Detector/data')/snapshot['storage_key']).read_bytes();sha=hashlib.sha256(image).hexdigest()
+   finally:pg(['start','-o','-h 127.0.0.1 -p 15432 -k /data/m10/runtime'])
+   for _ in range(150):
+    response=await c.get(f"/api/v1/events/{alarm['id']}")
+    if response.status_code==200:break
+    await asyncio.sleep(.1)
+   response.raise_for_status();saved=response.json();assert saved['snapshot_id']==snapshot['id']
+   data=(await c.get(saved['snapshot_url'])).content;assert hashlib.sha256(data).hexdigest()==sha
+   file=await c.get('/api/v1/events/export',params={'camera_id':cid,'event_type':KIND,'start':boundary});file.raise_for_status();rows=list(csv.DictReader(io.StringIO(file.content.decode('utf-8-sig'))));assert alarm['id'] in {r['id'] for r in rows}
+   for _ in range(100):
+    if await redis.xlen('ad:ingest')==await redis.xlen('ad:analytics:ingest')==0:break
+    await asyncio.sleep(.1)
+   assert await redis.xlen('ad:ingest')==await redis.xlen('ad:analytics:ingest')==0
+   proof={'postgres_offline_loitering_sse':True,'export_during_outage':503,'json_error_not_download':True,'same_event_id_after_recovery':alarm['id'],'same_snapshot_id':snapshot['id'],'snapshot_sha256_matches':sha,'csv_contains_recovered_event':True,'event_backlog':0,'analytics_backlog':0}
+   (OUT/'outage-proof.json').write_text(json.dumps(proof,indent=2));print(json.dumps(proof),flush=True)
+  finally:
+   task.cancel()
+   try:await task
+   except asyncio.CancelledError:pass
+ await redis.aclose()
+asyncio.run(main())

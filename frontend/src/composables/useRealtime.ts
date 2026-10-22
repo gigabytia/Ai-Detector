@@ -1,3 +1,4 @@
+import { eventLabel } from '@/lib/eventLabel'
 import { useQueryClient } from '@tanstack/vue-query'
 import { onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -51,12 +52,9 @@ export function useRealtime() {
         const event = parseLiveEvent((message as MessageEvent).data)
         if (!event) return
         if (store.receive(event))
-          toast.warning(
-            t(event.type === 'PERSON_CROSSED_LINE' ? 'lines.crossed' : 'events.entered'),
-            {
-              description: t('events.track', { n: event.track_id }),
-            },
-          )
+          toast.warning(t(eventLabel(event.type)), {
+            description: t('events.track', { n: event.track_id }),
+          })
         void client.invalidateQueries({ queryKey: ['events'] })
       })
       source.addEventListener('camera.status', () => {

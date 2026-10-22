@@ -9,6 +9,7 @@ class CameraConfig(BaseModel):
     snapshot_enabled: bool = True
     target_fps: float = Field(default=10, ge=1, le=30)
     detection_confidence: float = Field(default=0.25, gt=0, le=1)
+    loitering_threshold_seconds: float = Field(default=10, ge=0, le=3600)
     zone_enter_dwell_seconds: float = Field(default=0.25, ge=0, le=3600)
     zone_exit_grace_seconds: float = Field(default=0.5, ge=0, le=3600)
     event_cooldown_seconds: float = Field(default=3, ge=0, le=3600)
@@ -20,6 +21,7 @@ class CameraConfigOverrides(BaseModel):
     snapshot_enabled: bool | None = None
     target_fps: float | None = Field(default=None, ge=1, le=30)
     detection_confidence: float | None = Field(default=None, gt=0, le=1)
+    loitering_threshold_seconds: float | None = Field(default=None, ge=0, le=3600)
     zone_enter_dwell_seconds: float | None = Field(default=None, ge=0, le=3600)
     zone_exit_grace_seconds: float | None = Field(default=None, ge=0, le=3600)
     event_cooldown_seconds: float | None = Field(default=None, ge=0, le=3600)

@@ -106,6 +106,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Events */
+        get: operations["export_events_api_v1_events_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events/{event_id}": {
         parameters: {
             query?: never;
@@ -380,6 +397,11 @@ export interface components {
              */
             detection_confidence: number;
             /**
+             * Loitering Threshold Seconds
+             * @default 10
+             */
+            loitering_threshold_seconds: number;
+            /**
              * Zone Enter Dwell Seconds
              * @default 0.25
              */
@@ -403,6 +425,8 @@ export interface components {
             target_fps?: number | null;
             /** Detection Confidence */
             detection_confidence?: number | null;
+            /** Loitering Threshold Seconds */
+            loitering_threshold_seconds?: number | null;
             /** Zone Enter Dwell Seconds */
             zone_enter_dwell_seconds?: number | null;
             /** Zone Exit Grace Seconds */
@@ -644,7 +668,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "PERSON_ENTERED_DANGER_ZONE" | "PERSON_CROSSED_LINE";
+            type: "PERSON_ENTERED_DANGER_ZONE" | "PERSON_CROSSED_LINE" | "PERSON_LOITERING_IN_DANGER_ZONE";
             /**
              * Severity
              * @enum {string}
@@ -1118,6 +1142,9 @@ export interface operations {
                 camera_id?: string | null;
                 status?: ("NEW" | "ACKNOWLEDGED" | "FALSE_POSITIVE") | null;
                 cursor?: string | null;
+                event_type?: ("PERSON_ENTERED_DANGER_ZONE" | "PERSON_CROSSED_LINE" | "PERSON_LOITERING_IN_DANGER_ZONE") | null;
+                start?: string | null;
+                end?: string | null;
             };
             header?: never;
             path?: never;
@@ -1197,6 +1224,77 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": string;
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_events_api_v1_events_export_get: {
+        parameters: {
+            query?: {
+                camera_id?: string | null;
+                status?: ("NEW" | "ACKNOWLEDGED" | "FALSE_POSITIVE") | null;
+                event_type?: ("PERSON_ENTERED_DANGER_ZONE" | "PERSON_CROSSED_LINE" | "PERSON_LOITERING_IN_DANGER_ZONE") | null;
+                start?: string | null;
+                end?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
                 };
             };
             /** @description Not Found */

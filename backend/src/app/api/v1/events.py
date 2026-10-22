@@ -6,13 +6,14 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
+from pydantic import AwareDatetime
 
 from app.api.deps import Resources, get_event_service
 from app.api.errors import ErrorResponse
 from app.application.event_service import EventService
 from app.application.event_service import decode_cursor as decode_cursor
-from app.schemas.events import EventPage, EventRead, EventStatus, EventUpdate
+from app.schemas.events import EventPage, EventRead, EventStatus, EventType, EventUpdate
 
 router = APIRouter(
     prefix="/events",
@@ -33,8 +34,13 @@ async def list_events(
     camera_id: UUID | None = None,
     status: EventStatus | None = None,
     cursor: Annotated[str | None, Query(max_length=512)] = None,
+    event_type: EventType | None = None,
+    start: AwareDatetime | None = None,
+    end: AwareDatetime | None = None,
 ) -> EventPage:
-    return await service.list(limit, camera_id, status, cursor)
+    return await service.list(
+        limit, camera_id, status, cursor, event_type=event_type, start=start, end=end
+    )
 
 
 @router.get(
@@ -72,6 +78,31 @@ async def stream(request: Request, resources: Resources) -> StreamingResponse:
         headers={
             "Cache-Control": "no-cache, no-transform",
             "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get(
+    "/export",
+    response_class=Response,
+    responses={200: {"content": {"text/csv": {"schema": {"type": "string", "format": "binary"}}}}},
+)
+async def export_events(
+    service: Service,
+    camera_id: UUID | None = None,
+    status: EventStatus | None = None,
+    event_type: EventType | None = None,
+    start: AwareDatetime | None = None,
+    end: AwareDatetime | None = None,
+) -> Response:
+    content = await service.export(camera_id, status, event_type, start, end)
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="events.csv"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
         },
     )
 

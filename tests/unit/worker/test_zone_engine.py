@@ -7,7 +7,7 @@ import pytest
 from worker_fakes import make_frame
 
 from ai_detector_core.cameras.config import CameraConfig
-from ai_detector_core.events.domain import DomainEvent
+from ai_detector_core.events.domain import DomainEvent, LoiteringMetadata
 from ai_detector_core.people.track import PersonState, PersonTrack
 from ai_detector_core.zones.model import ZoneSpec
 from fakes import FixedClock
@@ -238,3 +238,163 @@ def test_resolution_and_discontinuity_reset_scene_and_keep_severity() -> None:
     assert scenes.update(replace(changed, frame=make_frame(20, 200, 100)), config).events
     reset = replace(changed, frame=replace(make_frame(21, 200, 100), discontinuity=True))
     assert not scenes.update(reset, config).events
+
+
+def loiter_events(events: tuple[DomainEvent, ...]) -> list[DomainEvent]:
+    return [e for e in events if e.type == "PERSON_LOITERING_IN_DANGER_ZONE"]
+
+
+def test_loitering_strict_threshold_source_time_one_event_not_wall_clock() -> None:
+    clock = FixedClock()
+    engine = ZoneEngine(clock)
+    for ms in range(0, 10001, 1000):
+        clock.advance(99)
+        assert not loiter_events(tick(engine, ms)[1])
+    event = loiter_events(tick(engine, 10001)[1])[0]
+    assert isinstance(event.metadata, LoiteringMetadata)
+    assert event.severity == "warning" and event.metadata.duration_seconds == pytest.approx(10.001)
+    assert event.metadata.threshold_seconds == 10 and event.metadata.zone_name == ZONE.name
+    assert DomainEvent.model_validate_json(event.model_dump_json()) == event
+    for ms in range(11000, 30000, 1000):
+        assert not loiter_events(tick(engine, ms)[1])
+
+
+def test_loitering_lost_and_observed_outside_reset_unfired_clock() -> None:
+    engine = ZoneEngine(FixedClock())
+    config = CameraConfig(loitering_threshold_seconds=2)
+    tick(engine, 0, config=config)
+    tick(engine, 1000, config=config)
+    assert not loiter_events(tick(engine, 2000, lost=True, config=config)[1])
+    for ms in (3000, 4000, 5000):
+        assert not loiter_events(tick(engine, ms, config=config)[1])
+    assert len(loiter_events(tick(engine, 5001, config=config)[1])) == 1
+    # Brief outside/LOST after firing must not re-arm the SAME confirmed visit.
+    tick(engine, 5100, inside=False, config=config)
+    tick(engine, 5200, config=config)
+    tick(engine, 5300, lost=True, config=config)
+    for ms in (5400, 6400, 7400, 8400):
+        assert not loiter_events(tick(engine, ms, config=config)[1])
+
+
+def test_confirmed_exit_allows_second_loitering_without_entry_cooldown_collision() -> None:
+    clock = FixedClock()
+    engine = ZoneEngine(clock)
+    config = CameraConfig(loitering_threshold_seconds=1)
+    tick(engine, 0, config=config)
+    tick(engine, 500, config=config)
+    assert len(loiter_events(tick(engine, 1001, config=config)[1])) == 1
+    tick(engine, 1100, inside=False, config=config)
+    tick(engine, 1700, inside=False, config=config)
+    clock.advance(4)
+    tick(engine, 1800, config=config)
+    tick(engine, 2300, config=config)
+    assert len(loiter_events(tick(engine, 2801, config=config)[1])) == 1
+
+
+@pytest.mark.parametrize("gap", [3000, -100])
+def test_loitering_clock_reset_on_capture_gap_or_backward_source_time(gap: int) -> None:
+    engine = ZoneEngine(FixedClock())
+    config = CameraConfig(loitering_threshold_seconds=1)
+    tick(engine, 0, config=config)
+    tick(engine, 500, config=config)
+    assert not loiter_events(tick(engine, gap, config=config)[1])
+    assert not loiter_events(tick(engine, gap + 500, config=config)[1])
+    assert len(loiter_events(tick(engine, gap + 1001, config=config)[1])) == 1
+
+
+def test_hot_threshold_preserves_visit_and_fired_marker_and_severity() -> None:
+    engine = ZoneEngine(FixedClock(), loitering_severity="critical")
+    for ms in (0, 500, 1000):
+        tick(engine, ms)
+    config = CameraConfig(loitering_threshold_seconds=0.5)
+    event = loiter_events(tick(engine, 1100, config=config)[1])[0]
+    assert event.severity == "critical"
+    assert not loiter_events(
+        tick(engine, 1200, config=CameraConfig(loitering_threshold_seconds=0))[1]
+    )
+
+
+def test_geometry_disable_removal_and_multiple_zone_membership() -> None:
+    engine = ZoneEngine(FixedClock())
+    config = CameraConfig(loitering_threshold_seconds=0.5, event_cooldown_seconds=0)
+    other = ZONE.model_copy(update={"id": uuid4()})
+    tick(engine, 0, config=config, zones=(ZONE, other))
+    events = loiter_events(tick(engine, 600, config=config, zones=(ZONE, other))[1])
+    assert {e.zone_id for e in events} == {ZONE.id, other.id}
+    tick(engine, 700, config=config, zones=())
+    tick(engine, 800, config=config, zones=(ZONE,))
+    assert len(loiter_events(tick(engine, 1400, config=config, zones=(ZONE,))[1])) == 1
+    engine.update(make_frame(1500, 100, 100), (), (ZONE,), config)
+    tick(engine, 1600, config=config)
+    assert len(loiter_events(tick(engine, 2200, config=config)[1])) == 1
+
+
+def test_loitering_scene_reset_does_not_inherit_previous_timer() -> None:
+    scenes = SceneRegistry(FixedClock())
+    config = CameraConfig(loitering_threshold_seconds=1)
+    base = DetectionResult(CID, RID, make_frame(0, 100, 100), (), 0, (track(),), (ZONE,))
+    for ms in (0, 500, 900):
+        scenes.update(replace(base, frame=replace(base.frame, source_ts_ms=ms)), config)
+    reset = replace(base, frame=replace(base.frame, source_ts_ms=1000, discontinuity=True))
+    assert not loiter_events(scenes.update(reset, config).events)
+    assert not loiter_events(
+        scenes.update(replace(base, frame=replace(base.frame, source_ts_ms=1500)), config).events
+    )
+    assert (
+        len(
+            loiter_events(
+                scenes.update(
+                    replace(base, frame=replace(base.frame, source_ts_ms=2100)), config
+                ).events
+            )
+        )
+        == 1
+    )
+
+
+def test_brief_outside_resets_unfired_continuous_timer_without_new_visit() -> None:
+    engine = ZoneEngine(FixedClock())
+    config = CameraConfig(loitering_threshold_seconds=2)
+    for ms in (0, 1000, 1900):
+        assert not loiter_events(tick(engine, ms, config=config)[1])
+    tick(engine, 1950, inside=False, config=config)
+    for ms in (2000, 3000, 4000):
+        assert not loiter_events(tick(engine, ms, config=config)[1])
+    assert len(loiter_events(tick(engine, 4001, config=config)[1])) == 1
+
+
+@pytest.mark.parametrize("threshold", [0.3, 1.0, 10.0])
+def test_loitering_no_accumulated_float_error_at_exact_threshold(threshold: float) -> None:
+    engine = ZoneEngine(FixedClock())
+    config = CameraConfig(loitering_threshold_seconds=threshold, zone_enter_dwell_seconds=0)
+    for ms in range(0, int(threshold * 1000) + 1, 100):
+        assert not loiter_events(tick(engine, ms, config=config)[1])
+    assert len(loiter_events(tick(engine, threshold * 1000 + 1, config=config)[1])) == 1
+
+
+@pytest.mark.parametrize(
+    "invalid", ["missing_zone", "line_reference", "entry_metadata", "threshold_not_exceeded"]
+)
+def test_loitering_payload_rejects_wrong_refs_or_duration(invalid: str) -> None:
+    from pydantic import ValidationError
+
+    engine = ZoneEngine(FixedClock())
+    config = CameraConfig(loitering_threshold_seconds=0.1)
+    tick(engine, 0, config=config)
+    event = loiter_events(tick(engine, 300, config=config)[1])[0]
+    raw = event.model_dump()
+    if invalid == "missing_zone":
+        raw["zone_id"] = None
+    elif invalid == "line_reference":
+        raw["line_id"] = uuid4()
+    elif invalid == "entry_metadata":
+        raw["metadata"] = {
+            "bbox": (0.1, 0.1, 0.5, 0.5),
+            "anchor": (0.3, 0.5),
+            "dwell_seconds": 1,
+            "stability": 1,
+        }
+    else:
+        raw["metadata"]["duration_seconds"] = raw["metadata"]["threshold_seconds"]
+    with pytest.raises(ValidationError):
+        DomainEvent.model_validate(raw)

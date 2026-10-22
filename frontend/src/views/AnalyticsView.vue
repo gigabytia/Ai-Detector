@@ -43,7 +43,9 @@ const typeName = (value: string) =>
     ? t('lines.crossed')
     : value === 'PERSON_ENTERED_DANGER_ZONE'
       ? t('events.entered')
-      : value
+      : value === 'PERSON_LOITERING_IN_DANGER_ZONE'
+        ? t('events.loitering')
+        : value
 const cards = computed(() =>
   data.value
     ? ([

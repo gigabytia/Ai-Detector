@@ -1,0 +1,10 @@
+{
+  "utf8_bom": true,
+  "delimiter": ",",
+  "rows": 1,
+  "columns": 19,
+  "csv_and_pandas_agree": true,
+  "unicode_quotes_multiline": true,
+  "formula_prefix": true,
+  "utc": true
+}

@@ -1,0 +1,61 @@
+import asyncio,csv,hashlib,io,json
+from datetime import UTC,datetime
+from pathlib import Path
+import httpx
+from redis.asyncio import Redis
+OUT=Path('/data/m10/Ai-Detector/docs/qa/m11')
+KIND='PERSON_LOITERING_IN_DANGER_ZONE'
+async def main():
+ redis=Redis.from_url('redis://127.0.0.1:16379/0');alarms=[];ready=asyncio.Event()
+ async with httpx.AsyncClient(base_url='http://127.0.0.1:18000',timeout=30) as c:
+  cams=(await c.get('/api/v1/cameras')).json();mock=next(x for x in cams if x['source_url']=='mock://walk_through');real=next(x for x in cams if x['source_type']=='file')
+  for cam in cams:(await c.post(f"/api/v1/cameras/{cam['id']}/stop")).raise_for_status()
+  await asyncio.sleep(1)
+  for cam,threshold in [(mock,None),(real,1)]:
+   cid=cam['id'];config=(await c.get(f'/api/v1/cameras/{cid}/config')).json()
+   result=await c.put(f'/api/v1/cameras/{cid}/config',json={**config['overrides'],'loitering_threshold_seconds':threshold,'snapshot_enabled':True});result.raise_for_status()
+   assert result.json()['effective']['loitering_threshold_seconds']==(10 if threshold is None else threshold)
+   zones=(await c.get(f'/api/v1/cameras/{cid}/zones')).json();body={'name':'M11 — непрерывное наблюдение','enabled':True,'points':[{'x':0,'y':0},{'x':1,'y':0},{'x':1,'y':1},{'x':0,'y':1}]}
+   result=await (c.put(f"/api/v1/cameras/{cid}/zones/{zones[0]['id']}",json=body) if zones else c.post(f'/api/v1/cameras/{cid}/zones',json=body));result.raise_for_status()
+  async def stream():
+   async with c.stream('GET','/api/v1/events/stream') as response:
+    async for line in response.aiter_lines():
+     if line.startswith('event:'):ready.set()
+     if line.startswith('data:'):
+      try:
+       value=json.loads(line[5:])
+       if value.get('type'):alarms.append(value)
+      except json.JSONDecodeError:pass
+  task=asyncio.create_task(stream());await asyncio.wait_for(ready.wait(),3);boundary=datetime.now(UTC).isoformat()
+  try:
+   for cam in [mock,real]:(await c.post(f"/api/v1/cameras/{cam['id']}/start")).raise_for_status()
+   for _ in range(240):
+    matches=[e for e in alarms if e['camera_id']==mock['id'] and e['type']==KIND]
+    if matches:break
+    await asyncio.sleep(.1)
+   assert matches,'no default10s mock loitering alarm'
+   alarm=matches[0];assert alarm['metadata']['duration_seconds']>10 and alarm['metadata']['threshold_seconds']==10
+   assert alarm['severity']=='warning'
+   await asyncio.sleep(2)
+   (await c.post(f"/api/v1/cameras/{mock['id']}/stop")).raise_for_status();await asyncio.sleep(1)
+   events=(await c.get('/api/v1/events',params={'camera_id':mock['id'],'start':boundary,'limit':200})).json()['items']
+   same=[e for e in events if e['type']==KIND and e['run_id']==alarm['run_id'] and e['track_id']==alarm['track_id'] and e['zone_id']==alarm['zone_id']];assert len(same)==1
+   assert any(e['type']=='PERSON_ENTERED_DANGER_ZONE' and e['track_id']==alarm['track_id'] for e in events)
+   saved=same[0];assert saved['snapshot_url'];image=await c.get(saved['snapshot_url']);image.raise_for_status()
+   update=await c.patch(f"/api/v1/events/{saved['id']}",json={'status':'FALSE_POSITIVE','note':'=1+1\n"проверка", CSV'});update.raise_for_status()
+   params={'camera_id':mock['id'],'event_type':KIND,'status':'FALSE_POSITIVE','start':boundary,'end':datetime.now(UTC).isoformat()}
+   history=(await c.get('/api/v1/events',params=params)).json()['items'];file=await c.get('/api/v1/events/export',params=params);file.raise_for_status()
+   rows=list(csv.DictReader(io.StringIO(file.content.decode('utf-8-sig'),newline='')));assert {r['id'] for r in rows}=={e['id'] for e in history}=={saved['id']}
+   assert rows[0]['note'].startswith("'=1+1")
+   real_events=(await c.get('/api/v1/events',params={'camera_id':real['id'],'event_type':KIND,'start':boundary,'limit':200})).json()['items'];assert real_events
+   run=json.loads(await redis.get(f"ad:camera:{real['id']}:status"))['run_id']
+   config=(await c.get(f"/api/v1/cameras/{real['id']}/config")).json();(await c.put(f"/api/v1/cameras/{real['id']}/config",json={**config['overrides'],'loitering_threshold_seconds':.4})).raise_for_status();await asyncio.sleep(1)
+   assert json.loads(await redis.get(f"ad:camera:{real['id']}:status"))['run_id']==run
+   proof={'default_mock_threshold':10,'observed_duration':saved['metadata']['duration_seconds'],'one_loiter_event_for_visit':len(same),'same_entry_loiter_track':True,'snapshot_width':saved['snapshot_width'],'snapshot_height':saved['snapshot_height'],'snapshot_sha256':hashlib.sha256(image.content).hexdigest(),'csv_rows':len(rows),'csv_matches_history_ids':True,'formula_note_escaped':True,'cpu_yolo_loiter_events':len(real_events),'hot_threshold_keeps_run':True,'analytics_backlog':await redis.xlen('ad:analytics:ingest')}
+   OUT.joinpath('live-proof.json').write_text(json.dumps(proof,ensure_ascii=False,indent=2));OUT.joinpath('targets.json').write_text(json.dumps({'camera':mock['id'],'real':real['id'],'event':saved['id'],'start':boundary}));print(json.dumps(proof),flush=True)
+  finally:
+   task.cancel()
+   try:await task
+   except asyncio.CancelledError:pass
+ await redis.aclose()
+asyncio.run(main())

@@ -33,6 +33,7 @@ class WorkerSettings(BaseSettings):
     detection_iou: float = Field(default=0.45, gt=0, le=1)
     line_hysteresis: float = Field(default=0.01, gt=0, le=0.1)
     severity_line_cross: Literal["critical", "warning", "info"] = "warning"
+    severity_loitering: Literal["critical", "warning", "info"] = "warning"
     severity_zone_enter: Literal["critical", "warning", "info"] = "critical"
     event_min_track_hits: int = Field(default=3, ge=1, le=1000)
     person_track_max_age: int = Field(default=25, ge=1, le=1000)

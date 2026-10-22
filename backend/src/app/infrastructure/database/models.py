@@ -49,6 +49,10 @@ class CameraConfigModel(Base):
     __tablename__ = "camera_configs"
     __table_args__ = (
         CheckConstraint(
+            "loitering_threshold_seconds >= 0 AND loitering_threshold_seconds <= 3600",
+            name="loitering_threshold_seconds_range",
+        ),
+        CheckConstraint(
             "zone_enter_dwell_seconds >= 0 AND zone_enter_dwell_seconds <= 3600",
             name="zone_enter_dwell_seconds_range",
         ),
@@ -65,6 +69,8 @@ class CameraConfigModel(Base):
             "detection_confidence > 0 AND detection_confidence <= 1", name="confidence_range"
         ),
     )
+
+    loitering_threshold_seconds: Mapped[float | None] = mapped_column(Float)
 
     zone_enter_dwell_seconds: Mapped[float | None] = mapped_column(Float)
 

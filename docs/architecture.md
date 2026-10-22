@@ -1,6 +1,6 @@
 # Архитектура AI Detector v2
 
-> Реализован M10: прежний M9 pipeline плюс independent analytics ingest, persisted 1Hz observations/completed track sessions, dashboard ECharts и timeline. Loitering/CSV — M11. Текущая граница — PROGRESS.md и ADR-037; ранние планы ниже не отменяют фактические границы этапа.
+> Реализован M11: M10 analytics/dashboard/timeline сохранены; добавлены непрерывный loitering и CSV всех persisted событий по общим фильтрам. Текущая граница — PROGRESS.md и ADR-038; ранние планы ниже не отменяют фактические границы этапа.
 
 Система видеонаблюдения: находит **людей** на видеопотоках, отслеживает их (track ID внутри камеры) и сообщает оператору о входе в опасную зону, пересечении линии и долгом нахождении в зоне. Объекты, перенос груза и pose estimation в эту версию не входят (ТЗ §2, §27).
 
@@ -231,3 +231,7 @@ Line CRUD → CameraSpec.lines → scheduler → SceneRegistry (ZoneEngine за�
 ## M10: отдельная аналитика
 
 Accepted inference result → event-loop AnalyticsCollector → bounded AnalyticsPublisher → ad:analytics:ingest → backend AnalyticsIngest → PostgreSQL camera_samples/track_sessions → AnalyticsRepository (SQL aggregates) → AnalyticsService (window/status policy) → thin REST route → dashboard/TrackTimeline. Alarm pub/sub/Stream, JPEG writer и preview не заменены. API analytics task имеет отдельный readiness probe; worker analytics_ok/dropped не объявляют успешную запись в БД. Нет DB connection в worker. См. ADR-037 для семантики и caps.
+
+## M11: расширение правил и экспорт
+
+ZoneEngine Visit получает continuous-observation timer и once-per-confirmed-visit marker; typed event идёт прежним alarm transport/snapshot/history путём. Нет нового PersonState/отдельного event bus. Effective threshold API/camera-owned, severity worker-owned. Export: shared repository predicates/projected SELECT → EventService → off-loop CSV codec → готовый HTTP attachment только после полной проверки limits. Старые M10 sampled analytics/retention границы не изменены. Текущий этап M11, подробнее PROGRESS/ADR-038; ранние future-only упоминания loitering/CSV выше исторические.
