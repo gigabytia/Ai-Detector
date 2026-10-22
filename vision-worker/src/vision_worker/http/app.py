@@ -3,7 +3,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
-from typing import Literal
+from typing import Literal, cast
 from urllib.parse import urlsplit
 from uuid import UUID
 
@@ -49,7 +49,11 @@ def create_http_app(supervisor: Supervisor, allowed_origins: list[str] | None = 
     @app.get("/health/ready", response_model=WorkerReadinessRead)
     async def ready(response: Response) -> WorkerReadinessRead:
         heartbeat = supervisor.heartbeat
-        is_ready = heartbeat.redis_ok and supervisor.scheduler.healthy
+        is_ready = (
+            heartbeat.redis_ok
+            and supervisor.scheduler.healthy
+            and (supervisor.events is None or supervisor.events.healthy)
+        )
         if not is_ready:
             response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return WorkerReadinessRead(
@@ -64,6 +68,7 @@ def create_http_app(supervisor: Supervisor, allowed_origins: list[str] | None = 
     async def worker_status() -> WorkerStatusRead:
         return WorkerStatusRead(cameras=[s.status() for s in supervisor.manager.sessions])
 
+    @app.websocket("/cameras/{camera_id}/telemetry")
     @app.websocket("/cameras/{camera_id}/preview")
     async def preview(websocket: WebSocket, camera_id: UUID) -> None:
         origin = websocket.headers.get("origin")
@@ -77,7 +82,12 @@ def create_http_app(supervisor: Supervisor, allowed_origins: list[str] | None = 
         if session is None:
             await websocket.close(code=1008)
             return
-        queue = supervisor.preview.subscribe(camera_id)
+        telemetry = websocket.url.path.endswith("/telemetry")
+        queue: asyncio.Queue[str] | asyncio.Queue[bytes]
+        if telemetry:
+            queue = supervisor.telemetry.subscribe(camera_id)
+        else:
+            queue = supervisor.preview.subscribe(camera_id)
         tasks: list[asyncio.Task[None]] = []
 
         async def receive_disconnect() -> None:
@@ -101,7 +111,10 @@ def create_http_app(supervisor: Supervisor, allowed_origins: list[str] | None = 
                     packet = await asyncio.wait_for(queue.get(), timeout=1)
                 except TimeoutError:
                     continue
-                await asyncio.wait_for(websocket.send_bytes(packet), timeout=2)
+                if isinstance(packet, str):
+                    await asyncio.wait_for(websocket.send_text(packet), timeout=2)
+                else:
+                    await asyncio.wait_for(websocket.send_bytes(cast(bytes, packet)), timeout=2)
 
         try:
             await websocket.accept()
@@ -112,7 +125,10 @@ def create_http_app(supervisor: Supervisor, allowed_origins: list[str] | None = 
         except (WebSocketDisconnect, TimeoutError, RuntimeError, asyncio.CancelledError):
             pass
         finally:
-            supervisor.preview.unsubscribe(camera_id, queue)
+            if telemetry:
+                supervisor.telemetry.unsubscribe(camera_id, cast(asyncio.Queue[str], queue))
+            else:
+                supervisor.preview.unsubscribe(camera_id, cast(asyncio.Queue[bytes], queue))
             for task in tasks:
                 task.cancel()
             # ASGI servers may cancel the connection while cleanup is awaiting child tasks.

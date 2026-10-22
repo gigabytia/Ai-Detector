@@ -3,7 +3,7 @@
 from fastapi import APIRouter, status
 
 from app.api.errors import ErrorResponse
-from app.api.v1 import cameras, internal, system, uploads, zones
+from app.api.v1 import cameras, events, internal, system, uploads, zones
 
 api_v1_router = APIRouter(
     prefix="/api/v1",
@@ -12,6 +12,7 @@ api_v1_router = APIRouter(
         status.HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponse},
     },
 )
+api_v1_router.include_router(events.router)
 api_v1_router.include_router(system.router)
 api_v1_router.include_router(cameras.router)
 api_v1_router.include_router(uploads.router)

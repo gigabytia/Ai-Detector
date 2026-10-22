@@ -2,8 +2,10 @@
 import AppShell from '@/components/layout/AppShell.vue'
 import { Toaster } from '@/components/ui/sonner'
 import { useUiStore } from '@/stores/ui'
+import { useRealtime } from '@/composables/useRealtime'
 
 const ui = useUiStore()
+useRealtime()
 </script>
 
 <template>

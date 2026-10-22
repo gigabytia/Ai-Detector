@@ -1,0 +1,1 @@
+{"redis_outage_seconds": 21, "worker_not_ready_during_outage": true, "same_run_ids": true, "generated_and_persisted_events": ["710dd57c-f7d0-4b4b-b9c2-4c96e2a81569", "9adf4853-2e05-4200-abc9-4156bd020192", "510c84cf-03e0-465c-9633-aaf5f53bd859"], "backlog": 0}

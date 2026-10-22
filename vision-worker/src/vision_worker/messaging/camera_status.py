@@ -9,6 +9,7 @@ from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
 from ai_detector_core.cameras.status import CameraRuntimeStatus
+from ai_detector_core.telemetry.event_bus import CAMERAS_STATUS
 from ai_detector_core.telemetry.redis_keys import CAMERA_STATUS_TTL_SECONDS, camera_status_key
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ class CameraStatusPublisher:
                     )
                 for camera_id in gone:
                     pipe.delete(camera_status_key(camera_id))
+                pipe.publish(CAMERAS_STATUS, "changed")
                 await pipe.execute()
         except RedisError:
             if self._healthy:

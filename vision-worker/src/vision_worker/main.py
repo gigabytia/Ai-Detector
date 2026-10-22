@@ -17,9 +17,11 @@ from vision_worker.http.app import create_http_app
 from vision_worker.inference.adapters.ultralytics import UltralyticsPersonDetector
 from vision_worker.messaging.camera_status import CameraStatusPublisher
 from vision_worker.messaging.commands import CommandListener
+from vision_worker.messaging.events import EventPublisher
 from vision_worker.messaging.heartbeat import HeartbeatPublisher
 from vision_worker.pipeline.preview import PreviewHub
 from vision_worker.pipeline.scheduler import InferenceScheduler
+from vision_worker.pipeline.telemetry import TelemetryHub
 from vision_worker.rules.registry import SceneRegistry
 from vision_worker.supervisor import Supervisor
 from vision_worker.tracking.bytetrack import ByteTrackPersonTracker
@@ -55,13 +57,19 @@ def build_supervisor(settings: WorkerSettings) -> Supervisor:
         )
     )
     preview = PreviewHub(settings.preview_fps, settings.preview_max_width)
+    events = EventPublisher(redis)
+    telemetry = TelemetryHub()
     return Supervisor(
+        events=events,
+        telemetry=telemetry,
         scheduler=InferenceScheduler(
             manager,
             detector,
             preview,
             settings.inference_batch_size,
             settings.inference_max_wait_ms,
+            events=events,
+            telemetry=telemetry,
             scenes=SceneRegistry(
                 clock, settings.event_min_track_hits, settings.severity_zone_enter
             ),

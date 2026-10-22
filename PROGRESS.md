@@ -4,11 +4,45 @@
 
 ## Текущий этап
 
-**Milestone 6 — danger zone: выполнен.** Milestone 5 повторно проверен. Следующий — Milestone 7 (event bus, сохранение/доставка событий, SSE/телеметрия и live update).
+**Milestone 7 — realtime/event history: выполнен.** Следующий — Milestone 8 (snapshot storage, снимок события и event detail). История M6/M5 и их проверки сохранены ниже.
 
 Реализация заново восстановлена на базе присланного архива Milestone 3 после утраты предыдущего рабочего окружения. Это не побайтовое восстановление незавершённой сессии: использованы сохранённые архитектурные документы, ADR и доступный контекст. Исходный `AI_DETECTOR_v2_MASTER_PROMPT.md` в архиве отсутствовал.
 
-## Milestone 6 — результат текущей сессии
+## Milestone 7 — результат текущей сессии
+
+База: проверенный полный архив M6, SHA-256 `45cded322ea60069a4a53e87f7e093ebe403ace34afa2976606874e5c958f909`, HEAD `4995cae`. Полная `.git` восстановлена и сохраняется в новом архиве. Коммит оформляется от **Kostya** с исходной Git-идентичностью.
+
+### Сделано
+
+* Bounded RAM-outbox worker, retry, Lua Stream+pub/sub, UUID при повторе. Inference не ждёт Redis; overflow/ошибка доставки отражены в readiness и логах.
+* events и миграция `14d6499b16a2`; ingest ≤200, одна транзакция, idempotent INSERT, ACK/XDEL после commit, pending retry/reclaim ≥30 с, bounded dead letter. Нет покадровой записи.
+* REST history/read/status/note, keyset pagination, camera/status filters, row-lock переходы NEW → ACK/FP с audit. 409 pending + ограниченные frontend retries. История мягко удалённых камер сохраняется.
+* SSE fanout без запросов к БД, heartbeat, reconnect/resync/overflow cleanup, одно подключение frontend + periodic REST reconciliation. Отдельная latest-only JSON WS-телеметрия и focus-счётчики без смешивания с preview-рамками.
+* Панель событий: live alarm до persistence, история, фильтры, pagination, ACK/ложная тревога/заметка; state bounded. OpenAPI/TS/docs/ADR-034 и upgrade guide обновлены.
+
+### Проверено
+
+| Проверка | Результат |
+|---|---|
+| make check | ruff/format/mypy strict, ESLint/Prettier/vue-tsc, **163 Python unit + 97 Vitest**, production build |
+| PostgreSQL/Valkey integration | **23 passed**: прежние API + duplicate UUID, DB failure/Pending reclaim, poison/dead letter, pub/sub без записи, keyset/audit/soft delete, потерянный ACK после commit, competing operators |
+| Живой отказ PostgreSQL | SSE тревога получена при остановленной БД, PATCH → 409, pending/backlog=1; после возврата записан тот же UUID, backlog=0 |
+| Живой отказ Valkey 21 с | worker readiness=503, камеры сохранили run IDs; 3 события из окна сбоя доставлены и записаны после восстановления, backlog=0 |
+| Реальный YOLO/ByteTrack + 2 mock | Тестовый MP4 из статичного bus.jpg: 4 сохранённых входа с реальными track IDs; отдельная telemetry persons=4/in-zone=4; это не CCTV quality benchmark |
+| Chromium | ACK/FP сохраняют audit и заметку, статусный фильтр; отдельные telemetry/preview sockets, 390px без overflow, light/dark screenshots, pageerror=0. Image viewer недоступен: визуальную оценку PNG через него не заявляем |
+| Миграции/контракт/Git | upgrade с пустой БД и upgrade M6; downgrade/upgrade на тестовой БД, alembic check без diff, lock/OpenAPI совпали; full .git/fsck/ZIP проверяются при передаче |
+
+Shutdown: финальный worker с открытым WS — **0.62 с**, API с открытым SSE — **3.22 с**; runtime/heartbeat удалены, Stream=0. API ограничивает graceful drain long-lived SSE тремя секундами. Production audit: **0 vulnerabilities**; dev-audit не повторялся.
+
+Доказательства и воспроизводимые QA-скрипты — [docs/qa/m7/README.md](docs/qa/m7/README.md).
+
+### Ограничения
+
+RAM-outbox теряется при аварии worker во время отказа Redis. AOF everysec оставляет окно потери при аварии Redis/хоста. Stream не обрезается до записи — контролировать backlog/диск, noeviction/AOF/backup. SSE не replay: REST восстанавливает историю, а не пропущенные toast. UI live буфер 200/недавний dedupe 2000, полная история через пагинацию. Worker не ходит в PostgreSQL.
+
+Снимки/event detail с изображением — M8. CSV, дополнительные type/severity/period фильтры, линии/loitering, сохранённые track sessions/analytics/retention и авторизация не добавлены. Windows, Docker/CI, GPU, реальные RTSP и движущееся CCTV не проверялись; Node в sandbox 24.14.1 ниже engine — использовать поддерживаемую версию. Все прежние ограничения ниже сохраняются, если здесь не уточнено иначе.
+
+## Milestone 6 — результат предыдущей сессии
 
 ### Проверка предыдущего этапа
 

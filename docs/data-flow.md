@@ -52,7 +52,7 @@ Frontend: toast + бейдж на карточке,             │
 * Если оператор нажал «Подтвердить» раньше, чем ingest записал событие, API отвечает `409 EVENT_NOT_PERSISTED_YET`, frontend повторяет запрос через 500 мс (до 5 раз).
 * Изменение статуса: `PATCH /events/{id}` → service → repository → `PUBLISH ad:events:updates` → SSE `event.updated` у всех операторов.
 
-SSE-сообщения: `event.created`, `event.updated`, `camera.status`; комментарий-heartbeat каждые 15 с. История через SSE не досылается: при переподключении frontend инвалидирует запросы событий и камер.
+SSE-сообщения: `event.created`, `event.updated`, `camera.status`, `resync`, `unavailable`; комментарий-heartbeat каждые 10 с. История через SSE не досылается: при переподключении frontend инвалидирует запросы событий и камер.
 
 ## 3. Конфигурация и команды
 
@@ -70,7 +70,7 @@ worker: команда → GET /api/v1/internal/worker/cameras/{id} (токен)
 
 ## 4. Статус камер
 
-worker раз в 1 с: `SET ad:camera:{id}:status {CameraRuntimeStatus} EX 5` (pipeline на все камеры); у остановленной камеры ключ удаляется сразу. API в `GET /cameras` объединяет данные из PostgreSQL со статусом из Redis (`MGET`); ключа нет → `runtime: null`. Поля: `status`, `capture_fps`, `frame_size`, `last_frame_at`, `last_error`, `reconnect_attempts`, `last_reconnect_attempt_at`, `worker_id`, `run_id`, `updated_at`. С Milestone 4 есть `processed_fps`, `inference_ms`, `detections_count`, `dropped_frames`, `inference_error`. До SSE (Milestone 7) UI опрашивает `GET /cameras` раз в 2 с; канал `ad:cameras:status` появится вместе с SSE.
+worker раз в 1 с: `SET ad:camera:{id}:status {CameraRuntimeStatus} EX 5` (pipeline на все камеры); у остановленной камеры ключ удаляется сразу. API в `GET /cameras` объединяет данные из PostgreSQL со статусом из Redis (`MGET`); ключа нет → `runtime: null`. Поля: `status`, `capture_fps`, `frame_size`, `last_frame_at`, `last_error`, `reconnect_attempts`, `last_reconnect_attempt_at`, `worker_id`, `run_id`, `updated_at`. С Milestone 4 есть `processed_fps`, `inference_ms`, `detections_count`, `dropped_frames`, `inference_error`. M7 публикует уведомление в `ad:cameras:status`; SSE инвалидирует GET /cameras до раза/с. Polling 2 с используется при разрыве, 15 с — как периодическая сверка при активном SSE.
 
 ## 5. Превью и телеметрия в браузер (Уровень 1)
 
@@ -80,7 +80,7 @@ worker: соединение открыто = камера «открыта в U
    для обработанных кадров камеры, не чаще PREVIEW_FPS:
    resize ≤ PREVIEW_MAX_WIDTH → JPEG (пул потоков) → бинарное сообщение
 ```
-Формат бинарного сообщения: `uint32 BE длина JSON` + `JSON TelemetryDTO (UTF-8)` + `JPEG`. Кадр и рамки из одного обработанного кадра — синхронны по построению. Камера без зрителей JPEG не кодирует. Пока по камере идёт превью, кадры, не попавшие в превью, телеметрию не шлют — рамки без картинки не нужны.
+Формат бинарного сообщения: `uint32 BE длина JSON` + `JSON TelemetryDTO (UTF-8)` + `JPEG`. Кадр и рамки из одного обработанного кадра — синхронны по построению. Камера без зрителей JPEG не кодирует. Preview содержит атомарную metadata для рамок. В M7 дополнительный независимый `/live/cameras/{id}/telemetry` шлёт JSON до 5 Гц без JPEG; он используется для счётчиков, не для рисования рамок.
 
 ```json
 {
@@ -139,3 +139,9 @@ Preview v1 содержит дополнительный `tracks: [{track_id, bb
 REST зоны → PostgreSQL commit → camera.changed → internal CameraSpec (zones + effective config) → CameraSession.spec без reopen. При сборе кадра scheduler фиксирует spec. Детектор → tracker → SceneRegistry/ZoneEngine (тот же executor) → immutable DetectionResult(tracks, zones, events) → log event + preview JPEG/metadata. `zones`/tracks передаются атомарно с кадром; событие не отправляется через preview. SVG overlay использует геометрию этого кадра, черновик редактора только локальный до REST save. Polling камер остаётся раз в 2 с.
 
 Части этого документа про Redis event bus, Stream ingest, SSE, отдельную WS-телеметрию и snapshot — пока целевая схема, не реализация M6. SceneContext как отдельный изменяемый объект не вводился: текущий вход — frozen CameraSpec и per-run SceneRegistry. Линии ещё не обрабатываются. [ADR-033](decisions/ADR-033-danger-zone-runtime.md).
+
+## Реализованный поток M7
+
+`DetectionResult.events → bounded EventPublisher → Lua XADD(event JSON) + PUBLISH → два независимых пути: LiveHub/SSE и EventIngest/PostgreSQL`. ACK/XDEL только после commit; UUID conflict не обновляет операторские поля. Pub/sub не читает БД, поэтому тревоги идут при её отказе. REST status commit → event.updated; потерянные live уведомления исправляет REST reconciliation. Подробности, включая PEL reclaim, dead letter, outbox-loss и AOF everysec — [ADR-034](decisions/ADR-034-event-delivery-realtime.md).
+
+Граница M6 в предыдущем разделе — историческая. SnapshotWriter, track sessions и analytics из целевой схемы ещё не реализованы. Нет записи каждого кадра в БД/Stream и нет сохранения telemetry: только доменные события. Реальный wire M7 — [api.md](api.md#события-и-realtime-milestone-7).

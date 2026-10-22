@@ -30,7 +30,7 @@ MOCK = {"name": "Склад", "source_type": "mock", "source_url": "mock://walk_
 async def _truncate(url: str) -> None:
     engine = create_async_engine(url)
     async with engine.begin() as conn:
-        await conn.execute(text("TRUNCATE zones, camera_configs, cameras"))
+        await conn.execute(text("TRUNCATE events, zones, camera_configs, cameras"))
     await engine.dispose()
 
 

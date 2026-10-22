@@ -10,9 +10,11 @@ from redis.asyncio import Redis
 from vision_worker.cameras.manager import CameraManager
 from vision_worker.messaging.camera_status import CameraStatusPublisher
 from vision_worker.messaging.commands import CommandListener
+from vision_worker.messaging.events import EventPublisher
 from vision_worker.messaging.heartbeat import HeartbeatPublisher
 from vision_worker.pipeline.preview import PreviewHub
 from vision_worker.pipeline.scheduler import InferenceScheduler
+from vision_worker.pipeline.telemetry import TelemetryHub
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +33,11 @@ class Supervisor:
         scheduler: InferenceScheduler,
         preview: PreviewHub,
         detector_info: dict[str, str],
+        events: EventPublisher | None = None,
+        telemetry: TelemetryHub | None = None,
     ) -> None:
+        self.events = events
+        self.telemetry = telemetry or TelemetryHub()
         self.scheduler = scheduler
         self.preview = preview
         self.detector_info = detector_info
@@ -60,11 +66,19 @@ class Supervisor:
             "commands": self._commands.run,
             "camera-status": self._camera_status.run,
         }
+        if self.events is not None:
+            loops["events"] = self.events.run
         for name, loop in loops.items():
             task = asyncio.create_task(loop(self._stop), name=name)
             task.add_done_callback(_report_crash)
+            if name == "events":
+                task.add_done_callback(self._event_delivery_finished)
             self._tasks.append(task)
         logger.info("worker started")
+
+    def _event_delivery_finished(self, task: asyncio.Task[None]) -> None:
+        if not self._stop.is_set() and self.events is not None:
+            self.events.healthy = False
 
     async def stop(self) -> None:
         """Graceful shutdown: stop commands, stop cameras, withdraw status, close clients."""
@@ -73,6 +87,7 @@ class Supervisor:
         self._tasks.clear()
         await self._manager.stop_all()
         await self.preview.close()
+        await self.telemetry.close()
         await self._camera_status.publish_once()  # deletes status keys of stopped cameras
         await self._heartbeat.withdraw()
         await self._api_http.aclose()

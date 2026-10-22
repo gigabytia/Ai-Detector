@@ -126,4 +126,26 @@ POST/PUT: `{name, points:[{x,y},...], enabled:true}`. Имя 1..100 символ
 
 CRUD публикует camera.changed после commit, worker получает обновлённый CameraSpec; потерянное уведомление восстанавливается периодической сверкой. Тот же источник сохраняет run/track IDs. `config` PUT также заменяет три nullable интервала (0..3600 с), не патчит: передавайте все нужные переопределения.
 
-Preview v1 дополнен `zones: [{id,camera_id,name,points,enabled}]` — только включённые зоны из spec этого кадра. Поле additive; старые пакеты без zones принимаются. Состояние IN_DANGER_ZONE отображается красной рамкой, LOST не рисуется. **Отдельного SSE/event API пока нет**: сгенерированный DomainEvent находится в DetectionResult и JSON-логе worker, не является надёжно сохранённой историей.
+Preview v1 дополнен `zones: [{id,camera_id,name,points,enabled}]` — только включённые зоны из spec этого кадра. Поле additive; старые пакеты без zones принимаются. Состояние IN_DANGER_ZONE отображается красной рамкой, LOST не рисуется. Историческая граница M6: событие генерировалось только в DetectionResult и JSON-логе. В M7 добавлены REST/SSE/ingest, см. следующий раздел.
+
+## События и realtime (Milestone 7)
+
+M7 реализует доставку событий, описанных выше в исторической границе M6. Контракт generated OpenAPI/TypeScript обновлён.
+
+| Запрос | Ответ |
+|---|---|
+| `GET /api/v1/events?limit=50&camera_id=UUID&status=NEW&cursor=…` | `{items: EventRead[], next_cursor: string|null}`. limit 1…200, newest first, cursor непрозрачный |
+| `GET /api/v1/events/{id}` | EventRead / 404 |
+| `PATCH /api/v1/events/{id}` | `{status?: ACKNOWLEDGED|FALSE_POSITIVE, note?: string|null}` → EventRead |
+| `GET /api/v1/events/stream` | text/event-stream; без зависимости от PostgreSQL для live alarms |
+| WS `/live/cameras/{id}/telemetry` | отдельный metadata JSON, напрямую worker без `/live` |
+
+EventRead: поля DomainEvent (`id, camera_id, run_id, track_id, zone_id, type, severity, occurred_at, source_ts_ms, detector_confidence, event_confidence, message, metadata`) и `status, note, created_at, updated_at, acknowledged_at, false_positive_at`. zone_id nullable после удаления зоны. В M7 только PERSON_ENTERED_DANGER_ZONE. Snapshot полей пока нет.
+
+NEW → ACKNOWLEDGED или FALSE_POSITIVE. Повтор текущего финального статуса не меняет audit-время; другой финальный → 409 EVENT_STATUS_CONFLICT. Заметка ≤2000, редактируется в любом статусе; пропущенная note сохраняется, null очищает. Не записанный published UUID → 409 EVENT_NOT_PERSISTED_YET, неизвестный → 404. При недоступности истории — 503 SERVICE_UNAVAILABLE. События удалённой камеры доступны в истории, камера мягко удаляется.
+
+SSE: `event.created` (DomainEvent), `event.updated` (EventRead), `camera.status` (`{}`), `resync` (`{}`), `unavailable` (`{}`). Heartbeat раз в 10 с, retry 1500 мс, no-cache/no-transform/X-Accel-Buffering:no. Нет replay через Last-Event-ID: переподключение требует REST refresh. Ограниченная очередь 128; медленный клиент получает resync и disconnect. Frontend ограниченно повторяет только EVENT_NOT_PERSISTED_YET и регулярно сверяет историю.
+
+Telemetry JSON v1: `camera_id,run_id,frame_id,captured_at,source_ts_ms,inference_ms,persons,persons_in_zone,tracks:[{track_id,state,confidence,bbox}]`. Bbox нормализован 0…1; LOST не считается в зоне. До 5 Гц, очередь 1, без JPEG и без отдельной записи в PostgreSQL. Focus UI stale через 3 с. Рамки рисуются только из preview-пакета того же кадра.
+
+Worker readiness дополнительно учитывает publisher/backpressure, API readiness — живость ingest/pubsub задач (`event_delivery`). Redis AOF/очередь/восстановление/ограничения — [ADR-034](decisions/ADR-034-event-delivery-realtime.md). Экспорт CSV и дополнительные фильтры type/severity/period ещё не реализованы.

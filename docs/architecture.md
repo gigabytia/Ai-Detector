@@ -1,6 +1,6 @@
 # Архитектура AI Detector v2
 
-> Реализованы камеры, детекция, ByteTrack, preview, CRUD/редактор опасной зоны и генерация события входа (Milestone 6). Документ также содержит целевую архитектуру: доставка/хранение событий, SSE/телеметрия — M7, snapshot — M8, линии/loitering/аналитика — позже. Подробный текущий состав — в конце документа и PROGRESS.md.
+> Реализован Milestone 7: камеры, детекция, ByteTrack, preview, зоны, event bus/хранение тревог, SSE, операторские статусы и отдельная WS-телеметрия. Snapshot — M8, линии/loitering/аналитика — позже. Целевая архитектура ниже шире текущего состава; актуальная реализация — PROGRESS.md и ADR-034.
 
 Система видеонаблюдения: находит **людей** на видеопотоках, отслеживает их (track ID внутри камеры) и сообщает оператору о входе в опасную зону, пересечении линии и долгом нахождении в зоне. Объекты, перенос груза и pose estimation в эту версию не входят (ТЗ §2, §27).
 
@@ -211,3 +211,11 @@ class EventRule(Protocol):
 * `rules/{zone_engine,registry}.py`: membership/dwell/grace/confidence/cooldown в одиночном inference executor после tracker. DetectionResult содержит tracks/zones/events из одной сцены и кадра; в лог выходят события только актуального run. Preview v1 передаёт enabled zones и состояние треков.
 * Frontend: ZoneEditor с локальным черновиком и REST, SVG overlay над canvas с учётом letterbox, красные рамки IN_DANGER_ZONE. Модель/API и worker выполняют правила; UI только редактирует и отображает.
 * События пока генерируются и логируются, а не пишутся в БД/Redis Stream. Это сознательная граница M6/M7, а не гарантированная доставка. [ADR-033](decisions/ADR-033-danger-zone-runtime.md).
+
+## Добавлено в Milestone 7
+
+* shared/telemetry/event_bus.py — transport names; worker/messaging/events.py — bounded outbox, Lua Stream+pub/sub и retry, не блокирующий inference. pipeline/telemetry.py — отдельный JSON latest-only hub.
+* API application/event_service.py — статусные переходы/аудит; repository/events.py — история и row lock; redis/ingest.py — consumer group/batch/idempotency/reclaim/dead letter; redis/live.py — per-process fanout; redis/tasks.py — readiness фоновых задач. Lifespan запускает и отменяет их до закрытия клиентов.
+* events + миграция 14d6499b16a2. FK зон SET NULL, история soft-deleted камер сохраняется. track_sessions/snapshots/analytics таблиц пока нет.
+* Один frontend useRealtime, bounded volatile alarm store, пагинированный EventsView/карточки с заметкой и ACK/FP. useTelemetry только для focus, preview остаётся независимым.
+* Точные гарантии и остаточные риски — [ADR-034](decisions/ADR-034-event-delivery-realtime.md). M6-граница выше описывает историю этапа, а не текущее отсутствие доставки.

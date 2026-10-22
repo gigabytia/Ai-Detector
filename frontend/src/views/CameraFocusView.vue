@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 
 import type { Point } from '@/api/zones'
 import ZoneEditor from '@/components/cameras/ZoneEditor.vue'
+import CameraTelemetry from '@/components/cameras/CameraTelemetry.vue'
 import CameraConfigPanel from '@/components/cameras/CameraConfigPanel.vue'
 import CameraLiveView from '@/components/cameras/CameraLiveView.vue'
 import CameraRuntimeDetails from '@/components/cameras/CameraRuntimeDetails.vue'
@@ -71,6 +72,7 @@ function addPoint(point: Point) {
       </div>
     </section>
     <aside class="space-y-5">
+      <CameraTelemetry :camera-id="camera.id" :enabled="camera.enabled" />
       <ZoneEditor
         :key="camera.id"
         v-model:editing="editing"

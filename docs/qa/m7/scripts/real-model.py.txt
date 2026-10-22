@@ -1,0 +1,18 @@
+import httpx,time,json,asyncio
+import websockets
+async def main():
+ with httpx.Client(base_url='http://127.0.0.1:18000',timeout=30) as c:
+  with open('/data/runtime/bus.mp4','rb') as video:
+   response=c.post('/api/v1/uploads',files={'file':('bus.mp4',video,'video/mp4')});response.raise_for_status();source=response.json()['source_url']
+  response=c.post('/api/v1/cameras',json={'name':'QA M7 — реальная модель','source_type':'file','source_url':source,'enabled':True});response.raise_for_status();camera=response.json()['id']
+  c.put(f'/api/v1/cameras/{camera}/config',json={'target_fps':3}).raise_for_status()
+  c.post(f'/api/v1/cameras/{camera}/zones',json={'name':'QA зона','points':[{'x':0.01,'y':0.01},{'x':0.99,'y':0.01},{'x':0.99,'y':0.99},{'x':0.01,'y':0.99}],'enabled':True}).raise_for_status()
+  for _ in range(60):
+   events=c.get('/api/v1/events',params={'camera_id':camera}).json()['items']
+   if events:break
+   await asyncio.sleep(.5)
+  assert events
+  async with websockets.connect(f'ws://127.0.0.1:18001/cameras/{camera}/telemetry') as ws:
+   telemetry=json.loads(await asyncio.wait_for(ws.recv(),5));assert telemetry['persons']>0 and telemetry['persons_in_zone']>0
+  print(json.dumps({'real_camera':camera,'persisted_events':len(events),'tracks':[e['track_id'] for e in events],'telemetry_persons':telemetry['persons'],'telemetry_in_zone':telemetry['persons_in_zone'],'type':events[0]['type']}))
+asyncio.run(main())

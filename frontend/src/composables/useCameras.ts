@@ -13,16 +13,18 @@ import {
   updateCamera,
 } from '@/api/cameras'
 import { errorMessageKey } from '@/lib/apiErrors'
+import { computed } from 'vue'
+import { useRealtimeStore } from '@/stores/realtime'
 
-// Polling until live status arrives over SSE (Milestone 7).
-const REFRESH_INTERVAL_MS = 2_000
+// SSE triggers refresh; faster polling is a fallback only while disconnected.
 const CAMERAS_KEY = ['cameras'] as const
 
 export function useCameras() {
+  const realtime = useRealtimeStore()
   return useQuery({
     queryKey: CAMERAS_KEY,
     queryFn: ({ signal }) => fetchCameras(signal),
-    refetchInterval: REFRESH_INTERVAL_MS,
+    refetchInterval: computed(() => (realtime.connected ? 15_000 : 2_000)),
   })
 }
 

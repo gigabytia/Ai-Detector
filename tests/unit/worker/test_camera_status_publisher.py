@@ -33,6 +33,9 @@ class FakePipeline:
     def delete(self, key: str) -> None:
         self.ops.append(("delete", key, None, None))
 
+    def publish(self, channel: str, value: str) -> None:
+        pass
+
     async def execute(self) -> None:
         if self.store.down:
             raise RedisConnectionError("down")

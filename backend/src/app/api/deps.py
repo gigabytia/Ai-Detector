@@ -9,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ai_detector_core.cameras.config import CameraConfig
 from app.application.camera_config_service import CameraConfigService
 from app.application.camera_service import CameraService
+from app.application.event_service import EventService
 from app.application.system_service import SystemService
 from app.application.worker_spec_service import WorkerSpecService
 from app.application.zone_service import ZoneService
 from app.core.lifecycle import AppResources
 from app.infrastructure.database.repositories.cameras import CameraRepository
+from app.infrastructure.database.repositories.events import EventRepository
 from app.infrastructure.database.repositories.zones import ZoneRepository
 from app.infrastructure.redis.cameras import RedisCameraStatusReader, RedisCommandPublisher
 
@@ -73,3 +75,7 @@ def get_zone_service(resources: Resources, session: Session) -> ZoneService:
     return ZoneService(
         ZoneRepository(session), RedisCommandPublisher(resources.redis), resources.clock
     )
+
+
+def get_event_service(resources: Resources, session: Session) -> EventService:
+    return EventService(EventRepository(session), resources.redis, resources.clock)

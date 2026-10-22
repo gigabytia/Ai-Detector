@@ -24,7 +24,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "Last-Event-ID"],
     )
     register_error_handlers(app)
     app.include_router(health.router)
@@ -41,4 +41,5 @@ def run() -> None:
         host=settings.api_host,
         port=settings.api_port,
         log_config=None,
+        timeout_graceful_shutdown=3,  # SSE is long-lived; bound drain before lifespan cleanup.
     )

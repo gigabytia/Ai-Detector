@@ -17,8 +17,10 @@ from vision_worker.cameras.scenario import load_scenario
 from vision_worker.cameras.session import CameraSession
 from vision_worker.inference.adapters.scripted import ScriptedPersonDetector
 from vision_worker.inference.detector import PersonDetector
+from vision_worker.messaging.events import EventPublisher
 from vision_worker.pipeline.preview import PreviewHub
 from vision_worker.pipeline.results import DetectionResult
+from vision_worker.pipeline.telemetry import TelemetryHub
 from vision_worker.rules.registry import SceneRegistry
 from vision_worker.tracking.registry import TrackerRegistry, TrackKey
 
@@ -43,7 +45,11 @@ class InferenceScheduler:
         max_wait_ms: float = 20,
         trackers: TrackerRegistry | None = None,
         scenes: SceneRegistry | None = None,
+        events: EventPublisher | None = None,
+        telemetry: TelemetryHub | None = None,
     ) -> None:
+        self._events = events
+        self._telemetry = telemetry
         self._scenes = scenes if scenes is not None else SceneRegistry()
         self._trackers = trackers if trackers is not None else TrackerRegistry()
         self._manager = manager
@@ -218,6 +224,8 @@ class InferenceScheduler:
                 results = await asyncio.get_running_loop().run_in_executor(
                     self._pool, self._process, items
                 )
+                if stop.is_set():
+                    break  # publisher may already be flushing; do not enqueue after shutdown
                 active = {s.run_id for s in self._manager.sessions if isinstance(s, CameraSession)}
                 for item, result in zip(items, results, strict=True):
                     if item.session.run_id not in active or item.session.state not in (
@@ -229,6 +237,8 @@ class InferenceScheduler:
                         item.session.record_inference_error(result)
                     else:
                         for event in result.events:
+                            if self._events is not None:
+                                self._events.offer(event)
                             logger.info(
                                 "person entered danger zone",
                                 extra={
@@ -243,6 +253,8 @@ class InferenceScheduler:
                             )
                         item.session.record_result(result)
                         self._preview.offer(result)
+                        if self._telemetry is not None:
+                            self._telemetry.offer(result)
         except Exception:
             self.healthy = False
             raise

@@ -1,0 +1,2 @@
+{"database_offline": true, "live_event": "fd6a3d56-2b3e-40c5-bfb6-00fb5ce7fb69", "update_status": 409, "stream_backlog": 1, "pending": 1}
+{"database_recovered": true, "persisted_event": "fd6a3d56-2b3e-40c5-bfb6-00fb5ce7fb69", "seconds": 16.11, "backlog": 0}

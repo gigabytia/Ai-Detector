@@ -1,0 +1,37 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.6.0
+rootdir: /data/work-m7/Ai-Detector
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.15.1, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collected 186 items / 23 deselected / 163 selected
+
+tests/unit/backend/test_camera_config.py ........                        [  4%]
+tests/unit/backend/test_camera_schemas.py ..                             [  6%]
+tests/unit/backend/test_config.py ...                                    [  7%]
+tests/unit/backend/test_system_api.py ......                             [ 11%]
+tests/unit/shared/test_camera_source.py ......................           [ 25%]
+tests/unit/shared/test_json_logging.py .                                 [ 25%]
+tests/unit/shared/test_zones.py ...............                          [ 34%]
+tests/unit/test_event_transport.py ..........                            [ 41%]
+tests/unit/worker/test_camera_manager.py ....                            [ 43%]
+tests/unit/worker/test_camera_session.py .......                         [ 47%]
+tests/unit/worker/test_camera_status_publisher.py ..                     [ 49%]
+tests/unit/worker/test_capture_primitives.py .........                   [ 54%]
+tests/unit/worker/test_command_listener.py ....                          [ 57%]
+tests/unit/worker/test_detection.py ................                     [ 66%]
+tests/unit/worker/test_file_source.py ....                               [ 69%]
+tests/unit/worker/test_heartbeat.py ...                                  [ 71%]
+tests/unit/worker/test_mock_source.py .......                            [ 75%]
+tests/unit/worker/test_preview_api.py ......                             [ 79%]
+tests/unit/worker/test_tracking.py ....................                  [ 91%]
+tests/unit/worker/test_zone_engine.py ..............                     [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /data/work-m7/Ai-Detector/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================ 163 passed, 23 deselected, 1 warning in 3.30s =================

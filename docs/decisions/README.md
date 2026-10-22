@@ -35,3 +35,4 @@
 | [ADR-031](ADR-031-camera-config-defaults.md) | Переопределения настроек камеры |
 | [ADR-032](ADR-032-bytetrack-runtime.md) | ByteTrack: параметры, идентичность и сброс сцены |
 | [ADR-033](ADR-033-danger-zone-runtime.md) | Danger zone: геометрия, правила, редактор и граница M6 |
+| [ADR-034](ADR-034-event-delivery-realtime.md) | Event bus, идемпотентный ingest, SSE и WS-телеметрия |

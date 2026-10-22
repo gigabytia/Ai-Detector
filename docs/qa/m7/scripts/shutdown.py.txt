@@ -1,0 +1,37 @@
+import asyncio,json,os,signal,time
+import httpx,websockets
+from redis.asyncio import Redis
+async def main():
+ async with httpx.AsyncClient(timeout=10) as http:
+  cameras=(await http.get('http://127.0.0.1:18000/api/v1/cameras')).json();camera=next(c['id'] for c in cameras if c['enabled'])
+  started=asyncio.Event()
+  async def sse():
+   try:
+    async with http.stream('GET','http://127.0.0.1:18000/api/v1/events/stream') as response:
+     async for line in response.aiter_lines():
+      if line:started.set()
+   except httpx.HTTPError:pass
+  stream=asyncio.create_task(sse());await asyncio.wait_for(started.wait(),3)
+  async with websockets.connect(f'ws://127.0.0.1:18001/cameras/{camera}/telemetry') as ws:
+   await asyncio.wait_for(ws.recv(),3)
+   start=time.monotonic();os.kill(4057,signal.SIGTERM)
+   try:
+    while True:await asyncio.wait_for(ws.recv(),5)
+   except websockets.ConnectionClosed:pass
+  redis=Redis.from_url('redis://127.0.0.1:16379/0')
+  for _ in range(100):
+   if not await redis.keys('ad:camera:*:status') and not await redis.keys('ad:worker:*:heartbeat'):break
+   await asyncio.sleep(.05)
+  worker_seconds=round(time.monotonic()-start,2)
+  assert not await redis.keys('ad:camera:*:status')
+  assert not await redis.keys('ad:worker:*:heartbeat')
+  assert await redis.xlen('ad:ingest')==0
+  start=time.monotonic();os.kill(4056,signal.SIGTERM)
+  await asyncio.wait_for(stream,6)
+  for _ in range(100):
+   if not os.path.exists('/proc/4056'):break
+   await asyncio.sleep(.05)
+  assert not os.path.exists('/proc/4056')
+  print(json.dumps({'worker_shutdown_seconds':worker_seconds,'api_with_open_sse_seconds':round(time.monotonic()-start,2),'telemetry_closed':True,'runtime_keys_removed':True,'ingest_backlog':0}))
+  await redis.aclose()
+asyncio.run(main())

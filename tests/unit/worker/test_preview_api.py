@@ -21,6 +21,7 @@ def supervisor(*, healthy: bool = True, redis_ok: bool = True) -> Supervisor:
         SimpleNamespace(
             heartbeat=SimpleNamespace(redis_ok=redis_ok, last_published_at=None),
             scheduler=SimpleNamespace(healthy=healthy),
+            events=None,
             detector_info={"backend": "test"},
             manager=SimpleNamespace(sessions=[]),
             preview=PreviewHub(),
@@ -90,3 +91,36 @@ def test_disconnected_viewer_is_removed_without_any_new_frames() -> None:
         assert camera_id in hub._viewers
     assert not hub._viewers
     hub._pool.shutdown()
+
+
+def test_telemetry_is_json_and_cleans_up_without_jpeg_encoding() -> None:
+    from vision_worker.pipeline.telemetry import TelemetryHub
+
+    class PreloadedTelemetry(TelemetryHub):
+        def subscribe(self, camera_id: uuid.UUID) -> asyncio.Queue[str]:
+            queue = super().subscribe(camera_id)
+            queue.put_nowait('{"version":1,"persons":2}')
+            return queue
+
+    camera_id = uuid.uuid4()
+    hub = PreloadedTelemetry()
+    session = SimpleNamespace(spec=SimpleNamespace(id=camera_id), state=CameraStatus.RUNNING)
+    sup = cast(
+        Supervisor, SimpleNamespace(manager=SimpleNamespace(sessions=[session]), telemetry=hub)
+    )
+    client = TestClient(create_http_app(sup))
+    with client.websocket_connect(f"/cameras/{camera_id}/telemetry") as socket:
+        assert socket.receive_json() == {"version": 1, "persons": 2}
+    assert not hub._subscribers
+
+
+def test_telemetry_rejects_unknown_camera_and_bad_origin() -> None:
+    sup = supervisor()
+    client = TestClient(create_http_app(sup))
+    for headers in [{}, {"origin": "https://evil.example"}]:
+        with (
+            pytest.raises(WebSocketDisconnect),
+            client.websocket_connect(f"/cameras/{uuid.uuid4()}/telemetry", headers=headers),
+        ):
+            pass
+    sup.preview._pool.shutdown()

@@ -1,0 +1,39 @@
+import asyncio,json,os,subprocess,time
+import httpx
+from redis.asyncio import Redis
+ROOT='/data/m7-services'
+ENV={**os.environ,'LD_LIBRARY_PATH':ROOT+'/usr/lib64'}
+def pg(action):
+ subprocess.run([ROOT+'/usr/bin/pg_ctl','-D','/data/m7-runtime/postgres','-l','/data/m7-runtime/postgres.log',*action],env=ENV,check=True,stdout=subprocess.DEVNULL)
+async def main():
+ redis=Redis.from_url('redis://127.0.0.1:16379/0')
+ async with httpx.AsyncClient(base_url='http://127.0.0.1:18000',timeout=30) as client:
+  first=asyncio.Event();alarms=asyncio.Queue()
+  async def receive():
+   async with client.stream('GET','/api/v1/events/stream') as response:
+    assert response.status_code==200
+    kind=''
+    async for line in response.aiter_lines():
+     if line.startswith('event: '):kind=line[7:];first.set()
+     if line.startswith('data: ') and kind=='event.created':await alarms.put(json.loads(line[6:]))
+  task=asyncio.create_task(receive());await asyncio.wait_for(first.wait(),5)
+  started=time.time();pg(['stop','-m','fast'])
+  try:
+   alarm=await asyncio.wait_for(alarms.get(),25)
+   delayed=(await client.patch('/api/v1/events/'+alarm['id'],json={'status':'ACKNOWLEDGED'}))
+   assert delayed.status_code==409,delayed.text
+   assert delayed.json()['error']['code']=='EVENT_NOT_PERSISTED_YET'
+   rows=await redis.xrange('ad:ingest');assert any(alarm['id'].encode() in fields[b'event'] for _,fields in rows)
+   pending=await redis.xpending('ad:ingest','api-ingest')
+   print(json.dumps({'database_offline':True,'live_event':alarm['id'],'update_status':delayed.status_code,'stream_backlog':len(rows),'pending':pending['pending']}),flush=True)
+  finally:pg(['start','-o','-h 127.0.0.1 -p 15432 -k /data/m7-runtime'])
+  for _ in range(60):
+   r=await client.get('/api/v1/events/'+alarm['id'])
+   if r.status_code==200:break
+   await asyncio.sleep(.2)
+  assert r.status_code==200,r.text
+  assert await redis.xlen('ad:ingest')==0
+  print(json.dumps({'database_recovered':True,'persisted_event':r.json()['id'],'seconds':round(time.time()-started,2),'backlog':0}),flush=True)
+  task.cancel();await asyncio.gather(task,return_exceptions=True)
+ await redis.aclose()
+asyncio.run(main())

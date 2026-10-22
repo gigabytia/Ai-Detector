@@ -1,9 +1,10 @@
 """Creates and closes process-wide resources. Nothing is created at import time."""
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from fastapi import FastAPI
 from redis.asyncio import Redis
@@ -22,6 +23,9 @@ from app.infrastructure.redis.client import (
     RedisWorkerHeartbeatReader,
     create_redis,
 )
+from app.infrastructure.redis.ingest import EventIngest
+from app.infrastructure.redis.live import LiveHub
+from app.infrastructure.redis.tasks import EventTasksProbe, report_task_failure
 from app.infrastructure.storage.uploads import LocalUploadStorage
 
 logger = logging.getLogger(__name__)
@@ -36,6 +40,8 @@ class AppResources:
     clock: Clock
     uploads: LocalUploadStorage
     system_service: SystemService
+    live: LiveHub | None = None
+    event_tasks: EventTasksProbe = field(default_factory=EventTasksProbe)
 
 
 def build_resources(settings: Settings) -> AppResources:
@@ -43,8 +49,9 @@ def build_resources(settings: Settings) -> AppResources:
     redis = create_redis(str(settings.redis_url))
     clock = SystemClock()
     redis_probe = RedisProbe(redis)
+    event_tasks = EventTasksProbe()
     system_service = SystemService(
-        probes=[DatabaseProbe(engine), redis_probe],
+        probes=[DatabaseProbe(engine), redis_probe, event_tasks],
         heartbeats=RedisWorkerHeartbeatReader(redis),
         redis_probe_name=redis_probe.name,
         clock=clock,
@@ -62,6 +69,7 @@ def build_resources(settings: Settings) -> AppResources:
         clock=clock,
         uploads=uploads,
         system_service=system_service,
+        event_tasks=event_tasks,
     )
 
 
@@ -75,10 +83,26 @@ def make_lifespan(settings: Settings) -> Callable[[FastAPI], AbstractAsyncContex
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         resources = build_resources(settings)
         app.state.resources = resources
+        resources.live = LiveHub(resources.redis)
+        stop = asyncio.Event()
+        tasks = [
+            asyncio.create_task(
+                EventIngest(resources.redis, resources.session_factory).run(stop),
+                name="event-ingest",
+            ),
+            asyncio.create_task(resources.live.run(stop), name="event-live"),
+        ]
+        resources.event_tasks.tasks = tasks
+        for task in tasks:
+            task.add_done_callback(report_task_failure)
         logger.info("api started", extra={"app_env": settings.app_env})
         try:
             yield
         finally:
+            stop.set()
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
             await close_resources(resources)
             logger.info("api stopped")
 
