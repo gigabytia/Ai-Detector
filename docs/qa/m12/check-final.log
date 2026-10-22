@@ -1,0 +1,150 @@
+uv run ruff check .
+All checks passed!
+uv run ruff format --check .
+174 files already formatted
+uv run mypy shared/src backend/src vision-worker/src tests
+Success: no issues found in 172 source files
+npm --prefix frontend run lint
+
+> ai-detector-frontend@0.1.0 lint
+> eslint . --max-warnings 0
+
+npm --prefix frontend run format:check
+
+> ai-detector-frontend@0.1.0 format:check
+> prettier --check src
+
+Checking formatting...
+All matched files use Prettier code style!
+npm --prefix frontend run typecheck
+
+> ai-detector-frontend@0.1.0 typecheck
+> vue-tsc --build
+
+uv run pytest
+============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.6.0
+rootdir: /data/m10/Ai-Detector
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.15.1, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collected 295 items / 41 deselected / 254 selected
+
+tests/unit/backend/test_camera_config.py ........                        [  3%]
+tests/unit/backend/test_camera_schemas.py ..                             [  3%]
+tests/unit/backend/test_config.py ...                                    [  5%]
+tests/unit/backend/test_system_api.py ......                             [  7%]
+tests/unit/shared/test_camera_source.py ......................           [ 16%]
+tests/unit/shared/test_json_logging.py .                                 [ 16%]
+tests/unit/shared/test_zones.py ...............                          [ 22%]
+tests/unit/test_event_export.py ............                             [ 27%]
+tests/unit/test_event_transport.py ..........                            [ 31%]
+tests/unit/test_snapshots.py ..............                              [ 36%]
+tests/unit/worker/test_analytics.py ..............                       [ 42%]
+tests/unit/worker/test_camera_manager.py ....                            [ 43%]
+tests/unit/worker/test_camera_session.py .......                         [ 46%]
+tests/unit/worker/test_camera_status_publisher.py ..                     [ 47%]
+tests/unit/worker/test_capture_primitives.py .........                   [ 50%]
+tests/unit/worker/test_command_listener.py ....                          [ 52%]
+tests/unit/worker/test_detection.py ................                     [ 58%]
+tests/unit/worker/test_file_source.py ....                               [ 60%]
+tests/unit/worker/test_heartbeat.py ...                                  [ 61%]
+tests/unit/worker/test_line_engine.py ......................             [ 70%]
+tests/unit/worker/test_mock_source.py .......                            [ 72%]
+tests/unit/worker/test_pipeline_metrics.py .............                 [ 77%]
+tests/unit/worker/test_preview_api.py ......                             [ 80%]
+tests/unit/worker/test_tracking.py ....................                  [ 88%]
+tests/unit/worker/test_zone_engine.py ..............................     [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /data/m10/Ai-Detector/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================ 254 passed, 41 deselected, 1 warning in 4.70s =================
+npm --prefix frontend test
+
+> ai-detector-frontend@0.1.0 test
+> vitest run
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.3 [39m[90m/data/m10/Ai-Detector/frontend[39m
+
+ [32m✓[39m src/components/cameras/LineEditor.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 229[2mms[22m[39m
+ [32m✓[39m src/components/cameras/ZoneEditor.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 251[2mms[22m[39m
+ [32m✓[39m src/components/cameras/CameraConfigPanel.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 194[2mms[22m[39m
+ [32m✓[39m src/views/AnalyticsView.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 185[2mms[22m[39m
+ [32m✓[39m src/components/events/EventSnapshot.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 89[2mms[22m[39m
+ [32m✓[39m src/views/EventsView.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 101[2mms[22m[39m
+ [32m✓[39m src/components/analytics/TrackTimeline.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 54[2mms[22m[39m
+ [32m✓[39m src/composables/useRealtime.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m src/api/eventsExport.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/lib/live/protocol.test.ts [2m([22m[2m36 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/lib/live/source.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/stores/realtime.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/composables/useCameraLive.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/stores/ui.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/api/events.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/lib/live/events.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/lib/cameraStatus.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/lib/live/overlay.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/lib/systemHealth.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/lib/eventGeometry.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/lib/analytics.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/lib/live/geometry.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/lib/apiErrors.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m23 passed[39m[22m[90m (23)[39m
+[2m      Tests [22m [1m[32m129 passed[39m[22m[90m (129)[39m
+[2m   Start at [22m 11:23:17
+[2m   Duration [22m 21.63s[2m (environment 71%, import 16%, transform 7%, tests 6%, worker 1%)[22m
+
+[2mEnvironment [22m [33mjsdom was created 23 times[39m[2m · 13.60s total, 71% of tracked time[22m
+[2m            [22m [2mcreate it once per worker with [22m[33mpool: 'vmThreads'[39m[2m (keeps per-file isolation) or [22m[33misolate: false[39m[2m (shares it across files)[22m
+[2m            [22m [2mlearn more: https://vitest.dev/guide/improving-performance#test-environments[22m
+
+npm --prefix frontend run build
+
+> ai-detector-frontend@0.1.0 build
+> vue-tsc --build && vite build
+
+vite v8.3.3 building client environment for production...
+transforming...
+✓ 3343 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                              0.62 kB │ gzip:   0.34 kB
+dist/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2     10.25 kB
+dist/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2      11.23 kB
+dist/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2       18.74 kB
+dist/assets/inter-greek-wght-normal-CkhJZR-_.woff2          18.99 kB
+dist/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2   25.96 kB
+dist/assets/inter-latin-wght-normal-Dx4kXJAl.woff2          48.25 kB
+dist/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2      85.06 kB
+dist/assets/index-Y7BM08YL.css                              50.57 kB │ gzip:  10.03 kB
+dist/assets/PageHeader-DJ1B-jfD.js                           0.34 kB │ gzip:   0.28 kB
+dist/assets/CamerasEmptyState-Jr6YwgG5.js                    1.09 kB │ gzip:   0.65 kB
+dist/assets/useInfiniteQuery-wiGkvLKf.js                     1.11 kB │ gzip:   0.46 kB
+dist/assets/MonitoringView-DgQXSeN1.js                       2.00 kB │ gzip:   0.98 kB
+dist/assets/SettingsView-BENJ1l4E.js                         2.13 kB │ gzip:   1.03 kB
+dist/assets/createLucideIcon-DMV7vsVX.js                     2.53 kB │ gzip:   1.26 kB
+dist/assets/useCameras-CfuNAVBu.js                           4.13 kB │ gzip:   1.67 kB
+dist/assets/EventCard-BRJajq2P.js                            4.27 kB │ gzip:   2.02 kB
+dist/assets/EventsView-Dsch-TTp.js                           5.78 kB │ gzip:   2.29 kB
+dist/assets/EventDetailView-DreY9Yd5.js                      6.67 kB │ gzip:   2.70 kB
+dist/assets/CameraStatusBadge-BHoZN8JP.js                    7.00 kB │ gzip:   2.87 kB
+dist/assets/CameraLiveView-KMy9YfWu.js                      10.28 kB │ gzip:   4.20 kB
+dist/assets/CameraFocusView-BlSTpBau.js                     22.16 kB │ gzip:   5.36 kB
+dist/assets/CamerasView-Bl_Szq83.js                         70.72 kB │ gzip:  20.99 kB
+dist/assets/index-0EizMOH2.js                              152.63 kB │ gzip:  52.94 kB
+dist/assets/http-DCMTOkr7.js                               166.94 kB │ gzip:  59.70 kB
+dist/assets/AnalyticsView-CsnSy4cc.js                      556.91 kB │ gzip: 189.09 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.93s

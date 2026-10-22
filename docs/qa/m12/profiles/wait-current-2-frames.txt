@@ -1,0 +1,19 @@
+## /data/raw/m12/wait-current-2/frames.jsonl
+
+- Shape: 196 rows x 6 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s, frame_id, amortized_inference_ms
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 196 | 0.02678 → 20, mean 10.01 |
+| camera_id | text | 100% | 1 | top: 00000000-0000-0000-0000-000000000001 (196) |
+| frame_id | number | 100% | 196 | 75 → 374, mean 224.6 |
+| local_latency_ms | number | 100% | 195 | 48.8 → 137.7, mean 94.67 |
+| amortized_inference_ms | number | 100% | 196 | 45 → 78.53, mean 59.39 |
+| tracks | number | 100% | 2 | 0 → 4, mean 3.918 |
+
+**Warnings:**
+
+- ⚠️ `camera_id` is constant
+

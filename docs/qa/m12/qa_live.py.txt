@@ -1,0 +1,75 @@
+"""Sandbox-only live M12 metrics and Redis outage QA; stops local Valkey briefly."""
+import asyncio,csv,io,json,subprocess,time
+from datetime import UTC,datetime
+from pathlib import Path
+import httpx
+from prometheus_client.parser import text_string_to_metric_families
+from redis.asyncio import Redis
+from redis.exceptions import RedisError
+from ai_detector_core.telemetry.event_bus import INGEST_STREAM
+from ai_detector_core.telemetry.analytics import ANALYTICS_STREAM
+OUT=Path('/data/m12')
+
+def values(body):
+ return {(s.name,tuple(sorted(s.labels.items()))):s.value for f in text_string_to_metric_families(body) for s in f.samples}
+def val(v,name,**labels):return v.get((name,tuple(sorted(labels.items()))))
+async def main():
+ redis=Redis.from_url('redis://127.0.0.1:16379/0',decode_responses=True)
+ keys=['dir','appendonly','appendfsync','appendfilename','appenddirname','dbfilename','save','logfile'];config={}
+ for key in keys:config.update(await redis.config_get(key))
+ def restore():
+  subprocess.run(['valkey-server','--bind','127.0.0.1','--port','16379','--daemonize','yes',*[x for k in keys for x in ['--'+k,config[k]]]],check=True,capture_output=True)
+ offline=False
+ async with httpx.AsyncClient(timeout=10) as c:
+  for _ in range(60):
+   try:
+    ready=(await c.get('http://127.0.0.1:18001/health/ready')).json()
+    if ready.get('status')=='ready':break
+   except httpx.HTTPError:pass
+   await asyncio.sleep(.5)
+  assert ready['status']=='ready' and ready['detector']['inference_threads']=='2'
+  status=(await c.get('http://127.0.0.1:18001/status')).json()['cameras'];assert len(status)==3
+  before=(await c.get('http://127.0.0.1:18001/metrics'));before.raise_for_status();assert 'text/plain' in before.headers['content-type']
+  (OUT/'metrics-before.txt').write_text(before.text);vb=values(before.text)
+  for s in status:
+   assert val(vb,'ai_detector_camera_capture_queue_depth',camera_id=s['camera_id']) in [0,1]
+  assert val(vb,'ai_detector_detector_info',backend='ultralytics',model='yolo26n-coco',device='cpu',inference_threads='2')==1
+  start=datetime.now(UTC)
+  await asyncio.sleep(12)
+  rows=(await c.get('http://127.0.0.1:18000/api/v1/events',params={'start':start.isoformat(),'limit':50})).json()['items']
+  assert rows,'no live alarms'
+  export=await c.get('http://127.0.0.1:18000/api/v1/events/export',params={'start':start.isoformat()});export.raise_for_status();assert 'attachment' in export.headers['content-disposition']
+  csvrows=list(csv.DictReader(io.StringIO(export.content.decode('utf-8-sig'))));assert {r['id'] for r in rows}<={r['id'] for r in csvrows}
+  snap=next(r for r in rows if r.get('snapshot_id'))
+  image=await c.get('http://127.0.0.1:18000/api/v1/snapshots/'+snap['snapshot_id']);image.raise_for_status();assert image.content[:2]==b'\xff\xd8'
+  healthy=values((await c.get('http://127.0.0.1:18001/metrics')).text)
+  assert val(healthy,'ai_detector_processed_frames_total')>val(vb,'ai_detector_processed_frames_total')
+  peakqueue=0;redis_down_seen=False;scrapes=0;duringbody=''
+  try:
+   offline=True
+   try:await redis.execute_command('SHUTDOWN','NOSAVE')
+   except RedisError:pass
+   for _ in range(24):
+    await asyncio.sleep(.5)
+    response=await c.get('http://127.0.0.1:18001/metrics');response.raise_for_status();scrapes+=1;duringbody=response.text;v=values(duringbody)
+    peakqueue=max(peakqueue,val(v,'ai_detector_outbox_queue_depth',kind='analytics') or 0)
+    redis_down_seen=redis_down_seen or val(v,'ai_detector_redis_healthy')==0
+   (OUT/'metrics-during-outage.txt').write_text(duringbody)
+   during=values(duringbody)
+   assert peakqueue>0 and redis_down_seen
+   assert val(during,'ai_detector_processed_frames_total')>val(healthy,'ai_detector_processed_frames_total')
+  finally:
+   if offline:restore();offline=False
+  for _ in range(80):
+   await asyncio.sleep(.5)
+   try:
+    after=await c.get('http://127.0.0.1:18001/metrics');after.raise_for_status();va=values(after.text)
+    if val(va,'ai_detector_redis_healthy')==1 and val(va,'ai_detector_delivery_healthy',kind='events')==1 and val(va,'ai_detector_delivery_healthy',kind='analytics')==1 and await redis.xlen(INGEST_STREAM)==0 and await redis.xlen(ANALYTICS_STREAM)==0:break
+   except (RedisError,httpx.HTTPError):pass
+  else:raise AssertionError('delivery did not recover')
+  (OUT/'metrics-after.txt').write_text(after.text)
+  assert val(va,'ai_detector_outbox_dropped',kind='events')==val(va,'ai_detector_outbox_dropped',kind='analytics')==0
+  proof={'ready_actual_threads':2,'cameras':len(status),'real_and_scripted_detector_histograms':val(va,'ai_detector_detector_call_seconds_count',kind='real')>0 and val(va,'ai_detector_detector_call_seconds_count',kind='scripted')>0,'live_alarm_types':sorted({r['type'] for r in rows}),'csv_matches_live_persisted_ids':True,'jpeg_readable':True,'metrics_scrapes_while_redis_offline':scrapes,'heartbeat_failure_visible':redis_down_seen,'processing_continues_during_outage':True,'analytics_ram_queue_peak':peakqueue,'dropped_events':0,'dropped_analytics':0,'event_stream_backlog':await redis.xlen(INGEST_STREAM),'analytics_stream_backlog':await redis.xlen(ANALYTICS_STREAM)}
+  (OUT/'live-proof.json').write_text(json.dumps(proof,indent=2));print(json.dumps(proof))
+ await redis.aclose()
+asyncio.run(main())

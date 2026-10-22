@@ -1,0 +1,16 @@
+## /data/raw/m12/optimized-4/batches.jsonl
+
+- Shape: 75 rows x 3 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s, duration_ms
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 75 | 0.2117 → 19.89, mean 10.05 |
+| size | number | 100% | 1 | 4 → 4, mean 4 |
+| duration_ms | number | 100% | 75 | 249.4 → 283.4, mean 263.3 |
+
+**Warnings:**
+
+- ⚠️ `size` is constant
+

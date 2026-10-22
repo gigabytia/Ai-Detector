@@ -1,0 +1,21 @@
+## /data/raw/m12/wait-legacy-1/samples.jsonl
+
+- Shape: 80 rows x 8 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s, cpu_seconds, processed_frames, dropped_delta
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 80 | 0.2501 → 20.07, mean 10.16 |
+| cpu_seconds | number | 100% | 80 | 0.21 → 15.73, mean 7.845 |
+| rss_bytes | number | 100% | 51 | 541,573,120 → 542,191,616, mean 5.419e+08 |
+| capture_queue_depth | number | 100% | 2 | 0 → 1, mean 0.725 |
+| queue_max_per_camera | number | 100% | 2 | 0 → 1, mean 0.725 |
+| processed_frames | number | 100% | 80 | 3 → 196, mean 99.1 |
+| dropped_delta | number | 100% | 80 | 1 → 105, mean 53.35 |
+| degraded_cameras | number | 100% | 1 | 0 → 0, mean 0 |
+
+**Warnings:**
+
+- ⚠️ `degraded_cameras` is constant
+

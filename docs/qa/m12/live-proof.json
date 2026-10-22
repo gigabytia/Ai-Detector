@@ -1,0 +1,19 @@
+{
+  "ready_actual_threads": 2,
+  "cameras": 3,
+  "real_and_scripted_detector_histograms": true,
+  "live_alarm_types": [
+    "PERSON_ENTERED_DANGER_ZONE",
+    "PERSON_LOITERING_IN_DANGER_ZONE"
+  ],
+  "csv_matches_live_persisted_ids": true,
+  "jpeg_readable": true,
+  "metrics_scrapes_while_redis_offline": 24,
+  "heartbeat_failure_visible": true,
+  "processing_continues_during_outage": true,
+  "analytics_ram_queue_peak": 48.0,
+  "dropped_events": 0,
+  "dropped_analytics": 0,
+  "event_stream_backlog": 0,
+  "analytics_stream_backlog": 0
+}

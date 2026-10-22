@@ -1,0 +1,15 @@
+## /data/raw/m12/honored2-4/frames.jsonl
+
+- Shape: 468 rows x 6 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 468 | 0.1711 → 20.1, mean 10.06 |
+| camera_id | text | 100% | 4 | top: 00000000-0000-0000-0000-000000000002 (117), 00000000-0000-0000-0000-000000000003 (117), 00000000-0000-0000-0000-000000000004 (117), 00000000-0000-0000-0000-000000000001 (117) |
+| frame_id | number | 100% | 141 | 75 → 375, mean 223.8 |
+| local_latency_ms | number | 100% | 465 | 162.3 → 246.9, mean 205.7 |
+| amortized_inference_ms | number | 100% | 117 | 38.3 → 48.61, mean 42.38 |
+| tracks | number | 100% | 2 | 0 → 4, mean 3.863 |
+

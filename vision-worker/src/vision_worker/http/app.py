@@ -9,6 +9,7 @@ from uuid import UUID
 
 from anyio import CancelScope
 from fastapi import FastAPI, Response, WebSocket, WebSocketDisconnect, status
+from prometheus_client import CONTENT_TYPE_LATEST
 from pydantic import AwareDatetime, BaseModel
 
 from ai_detector_core.cameras.status import CameraRuntimeStatus
@@ -66,6 +67,13 @@ def create_http_app(supervisor: Supervisor, allowed_origins: list[str] | None = 
             detector=supervisor.detector_info,
             redis_ok=heartbeat.redis_ok,
             last_heartbeat_at=heartbeat.last_published_at,
+        )
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics() -> Response:
+        return Response(
+            supervisor.scheduler.metrics.render(supervisor),
+            headers={"Content-Type": CONTENT_TYPE_LATEST, "Cache-Control": "no-store"},
         )
 
     @app.get("/status", response_model=WorkerStatusRead)

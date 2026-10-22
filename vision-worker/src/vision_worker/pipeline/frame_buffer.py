@@ -28,3 +28,9 @@ class LatestFrameBuffer:
     def dropped(self) -> int:
         with self._lock:
             return self._dropped
+
+    @property
+    def depth(self) -> int:
+        """Pending capture frames only; the inference batch is counted separately."""
+        with self._lock:
+            return int(self._frame is not None)

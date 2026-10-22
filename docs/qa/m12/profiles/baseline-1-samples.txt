@@ -1,0 +1,21 @@
+## /data/raw/m12/baseline-1/samples.jsonl
+
+- Shape: 80 rows x 8 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s, cpu_seconds, processed_frames, dropped_delta
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 80 | 0.2506 → 20.08, mean 10.17 |
+| cpu_seconds | number | 100% | 80 | 0.22 → 15.63, mean 7.942 |
+| rss_bytes | number | 100% | 66 | 532,148,224 → 551,596,032, mean 547,483,136 |
+| capture_queue_depth | number | 100% | 2 | 0 → 1, mean 0.7125 |
+| queue_max_per_camera | number | 100% | 2 | 0 → 1, mean 0.7125 |
+| processed_frames | number | 100% | 80 | 2 → 193, mean 97.35 |
+| dropped_delta | number | 100% | 80 | 1 → 108, mean 54.86 |
+| degraded_cameras | number | 100% | 1 | 0 → 0, mean 0 |
+
+**Warnings:**
+
+- ⚠️ `degraded_cameras` is constant
+

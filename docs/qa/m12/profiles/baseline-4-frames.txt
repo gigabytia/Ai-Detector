@@ -1,0 +1,15 @@
+## /data/raw/m12/baseline-4/frames.jsonl
+
+- Shape: 292 rows x 6 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s, local_latency_ms
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 292 | 0.1214 → 20.06, mean 10.34 |
+| camera_id | text | 100% | 4 | top: 00000000-0000-0000-0000-000000000001 (73), 00000000-0000-0000-0000-000000000002 (73), 00000000-0000-0000-0000-000000000003 (73), 00000000-0000-0000-0000-000000000004 (73) |
+| frame_id | number | 100% | 87 | 73 → 372, mean 226.3 |
+| local_latency_ms | number | 100% | 292 | 254.6 → 379.3, mean 314.5 |
+| amortized_inference_ms | number | 100% | 73 | 61.44 → 78.38, mean 68.7 |
+| tracks | number | 100% | 2 | 0 → 4, mean 3.781 |
+

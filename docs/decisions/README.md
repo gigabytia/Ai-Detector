@@ -43,3 +43,5 @@
 | [ADR-037](ADR-037-observed-analytics.md) | 1Hz observations, independent ingest, dashboard semantics и completed-track timeline |
 
 | [ADR-038](ADR-038-loitering-csv.md) | Непрерывное observed loitering, typed alarm и безопасный bounded CSV |
+
+| [ADR-039](ADR-039-measured-cpu-optimization.md) | Измеряемая CPU optimization, thread warmup и bounded metrics |

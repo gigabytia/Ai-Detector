@@ -103,6 +103,7 @@ def build_supervisor(settings: WorkerSettings) -> Supervisor:
             "backend": "ultralytics",
             "model": detector.manifest.name,
             "device": detector.device,
+            "inference_threads": str(detector.threads),
         },
         redis=redis,
         api_http=api_http,

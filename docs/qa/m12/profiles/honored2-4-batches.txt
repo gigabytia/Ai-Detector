@@ -1,0 +1,16 @@
+## /data/raw/m12/honored2-4/batches.jsonl
+
+- Shape: 117 rows x 3 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s, duration_ms
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 117 | 0.1692 → 20.1, mean 10.06 |
+| size | number | 100% | 1 | 4 → 4, mean 4 |
+| duration_ms | number | 100% | 117 | 153.2 → 194.4, mean 169.5 |
+
+**Warnings:**
+
+- ⚠️ `size` is constant
+

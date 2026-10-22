@@ -1,0 +1,209 @@
+# HELP ai_detector_detector_info Loaded detector configuration
+# TYPE ai_detector_detector_info gauge
+ai_detector_detector_info{backend="ultralytics",device="cpu",inference_threads="2",model="yolo26n-coco"} 1.0
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 2.382708736e+09
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 6.06625792e+08
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.79266818091e+09
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 104.42
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 20.0
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1.048576e+06
+# HELP ai_detector_processed_frames_total Successfully delivered local pipeline results
+# TYPE ai_detector_processed_frames_total counter
+ai_detector_processed_frames_total 3465.0
+# HELP ai_detector_processed_frames_created Successfully delivered local pipeline results
+# TYPE ai_detector_processed_frames_created gauge
+ai_detector_processed_frames_created 1.7926681856499836e+09
+# HELP ai_detector_pipeline_errors_total Failed frame results
+# TYPE ai_detector_pipeline_errors_total counter
+ai_detector_pipeline_errors_total 0.0
+# HELP ai_detector_pipeline_errors_created Failed frame results
+# TYPE ai_detector_pipeline_errors_created gauge
+ai_detector_pipeline_errors_created 1.7926681856501276e+09
+# HELP ai_detector_stale_results_total Obsolete results discarded after stop/restart
+# TYPE ai_detector_stale_results_total counter
+ai_detector_stale_results_total 0.0
+# HELP ai_detector_stale_results_created Obsolete results discarded after stop/restart
+# TYPE ai_detector_stale_results_created gauge
+ai_detector_stale_results_created 1.7926681856501358e+09
+# HELP ai_detector_generated_events_total Rule alarms generated, not persistence acknowledgements
+# TYPE ai_detector_generated_events_total counter
+ai_detector_generated_events_total{type="PERSON_ENTERED_DANGER_ZONE"} 99.0
+ai_detector_generated_events_total{type="PERSON_LOITERING_IN_DANGER_ZONE"} 94.0
+# HELP ai_detector_generated_events_created Rule alarms generated, not persistence acknowledgements
+# TYPE ai_detector_generated_events_created gauge
+ai_detector_generated_events_created{type="PERSON_ENTERED_DANGER_ZONE"} 1.792668186336665e+09
+ai_detector_generated_events_created{type="PERSON_LOITERING_IN_DANGER_ZONE"} 1.7926681866419067e+09
+# HELP ai_detector_local_frame_latency_seconds Capture handoff to result delivery; excludes sensor/network/decode and persistence/UI
+# TYPE ai_detector_local_frame_latency_seconds histogram
+ai_detector_local_frame_latency_seconds_bucket{le="0.005"} 0.0
+ai_detector_local_frame_latency_seconds_bucket{le="0.01"} 0.0
+ai_detector_local_frame_latency_seconds_bucket{le="0.02"} 1.0
+ai_detector_local_frame_latency_seconds_bucket{le="0.05"} 27.0
+ai_detector_local_frame_latency_seconds_bucket{le="0.1"} 1590.0
+ai_detector_local_frame_latency_seconds_bucket{le="0.2"} 3424.0
+ai_detector_local_frame_latency_seconds_bucket{le="0.5"} 3465.0
+ai_detector_local_frame_latency_seconds_bucket{le="1.0"} 3465.0
+ai_detector_local_frame_latency_seconds_bucket{le="2.0"} 3465.0
+ai_detector_local_frame_latency_seconds_bucket{le="5.0"} 3465.0
+ai_detector_local_frame_latency_seconds_bucket{le="10.0"} 3465.0
+ai_detector_local_frame_latency_seconds_bucket{le="+Inf"} 3465.0
+ai_detector_local_frame_latency_seconds_count 3465.0
+ai_detector_local_frame_latency_seconds_sum 363.61452060800366
+# HELP ai_detector_local_frame_latency_seconds_created Capture handoff to result delivery; excludes sensor/network/decode and persistence/UI
+# TYPE ai_detector_local_frame_latency_seconds_created gauge
+ai_detector_local_frame_latency_seconds_created 1.7926681856501687e+09
+# HELP ai_detector_detector_call_seconds Whole detector call wall duration; not amortized per frame
+# TYPE ai_detector_detector_call_seconds histogram
+ai_detector_detector_call_seconds_bucket{kind="scripted",le="0.005"} 2310.0
+ai_detector_detector_call_seconds_bucket{kind="scripted",le="0.01"} 2310.0
+ai_detector_detector_call_seconds_bucket{kind="scripted",le="0.02"} 2310.0
+ai_detector_detector_call_seconds_bucket{kind="scripted",le="0.05"} 2310.0
+ai_detector_detector_call_seconds_bucket{kind="scripted",le="0.1"} 2310.0
+ai_detector_detector_call_seconds_bucket{kind="scripted",le="0.2"} 2310.0
+ai_detector_detector_call_seconds_bucket{kind="scripted",le="0.5"} 2310.0
+ai_detector_detector_call_seconds_bucket{kind="scripted",le="1.0"} 2310.0
+ai_detector_detector_call_seconds_bucket{kind="scripted",le="2.0"} 2310.0
+ai_detector_detector_call_seconds_bucket{kind="scripted",le="5.0"} 2310.0
+ai_detector_detector_call_seconds_bucket{kind="scripted",le="10.0"} 2310.0
+ai_detector_detector_call_seconds_bucket{kind="scripted",le="+Inf"} 2310.0
+ai_detector_detector_call_seconds_count{kind="scripted"} 2310.0
+ai_detector_detector_call_seconds_sum{kind="scripted"} 0.02949737700237165
+ai_detector_detector_call_seconds_bucket{kind="real",le="0.005"} 0.0
+ai_detector_detector_call_seconds_bucket{kind="real",le="0.01"} 0.0
+ai_detector_detector_call_seconds_bucket{kind="real",le="0.02"} 0.0
+ai_detector_detector_call_seconds_bucket{kind="real",le="0.05"} 308.0
+ai_detector_detector_call_seconds_bucket{kind="real",le="0.1"} 1034.0
+ai_detector_detector_call_seconds_bucket{kind="real",le="0.2"} 1153.0
+ai_detector_detector_call_seconds_bucket{kind="real",le="0.5"} 1155.0
+ai_detector_detector_call_seconds_bucket{kind="real",le="1.0"} 1155.0
+ai_detector_detector_call_seconds_bucket{kind="real",le="2.0"} 1155.0
+ai_detector_detector_call_seconds_bucket{kind="real",le="5.0"} 1155.0
+ai_detector_detector_call_seconds_bucket{kind="real",le="10.0"} 1155.0
+ai_detector_detector_call_seconds_bucket{kind="real",le="+Inf"} 1155.0
+ai_detector_detector_call_seconds_count{kind="real"} 1155.0
+ai_detector_detector_call_seconds_sum{kind="real"} 80.42834549701001
+# HELP ai_detector_detector_call_seconds_created Whole detector call wall duration; not amortized per frame
+# TYPE ai_detector_detector_call_seconds_created gauge
+ai_detector_detector_call_seconds_created{kind="scripted"} 1.7926681858698392e+09
+ai_detector_detector_call_seconds_created{kind="real"} 1.7926681860068548e+09
+# HELP ai_detector_detector_batch_size Frames in a detector call
+# TYPE ai_detector_detector_batch_size histogram
+ai_detector_detector_batch_size_bucket{kind="scripted",le="1.0"} 2310.0
+ai_detector_detector_batch_size_bucket{kind="scripted",le="2.0"} 2310.0
+ai_detector_detector_batch_size_bucket{kind="scripted",le="4.0"} 2310.0
+ai_detector_detector_batch_size_bucket{kind="scripted",le="8.0"} 2310.0
+ai_detector_detector_batch_size_bucket{kind="scripted",le="16.0"} 2310.0
+ai_detector_detector_batch_size_bucket{kind="scripted",le="32.0"} 2310.0
+ai_detector_detector_batch_size_bucket{kind="scripted",le="+Inf"} 2310.0
+ai_detector_detector_batch_size_count{kind="scripted"} 2310.0
+ai_detector_detector_batch_size_sum{kind="scripted"} 2310.0
+ai_detector_detector_batch_size_bucket{kind="real",le="1.0"} 1155.0
+ai_detector_detector_batch_size_bucket{kind="real",le="2.0"} 1155.0
+ai_detector_detector_batch_size_bucket{kind="real",le="4.0"} 1155.0
+ai_detector_detector_batch_size_bucket{kind="real",le="8.0"} 1155.0
+ai_detector_detector_batch_size_bucket{kind="real",le="16.0"} 1155.0
+ai_detector_detector_batch_size_bucket{kind="real",le="32.0"} 1155.0
+ai_detector_detector_batch_size_bucket{kind="real",le="+Inf"} 1155.0
+ai_detector_detector_batch_size_count{kind="real"} 1155.0
+ai_detector_detector_batch_size_sum{kind="real"} 1155.0
+# HELP ai_detector_detector_batch_size_created Frames in a detector call
+# TYPE ai_detector_detector_batch_size_created gauge
+ai_detector_detector_batch_size_created{kind="scripted"} 1.7926681858698816e+09
+ai_detector_detector_batch_size_created{kind="real"} 1.7926681860068939e+09
+# HELP ai_detector_batch_wait_seconds First selected frame to executor submission
+# TYPE ai_detector_batch_wait_seconds histogram
+ai_detector_batch_wait_seconds_bucket{le="0.005"} 1155.0
+ai_detector_batch_wait_seconds_bucket{le="0.01"} 1155.0
+ai_detector_batch_wait_seconds_bucket{le="0.02"} 1155.0
+ai_detector_batch_wait_seconds_bucket{le="0.05"} 1156.0
+ai_detector_batch_wait_seconds_bucket{le="0.1"} 1156.0
+ai_detector_batch_wait_seconds_bucket{le="0.2"} 1156.0
+ai_detector_batch_wait_seconds_bucket{le="0.5"} 1156.0
+ai_detector_batch_wait_seconds_bucket{le="1.0"} 1156.0
+ai_detector_batch_wait_seconds_bucket{le="2.0"} 1156.0
+ai_detector_batch_wait_seconds_bucket{le="5.0"} 1156.0
+ai_detector_batch_wait_seconds_bucket{le="10.0"} 1156.0
+ai_detector_batch_wait_seconds_bucket{le="+Inf"} 1156.0
+ai_detector_batch_wait_seconds_count 1156.0
+ai_detector_batch_wait_seconds_sum 0.07765748499514302
+# HELP ai_detector_batch_wait_seconds_created First selected frame to executor submission
+# TYPE ai_detector_batch_wait_seconds_created gauge
+ai_detector_batch_wait_seconds_created 1.7926681856502328e+09
+# HELP ai_detector_inflight_frames Selected frames including batch wait and inference
+# TYPE ai_detector_inflight_frames gauge
+ai_detector_inflight_frames 0.0
+# HELP ai_detector_camera_capture_fps Sliding two-second capture FPS
+# TYPE ai_detector_camera_capture_fps gauge
+ai_detector_camera_capture_fps{camera_id="6fd40c99-cc70-491f-8697-e454166c8cee"} 15.0
+ai_detector_camera_capture_fps{camera_id="e1a19190-410c-4e68-8eeb-4982947d3dac"} 15.0
+ai_detector_camera_capture_fps{camera_id="35a490cf-e831-45f2-873f-53c8341198da"} 15.0
+# HELP ai_detector_camera_processed_fps Sliding two-second processed FPS
+# TYPE ai_detector_camera_processed_fps gauge
+ai_detector_camera_processed_fps{camera_id="6fd40c99-cc70-491f-8697-e454166c8cee"} 9.74
+ai_detector_camera_processed_fps{camera_id="e1a19190-410c-4e68-8eeb-4982947d3dac"} 9.74
+ai_detector_camera_processed_fps{camera_id="35a490cf-e831-45f2-873f-53c8341198da"} 9.74
+# HELP ai_detector_camera_capture_queue_depth Pending capture frames (0/1), excludes in-flight batch
+# TYPE ai_detector_camera_capture_queue_depth gauge
+ai_detector_camera_capture_queue_depth{camera_id="6fd40c99-cc70-491f-8697-e454166c8cee"} 1.0
+ai_detector_camera_capture_queue_depth{camera_id="e1a19190-410c-4e68-8eeb-4982947d3dac"} 1.0
+ai_detector_camera_capture_queue_depth{camera_id="35a490cf-e831-45f2-873f-53c8341198da"} 1.0
+# HELP ai_detector_camera_dropped_frames Capture replacements since camera run start; resets on restart
+# TYPE ai_detector_camera_dropped_frames gauge
+ai_detector_camera_dropped_frames{camera_id="6fd40c99-cc70-491f-8697-e454166c8cee"} 664.0
+ai_detector_camera_dropped_frames{camera_id="e1a19190-410c-4e68-8eeb-4982947d3dac"} 664.0
+ai_detector_camera_dropped_frames{camera_id="35a490cf-e831-45f2-873f-53c8341198da"} 664.0
+# HELP ai_detector_camera_processed_frames Successful results since camera run start; resets on restart
+# TYPE ai_detector_camera_processed_frames gauge
+ai_detector_camera_processed_frames{camera_id="6fd40c99-cc70-491f-8697-e454166c8cee"} 1155.0
+ai_detector_camera_processed_frames{camera_id="e1a19190-410c-4e68-8eeb-4982947d3dac"} 1155.0
+ai_detector_camera_processed_frames{camera_id="35a490cf-e831-45f2-873f-53c8341198da"} 1155.0
+# HELP ai_detector_camera_active_tracks Non-LOST tracks in last result; inspect result age
+# TYPE ai_detector_camera_active_tracks gauge
+ai_detector_camera_active_tracks{camera_id="6fd40c99-cc70-491f-8697-e454166c8cee"} 1.0
+ai_detector_camera_active_tracks{camera_id="e1a19190-410c-4e68-8eeb-4982947d3dac"} 1.0
+ai_detector_camera_active_tracks{camera_id="35a490cf-e831-45f2-873f-53c8341198da"} 4.0
+# HELP ai_detector_camera_result_age_seconds Age of last successful result; absent before first result
+# TYPE ai_detector_camera_result_age_seconds gauge
+ai_detector_camera_result_age_seconds{camera_id="6fd40c99-cc70-491f-8697-e454166c8cee"} 0.03584494200003974
+ai_detector_camera_result_age_seconds{camera_id="e1a19190-410c-4e68-8eeb-4982947d3dac"} 0.03574750299958396
+ai_detector_camera_result_age_seconds{camera_id="35a490cf-e831-45f2-873f-53c8341198da"} 0.035698562000106904
+# HELP ai_detector_camera_local_latency_seconds Last handoff latency; absent until first result
+# TYPE ai_detector_camera_local_latency_seconds gauge
+ai_detector_camera_local_latency_seconds{camera_id="6fd40c99-cc70-491f-8697-e454166c8cee"} 0.12616156500007492
+ai_detector_camera_local_latency_seconds{camera_id="e1a19190-410c-4e68-8eeb-4982947d3dac"} 0.1159917149998364
+ai_detector_camera_local_latency_seconds{camera_id="35a490cf-e831-45f2-873f-53c8341198da"} 0.10631160799948702
+# HELP ai_detector_camera_reconnect_attempts Current backoff attempts, resets on successful connection
+# TYPE ai_detector_camera_reconnect_attempts gauge
+ai_detector_camera_reconnect_attempts{camera_id="6fd40c99-cc70-491f-8697-e454166c8cee"} 0.0
+ai_detector_camera_reconnect_attempts{camera_id="e1a19190-410c-4e68-8eeb-4982947d3dac"} 0.0
+ai_detector_camera_reconnect_attempts{camera_id="35a490cf-e831-45f2-873f-53c8341198da"} 0.0
+# HELP ai_detector_outbox_queue_depth Waiting RAM records only, excludes pending delivery and Redis Streams
+# TYPE ai_detector_outbox_queue_depth gauge
+ai_detector_outbox_queue_depth{kind="events"} 16.0
+ai_detector_outbox_queue_depth{kind="analytics"} 48.0
+# HELP ai_detector_outbox_dropped RAM records dropped since worker startup
+# TYPE ai_detector_outbox_dropped gauge
+ai_detector_outbox_dropped{kind="events"} 0.0
+ai_detector_outbox_dropped{kind="analytics"} 0.0
+# HELP ai_detector_delivery_healthy Local publisher health, not end-to-end durability
+# TYPE ai_detector_delivery_healthy gauge
+ai_detector_delivery_healthy{kind="events"} 0.0
+ai_detector_delivery_healthy{kind="analytics"} 0.0
+# HELP ai_detector_redis_healthy Last heartbeat Redis result; scrape does no network I/O
+# TYPE ai_detector_redis_healthy gauge
+ai_detector_redis_healthy 0.0
+# HELP ai_detector_cuda_enabled Detector configured for CUDA; not utilization or availability probe
+# TYPE ai_detector_cuda_enabled gauge
+ai_detector_cuda_enabled 0.0

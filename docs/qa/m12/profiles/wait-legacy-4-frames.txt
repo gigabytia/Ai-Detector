@@ -1,0 +1,19 @@
+## /data/raw/m12/wait-legacy-4/frames.jsonl
+
+- Shape: 195 rows x 6 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s, frame_id, local_latency_ms, amortized_inference_ms
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 195 | 0.09416 → 19.98, mean 10.03 |
+| camera_id | text | 100% | 1 | top: 00000000-0000-0000-0000-000000000001 (195) |
+| frame_id | number | 100% | 195 | 76 → 374, mean 224.7 |
+| local_latency_ms | number | 100% | 195 | 67.96 → 147.7, mean 106.9 |
+| amortized_inference_ms | number | 100% | 195 | 44.28 → 72.48, mean 51.7 |
+| tracks | number | 100% | 2 | 0 → 4, mean 3.918 |
+
+**Warnings:**
+
+- ⚠️ `camera_id` is constant
+

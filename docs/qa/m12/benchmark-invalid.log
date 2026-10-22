@@ -1,0 +1,5 @@
+usage: pipeline.py [-h] [--cameras {1,2,4,8}] --source SOURCE --out OUT
+                   [--label LABEL] [--threads THREADS] [--batch BATCH]
+                   [--wait WAIT] [--fps FPS] [--warmup WARMUP]
+                   [--duration DURATION] [--preview] [--legacy-batch-wait]
+pipeline.py: error: threads must be in [1, 64]

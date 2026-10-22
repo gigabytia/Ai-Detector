@@ -33,6 +33,10 @@ class UltralyticsPersonDetector:
         self.detect(
             [Frame(np.zeros((size, size, 3), dtype=np.uint8), 0, 0, datetime.now(UTC))], 0.25
         )
+        # Ultralytics CPU predictor setup resets PyTorch threads during first predict.
+        # Restore the explicit worker setting after that one-time setup/warmup.
+        torch.set_num_threads(threads)
+        self.threads = torch.get_num_threads()
 
     def detect(self, frames: Sequence[Frame], confidence: float) -> list[list[PersonDetection]]:
         if not frames:

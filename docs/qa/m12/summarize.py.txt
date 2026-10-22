@@ -1,0 +1,56 @@
+"""Reconcile immutable JSONL runs. Raw grains: frame, detector call, process sample."""
+import json,math
+from pathlib import Path
+import pandas as pd
+RAW=Path('/data/raw/m12');OUT=Path('/data/analysis/m12')
+
+def quantile_independent(values,q):
+ values=sorted(values);position=(len(values)-1)*q;low=math.floor(position);high=math.ceil(position)
+ return values[low]+(values[high]-values[low])*(position-low)
+
+def analyze(path):
+ meta=json.loads((path/'meta.json').read_text());frames=pd.read_json(path/'frames.jsonl',lines=True);batches=pd.read_json(path/'batches.jsonl',lines=True);samples=pd.read_json(path/'samples.jsonl',lines=True)
+ assert not frames.isna().any().any() and not samples.isna().any().any()
+ assert not frames.duplicated(['camera_id','frame_id']).any()
+ assert len(frames)==meta['processed_frames']==sum(meta['frame_counts'].values())
+ assert frames['camera_id'].nunique()==meta['cameras']
+ assert samples['queue_max_per_camera'].max()<=1 and samples['capture_queue_depth'].max()<=meta['cameras']
+ assert batches['size'].max()<=meta['batch_limit']
+ assert samples['cpu_seconds'].is_monotonic_increasing and samples['elapsed_s'].is_monotonic_increasing
+ for q in [.5,.95,.99]:
+  assert math.isclose(frames['local_latency_ms'].quantile(q),quantile_independent([json.loads(line)['local_latency_ms'] for line in (path/'frames.jsonl').read_text().splitlines()],q),abs_tol=1e-6)
+ direct=[json.loads(line) for line in (path/'frames.jsonl').read_text().splitlines()]
+ assert len(direct)==len(frames)
+ fps=len(frames)/meta['duration_s'];rates=frames.groupby('camera_id').size()/meta['duration_s']
+ row={'run':path.name,'cameras':meta['cameras'],'duration_s':meta['duration_s'],'frames':len(frames),'fps_total':fps,'fps_per_camera':fps/meta['cameras'],'min_camera_fps':rates.min(),'max_camera_fps':rates.max(),'local_latency_p50_ms':frames['local_latency_ms'].quantile(.5),'local_latency_p95_ms':frames['local_latency_ms'].quantile(.95),'local_latency_p99_ms':frames['local_latency_ms'].quantile(.99),'cpu_percent_one_core':100*samples.iloc[-1]['cpu_seconds']/samples.iloc[-1]['elapsed_s'],'rss_peak_mib':samples['rss_bytes'].max()/2**20,'queue_capture_max':int(samples['capture_queue_depth'].max()),'queue_max_per_camera':int(samples['queue_max_per_camera'].max()),'dropped_replacements':int(samples.iloc[-1]['dropped_delta']),'degraded_samples':int((samples['degraded_cameras']>0).sum()),'sample_count':len(samples),'batch_mean':batches['size'].mean(),'detector_call_p95_ms':batches['duration_ms'].quantile(.95),'requested_threads':meta['threads'],'effective_threads':meta.get('effective_torch_threads'),'gpu_available':meta['gpu_available']}
+ assert math.isclose(row['fps_per_camera'],len(direct)/meta['duration_s']/meta['cameras'])
+ return row
+
+rows=[analyze(p.parent) for p in sorted(RAW.glob('*/meta.json'))];by={r['run']:r for r in rows}
+primary=[{'cameras':n,'baseline':by[f'baseline-{n}'],'m12':by[f'honored2-{n}']} for n in [1,4,8]]
+for r in primary:r['fps_relative_gain_percent']=100*(r['m12']['fps_total']/r['baseline']['fps_total']-1)
+plan=[{'comparison':'FPS per camera vs concurrent input count','grain':'one 20s run per variant/count','population':'1/4/8 copies of same paced static bus video; CPU-only; target10 each','unit':'FPS/camera','finding':'M12 has higher measured FPS on4/8 but does not meet10 each','derivation':'completed frames / measured seconds / concurrent cameras','disposition':'chart','reason':'shows capacity saturation without inventing camera quality or unique people'}, {'comparison':'local capture-to-result p95','grain':'frame; run-level percentile','unit':'ms','disposition':'table','reason':'clock scope excludes camera sensor/network/decode and storage/browser; no E2E claim'}, {'comparison':'CPU and sampled peak RSS','grain':'process sample within run','unit':'percent of one logical core; MiB','disposition':'table','reason':'throughput gain consumes more CPU; must not conceal tradeoff'}, {'comparison':'capture queue depth and fairness','grain':'sample and per-camera frame count','unit':'frames; FPS/camera','disposition':'prose','reason':'bounded latest-frame queue and no starvation; this is not Redis backlog'}, {'comparison':'GPU utilization','grain':'environment','unit':'unavailable','disposition':'prose','reason':'CPU PyTorch build; GPU not measured'}, {'comparison':'single-camera batch wait ABBA','grain':'frame across matched20s runs under same M12 adapter/config','unit':'ms','disposition':'table','reason':'isolate batch policy from CPU thread correctness fix'}]
+wait={}
+for label in ['legacy','current']:
+ names=[r['run'] for r in rows if r['run'].startswith('wait-'+label+'-')]
+ if not names:continue
+ vals=[json.loads(line)['local_latency_ms'] for name in names for line in (RAW/name/'frames.jsonl').read_text().splitlines()]
+ wait[label]={'runs':names,'frames':len(vals),'local_latency_p50_ms':quantile_independent(vals,.5),'local_latency_p95_ms':quantile_independent(vals,.95),'local_latency_p99_ms':quantile_independent(vals,.99),'window_duration_s':sum(by[n]['duration_s'] for n in names)}
+evidence={'primary_matrix':primary,'all_runs':rows,'batch_wait_abba':wait,'comparison_plan':plan,'validation':{'frame_count_independent':True,'quantiles_independent_sorted_interpolation':True,'no_duplicate_frame_keys':True,'capture_queues_bounded':True},'limitations':['Short sequential runs, no confidence interval or production SLA','Repeated static MP4 is pipeline load, not diverse moving CCTV accuracy','Baseline captures have initial PyTorch thread request overwritten to1; confirmed by repeat with M11 source','Exploratory threads1 labels prior to fix are requested, not a distinct effective-thread condition','Capture queue excludes selected/inflight batch and external queues','Local wall latency in harness; production metric uses monotonic handoff clock','No GPU/CUDA/real RTSP/Docker/Windows/4-8 full storage-I/O load test']}
+(OUT/'evidence.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2))
+lines=['# M12: измерения CPU pipeline','', 'Потоки — копии одного статичного bus MP4; target10 FPS на каждый. Warmup5с, затем20с; модель YOLO26n640, CPU, batch4/wait20. Это изолированный capture→detector→ByteTrack→scene pipeline без внешнего storage I/O и без viewers, не capacity SLA для реальных RTSP.','', '| Камер | M11 FPS/камера | M12 FPS/камера | local p95 M11→M12, мс | CPU M11→M12, % одного ядра | sampled peak RSS M11→M12, МиБ |', '|---|---:|---:|---:|---:|---:|']
+for r in primary:
+ b,a=r['baseline'],r['m12'];lines.append(f"| {r['cameras']} | {b['fps_per_camera']:.2f} | {a['fps_per_camera']:.2f} | {b['local_latency_p95_ms']:.1f} → {a['local_latency_p95_ms']:.1f} | {b['cpu_percent_one_core']:.1f} → {a['cpu_percent_one_core']:.1f} | {b['rss_peak_mib']:.1f} → {a['rss_peak_mib']:.1f} |")
+lines+=['','CPU100% = одно логическое ядро,200% = два. RSS — максимум250мс samples после warmup, не системная RAM и не абсолютный lifetime peak. local latency harness — captured_at→delivery в одном процессе, не sensor/RTSP/network/decode→browser/persist. Production /metrics использует monotonic capture handoff.','', 'M11 request INFERENCE_THREADS=2 был перезаписан Ultralytics в1 при первом predict. M12 восстанавливает явную настройку после predictor setup; effective2 подтверждён в metadata/health. Предварительные runs `threads1-*` сравнивали requested values при одинаковом effective1 и не доказывают влияние threads.','', '## Повтор8 камер']
+for name in ['baseline-repeat-8','final-repeat-8']:
+ if name in by:
+  r=by[name];lines.append(f"- {name}: effective threads{r['effective_threads']}, total{r['fps_total']:.2f} FPS, per-camera{r['fps_per_camera']:.2f}, local p95{r['local_latency_p95_ms']:.1f}мс, CPU{r['cpu_percent_one_core']:.1f}%, sampled peak RSS{r['rss_peak_mib']:.1f}МиБ.")
+lines+=['','## ABBA: только batch-wait, adapter/config M12 одинаковы','', '| Policy | Измеренных кадров | local p50, мс | local p95, мс |', '|---|---:|---:|---:|']
+for policy,v in wait.items():lines.append(f"| {policy} | {v['frames']} | {v['local_latency_p50_ms']:.1f} | {v['local_latency_p95_ms']:.1f} |")
+lines+=['','Legacy принудительно ждёт deadline даже без другой RUNNING камеры. Current заканчивает сбор, когда все RUNNING/DEGRADED камеры уже представлены; для других камер deadline сохранён. Значения объединены по raw frames двух20с windows каждой policy, не усреднённые p95. Самостоятельные windows в evidence.json.','', '## Ограничения и данные','', 'Все raw frames/batches/samples/meta сохранены отдельно по run. Уникальный ключ frame=(camera_id,frame_id); FPS сверены независимым count, p50/p95/p99 — sorted interpolation. Пустых/duplicate keys нет. Constant warnings ожидаемы: один camera_id в1-camera run, фиксированный batch size, queue_max1 и стабильный degraded count. Никакие строки/камеры по этим предупреждениям не исключались.','', 'Capture pending queue≤1 на камеру; выбранный batch отдельно≤4. Drops — latest-frame replacements, не потерянные сохранённые события. На4/8 камерах DEGRADED ожидаем, target10 не достигнут; не скрываем уменьшением target или порога. GPU недоступен (CPU build), его загрузка/VRAM не измерялись. Реальные RTSP, accuracy, full4/8 storage-I/O, GPU, Docker/CI/Windows не проверены. Нет ONNX/TensorRT, batching policy/default4 и target10 не снижены.']
+(OUT/'REPORT.md').write_text('\n'.join(lines)+'\n')
+spec={'version':1,'form':'categorical-bars','title':'M12: выше FPS на 4/8 потоках, но ещё ниже цели','aside':'FPS на камеру · CPU-only, одинаковый статичный MP4 · 5с прогрев +20с · цель10 на камеру; не RTSP SLA','mode':'grouped','labels':['1 камера','4 камеры','8 камер'],'axis':{'zero':True},'series':[{'label':'M11','valueKind':'number','role':'base','data':[r['baseline']['fps_per_camera'] for r in primary]},{'label':'M12','valueKind':'number','role':'subject','data':[r['m12']['fps_per_camera'] for r in primary]}]}
+(OUT/'fps-chart.json').write_text(json.dumps(spec,ensure_ascii=False,indent=2))
+print(json.dumps({'runs':len(rows),'matrix':[(r['cameras'],round(r['m12']['fps_per_camera'],2)) for r in primary],'repeat8':{n:round(by[n]['fps_total'],2) for n in ['baseline-repeat-8','final-repeat-8'] if n in by},'wait_abba':wait},ensure_ascii=False))
+
+# QA REPORT.md additionally records abandoned exploratory throughput/latency/RSS tradeoffs.

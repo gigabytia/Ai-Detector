@@ -1,0 +1,237 @@
+"""Isolated real capture/YOLO/tracking/rules scheduler benchmark; no external stores."""
+
+import argparse
+import asyncio
+import hashlib
+import json
+import os
+import platform
+import time
+import uuid
+from datetime import UTC, datetime
+from pathlib import Path
+
+import psutil
+import torch
+
+from ai_detector_core.cameras.config import CameraConfig
+from ai_detector_core.cameras.source import SourceType
+from ai_detector_core.cameras.spec import CameraSpec
+from ai_detector_core.ports.clock import SystemClock
+from vision_worker.cameras.file_source import FileFrameSource
+from vision_worker.cameras.manager import CameraManager
+from vision_worker.cameras.reconnect import BackoffPolicy
+from vision_worker.cameras.session import CameraSession
+from vision_worker.inference.adapters.ultralytics import UltralyticsPersonDetector
+from vision_worker.pipeline.preview import PreviewHub
+from vision_worker.pipeline.scheduler import InferenceScheduler
+
+
+def parse_args():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--cameras", type=int, choices=[1, 2, 4, 8], default=1)
+    p.add_argument("--source", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--label", default="benchmark")
+    p.add_argument("--threads", type=int, default=2)
+    p.add_argument("--batch", type=int, default=4)
+    p.add_argument("--wait", type=float, default=20)
+    p.add_argument("--fps", type=float, default=10)
+    p.add_argument("--warmup", type=float, default=5)
+    p.add_argument("--duration", type=float, default=20)
+    p.add_argument("--preview", action="store_true")
+    p.add_argument(
+        "--legacy-batch-wait",
+        action="store_true",
+        help="Ablation only: emulate M11 wait policy, not a worker setting",
+    )
+    a = p.parse_args()
+    for name, low, high in [
+        ("threads", 1, 64),
+        ("batch", 1, 32),
+        ("wait", 0, 1000),
+        ("fps", 1, 30),
+        ("warmup", 1, 60),
+        ("duration", 1, 300),
+    ]:
+        if not low <= getattr(a, name) <= high:
+            p.error(f"{name} must be in [{low}, {high}]")
+    if not Path(a.source).is_file():
+        p.error("source video file does not exist")
+    a.source_sha256 = hashlib.sha256(Path(a.source).read_bytes()).hexdigest()
+    Path(a.out).mkdir(parents=True, exist_ok=True)
+    if (Path(a.out) / "meta.json").exists():
+        p.error("refuse to overwrite a completed run")
+    return a
+
+
+async def main(a):
+    out = Path(a.out)
+    frames = []
+    batches = []
+    samples = []
+    record = False
+    start = 0.0
+    proc = psutil.Process()
+    detector = UltralyticsPersonDetector(
+        Path("models/person-detector/manifest.yaml"), "cpu", 0.45, a.threads
+    )
+
+    class Detector:
+        def detect(self, values, confidence):
+            t = time.perf_counter()
+            result = detector.detect(values, confidence)
+            if record:
+                batches.append(
+                    {
+                        "elapsed_s": time.perf_counter() - start,
+                        "size": len(values),
+                        "duration_ms": (time.perf_counter() - t) * 1000,
+                    }
+                )
+            return result
+
+    class Session(CameraSession):
+        def record_result(self, result):
+            super().record_result(result)
+            if record:
+                frames.append(
+                    {
+                        "elapsed_s": time.perf_counter() - start,
+                        "camera_id": str(self.camera_id),
+                        "frame_id": result.frame.frame_id,
+                        "local_latency_ms": max(
+                            0, (datetime.now(UTC) - result.frame.captured_at).total_seconds() * 1000
+                        ),
+                        "amortized_inference_ms": result.inference_ms,
+                        "tracks": len(result.tracks),
+                    }
+                )
+
+    def factory(spec):
+        return Session(
+            spec, FileFrameSource(Path(a.source)), BackoffPolicy(1, 30), "benchmark", SystemClock()
+        )
+
+    manager = CameraManager(factory)
+    preview = PreviewHub()
+    scheduler = InferenceScheduler(manager, Detector(), preview, a.batch, a.wait)
+    if a.legacy_batch_wait:
+        scheduler.can_fill_batch = lambda _items: True
+    specs = [
+        CameraSpec(
+            id=uuid.UUID(int=i + 1),
+            name=f"benchmark-{i + 1}",
+            source_type=SourceType.FILE,
+            source_url="file://benchmark.mp4",
+            enabled=True,
+            config=CameraConfig(target_fps=a.fps),
+        )
+        for i in range(a.cameras)
+    ]
+    stop = asyncio.Event()
+    task = None
+    try:
+        await manager.reconcile(specs)
+        if a.preview:
+            for spec in specs:
+                preview.subscribe(spec.id)
+        task = asyncio.create_task(scheduler.run(stop))
+        await asyncio.sleep(a.warmup)
+        dropped0 = {str(s.camera_id): s.buffer.dropped for s in manager.sessions}
+        cpu0 = proc.cpu_times()
+        record = True
+        start = time.perf_counter()
+        while time.perf_counter() - start < a.duration:
+            await asyncio.sleep(0.25)
+            now = time.perf_counter()
+            cpu = proc.cpu_times()
+            statuses = [s.status() for s in manager.sessions]
+            # Compatibility for replay against M11 sources; production uses public depth in M12.
+            depths = []
+            for s in manager.sessions:
+                if hasattr(s.buffer, "depth"):
+                    depths.append(s.buffer.depth)
+                else:
+                    with s.buffer._lock:
+                        depths.append(int(s.buffer._frame is not None))
+            samples.append(
+                {
+                    "elapsed_s": now - start,
+                    "cpu_seconds": cpu.user + cpu.system - cpu0.user - cpu0.system,
+                    "rss_bytes": proc.memory_info().rss,
+                    "capture_queue_depth": sum(depths),
+                    "queue_max_per_camera": max(depths),
+                    "processed_frames": len(frames),
+                    "dropped_delta": sum(
+                        x.dropped_frames - dropped0[str(x.camera_id)] for x in statuses
+                    ),
+                    "degraded_cameras": sum(x.status.value == "DEGRADED" for x in statuses),
+                }
+            )
+            if task.done():
+                task.result()
+                raise RuntimeError("scheduler exited unexpectedly")
+        duration = time.perf_counter() - start
+        record = False
+        meta = {
+            "recorded_at": datetime.now(UTC).isoformat(),
+            "label": a.label,
+            "cameras": a.cameras,
+            "threads": a.threads,
+            "effective_torch_threads": torch.get_num_threads(),
+            "batch_limit": a.batch,
+            "max_wait_ms": a.wait,
+            "target_fps": a.fps,
+            "warmup_s": a.warmup,
+            "duration_s": duration,
+            "preview": a.preview,
+            "legacy_batch_wait": a.legacy_batch_wait,
+            "source_sha256": a.source_sha256,
+            "model_sha256": detector.manifest.sha256,
+            "model": detector.manifest.name,
+            "input_size": detector.manifest.input_size,
+            "device": detector.device,
+            "gpu_available": torch.cuda.is_available(),
+            "cpu_count": os.cpu_count(),
+            "python": platform.python_version(),
+            "torch": torch.__version__,
+            "opencv_threads": __import__("cv2").getNumThreads(),
+            "host": platform.platform(),
+            "scope": (
+                "isolated file capture + real YOLO + ByteTrack + scene engine + optional preview; "
+                "no API/Redis/DB/events storage/analytics I/O"
+            ),
+            "processed_frames": len(frames),
+            "frame_counts": {
+                str(s.id): sum(f["camera_id"] == str(s.id) for f in frames) for s in specs
+            },
+        }
+        (out / "meta.json").write_text(json.dumps(meta, indent=2))
+        for name, data in [("frames", frames), ("batches", batches), ("samples", samples)]:
+            (out / f"{name}.jsonl").write_text("".join(json.dumps(row) + "\n" for row in data))
+        print(
+            json.dumps(
+                {
+                    "label": a.label,
+                    "cameras": a.cameras,
+                    "fps_total": len(frames) / duration,
+                    "fps_per_camera": len(frames) / duration / a.cameras,
+                    "cpu_percent": 100 * samples[-1]["cpu_seconds"] / samples[-1]["elapsed_s"],
+                    "rss_mib": samples[-1]["rss_bytes"] / 2**20,
+                }
+            )
+        )
+    finally:
+        record = False
+        stop.set()
+        try:
+            if task:
+                await task
+        finally:
+            await manager.stop_all()
+            await preview.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main(parse_args()))

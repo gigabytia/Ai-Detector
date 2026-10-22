@@ -184,3 +184,7 @@ EventRead/DomainEvent теперь принимают `PERSON_LOITERING_IN_DANGE
 `GET /api/v1/events` дополнен optional `event_type`, `start`, `end` (aware ISO8601). Те же camera_id/status/type/time predicates в `GET /api/v1/events/export`. [start,end), start<end, invalid/naive/date order→422. Export без pagination: все matching persisted rows, включая archived camera и FP если не отфильтрованы. Header-only200 при пустом наборе.
 
 Success `text/csv; charset=utf-8`, attachment events.csv, private no-store/nosniff, UTF8 BOM/comma/CRLF, UTC Z и19 columns. Формулы текста получают защитный апостроф; multiline RFC-style quoting. Не содержит source credentials/storage_key/JPEG; snapshot_id nullable. До50000rows/20MiB, overflow422 EXPORT_TOO_LARGE без attachment; SQL timeout15с/PG error503 JSON до download. Не stream partial CSV, codec off event loop. Общие filters snapshot at click; live-pending не включены. Подробности ADR-038.
+
+## M12 — measured performance
+
+Worker M12: `/metrics` (отдельный worker port), Prometheus local data/no network I/O; `/health/ready.detector.inference_threads` сообщает actual count. Backend OpenAPI/storage не менялись.

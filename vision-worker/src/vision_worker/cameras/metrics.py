@@ -3,6 +3,7 @@
 import time
 from collections import deque
 from collections.abc import Callable
+from dataclasses import dataclass
 
 WINDOW_SECONDS = 2.0
 
@@ -22,3 +23,11 @@ class RateMeter:
             return 0.0
         span = recent[-1] - recent[0]
         return (len(recent) - 1) / span if span > 0 else 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class CameraPerformance:
+    processed_frames: int
+    active_tracks: int
+    result_age_seconds: float | None
+    local_latency_seconds: float | None

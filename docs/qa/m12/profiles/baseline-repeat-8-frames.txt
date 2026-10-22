@@ -1,0 +1,15 @@
+## /data/raw/m12/baseline-repeat-8/frames.jsonl
+
+- Shape: 312 rows x 6 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 312 | 0.07287 → 20.1, mean 10.12 |
+| camera_id | text | 100% | 8 | top: 00000000-0000-0000-0000-000000000001 (39), 00000000-0000-0000-0000-000000000002 (39), 00000000-0000-0000-0000-000000000003 (39), 00000000-0000-0000-0000-000000000004 (39), 00000000-0000-0000-0000-000000000005 (39) |
+| frame_id | number | 100% | 102 | 72 → 373, mean 223.1 |
+| local_latency_ms | number | 100% | 310 | 251.4 → 373.6, mean 295.4 |
+| amortized_inference_ms | number | 100% | 78 | 61.13 → 76.74, mean 64.43 |
+| tracks | number | 100% | 2 | 0 → 4, mean 3.59 |
+

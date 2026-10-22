@@ -21,6 +21,9 @@ class Frame:
     # Durable scene generation: unlike a one-frame flag, survives latest-frame dropping.
     source_epoch: int = 0
 
+    # Local capture handoff clock, not source PTS or wall clock; never serialized.
+    captured_monotonic: float | None = None
+
     @property
     def size(self) -> tuple[int, int]:
         height, width = self.image.shape[:2]

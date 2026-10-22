@@ -1,0 +1,5 @@
+preflight OK 79ms: /data/analysis/m12/.fps-14292-921ddd0c_notion_agent_chart.html
+fragment: /data/analysis/m12/fps_notion_agent_chart.html
+colorMap: {"M11":"yellow","M12":"brown"}
+build record: form=categorical-bars series=2 card=0d2f0f1261eee4fc575ee016d2c123534da072a0eb2045d789ef7ffd178ad652
+canonical artifact ready for upload; follow the card's bounded-review rule when applicable

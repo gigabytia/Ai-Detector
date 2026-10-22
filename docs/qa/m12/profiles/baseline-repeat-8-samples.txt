@@ -1,0 +1,21 @@
+## /data/raw/m12/baseline-repeat-8/samples.jsonl
+
+- Shape: 80 rows x 8 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s, cpu_seconds, dropped_delta
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 80 | 0.2503 → 20.12, mean 10.19 |
+| cpu_seconds | number | 100% | 80 | 0.3 → 24.01, mean 12.13 |
+| rss_bytes | number | 100% | 63 | 790,732,800 → 823,664,640, mean 8.143e+08 |
+| capture_queue_depth | number | 100% | 4 | 4 → 8, mean 7.45 |
+| queue_max_per_camera | number | 100% | 1 | 1 → 1, mean 1 |
+| processed_frames | number | 100% | 78 | 4 → 312, mean 157.3 |
+| dropped_delta | number | 100% | 80 | 27 → 2,107, mean 1,066 |
+| degraded_cameras | number | 100% | 3 | 2 → 8, mean 7.875 |
+
+**Warnings:**
+
+- ⚠️ `queue_max_per_camera` is constant
+

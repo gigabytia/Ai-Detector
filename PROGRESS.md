@@ -4,11 +4,25 @@
 
 ## Текущий этап
 
-**Milestone 11 — loitering и CSV: выполнен.** Следующий — M12: измерения и оптимизация. Настоящая полная `.git` M4 → M5 → M6 → M7 → M8 → M9 → M10 → M11, без git init. База M10 `1f01891`, автор Kostya. Обновление — UPDATE_MILESTONE_11.md. Результаты прежних этапов ниже исторические.
+**Milestone 12 — measurements/optimization: выполнен в CPU-среде.** База M11 `0a0aafd`, автор Kostya, настоящая `.git` M4 → … → M11 → M12. Без git init. Обновление — UPDATE_MILESTONE_12.md. GPU/реальные RTSP/длительный4/8 end-to-end не проверены; дальнейшая оптимизация только после этих измерений. Предыдущие разделы исторические.
 
 Реализация заново восстановлена на базе присланного архива Milestone 3 после утраты предыдущего рабочего окружения. Это не побайтовое восстановление незавершённой сессии: использованы сохранённые архитектурные документы, ADR и доступный контекст. Исходный `AI_DETECTOR_v2_MASTER_PROMPT.md` в архиве отсутствовал.
 
-## Milestone 11 — результат текущей сессии
+## Milestone 12 — результат текущей сессии
+
+База полный M11 `0a0aafd`, история/веса сохранены. Всего19 benchmark runs: initial baseline, tuning, исправления по замерам, repeats/ABBA; no speculative ONNX/TensorRT.
+
+- Найден и исправлен reset `torch.set_num_threads`: Ultralytics CPU setup при первом predict перезаписывал request2 в actual1. После warmup настройка восстановлена, actual2 доступен в worker readiness и detector_info metric. Unit регрессии1/2/8 и реальный repeat на коде M11 подтверждают диагноз. Значение default2 сохранено, но CPU consumption реально увеличивается.
+- Scheduler не ждёт недостижимый batch: по одному frame/camera; если все RUNNING/DEGRADED камеры уже выбраны, сбор заканчивается. Deadline20мс для других running камер, fair rotation/latest-only/target sampling/stop-stale guard сохранены. ABBA при одинаковом adapter2: local p50 legacy105.4→current93.3мс, p95134.7→125.2мс (по raw frames2×20с на policy), не обещание фиксированных20мс.
+- Worker `/metrics`: standard process CPU/RSS, cumulative whole-call real/scripted detector и local monotonic latency histograms, batch size/wait/inflight, processed/errors/stale/generated alarm counters, live-camera gauges/FPS/depth/drops/tracks/result age, RAM outboxes/drops/health и cached heartbeat. С bounded labels, удалением stale camera children, no network I/O/PG на scrape. Не full observability platform: backend false-positive operator counter/GPU utilization/Redis backlog не выдуманы. prometheus-client0.26.0 frozen.
+- Portable isolated benchmark CLI с source/model SHA, requested/effective threads, timings, resource samples, frame keys/counts, validation1..300с и no overwrite. RAW/единый evidence/independent numeric checks/report/chart в docs/qa/m12. Main matrix1/4/8: FPS/камера M11 9.61/3.63/1.84 → M12 9.76/5.81/3.00; local p95161.8/360.1/344.7 →114.0/238.0/234.3мс. Repeat8:15.51→23.24FPS total, CPU119.4→171.9% одного core. Short static-video CPU test, не RTSP SLA; цель10/камеру на4/8 не достигнута.
+- Проверки: **254 Python unit,41 integration,129 frontend**, strict mypy172, Ruff174, linters/types/build Node24.15.0, alembic no diff/lock/OpenAPI match/production audit0. Compose mappings static only. Живой3-camera YOLO+mock: actual2, entry/loiter→CSV/history/JPEG,24 scrapes за12с Redis outage, processing продолжается, queue peak48, drops0, оба Streams0 после восстановления.
+
+Shutdown worker1.01с/API с SSE3.16с,6 финальных sessions/оба Streams0 и5 JPEG после worker stop; CLI smoke/invalid args PASS. Доказательства и ограничения — docs/qa/m12/README.md. Frontend логика не менялась, browser/UI/visual QA M11 не заявляется повторно. ECharts chunk warning и dev audit4high прежние. Auth нет; trusted network. RAM/AOF/crash/snapshot/analytics retention ограничения M7–M11 сохраняются. GPU utilization/VRAM/CUDA, ONNX/TensorRT, real RTSP/moving accuracy, длительный4/8 full storage I/O, Docker/CI/Windows не проверены. Source MP4 runtime исключён из архива; exact rerun требует те же байты, любые другие clips — отдельный эксперимент.
+
+Следующие работы: длительная end-to-end нагрузка/реальные потоки на целевом CPU/GPU и проверка deployment/security; не обещать throughput до измерений.
+
+## Milestone 11 — результат предыдущей сессии
 
 База — полный M10 `1f01891` (Kostya); Git не пересоздавался. В новом архиве настоящая `.git`, исходники, веса, QA и инструкция обновления.
 

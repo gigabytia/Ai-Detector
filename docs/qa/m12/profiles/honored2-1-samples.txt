@@ -1,0 +1,21 @@
+## /data/raw/m12/honored2-1/samples.jsonl
+
+- Shape: 80 rows x 8 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s, cpu_seconds, processed_frames, dropped_delta
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 80 | 0.2503 → 20.08, mean 10.17 |
+| cpu_seconds | number | 100% | 80 | 0.2 → 16.11, mean 8.242 |
+| rss_bytes | number | 100% | 57 | 552,120,320 → 561,131,520, mean 5.574e+08 |
+| capture_queue_depth | number | 100% | 2 | 0 → 1, mean 0.6375 |
+| queue_max_per_camera | number | 100% | 2 | 0 → 1, mean 0.6375 |
+| processed_frames | number | 100% | 80 | 2 → 196, mean 98.89 |
+| dropped_delta | number | 100% | 80 | 2 → 106, mean 53.86 |
+| degraded_cameras | number | 100% | 1 | 0 → 0, mean 0 |
+
+**Warnings:**
+
+- ⚠️ `degraded_cameras` is constant
+

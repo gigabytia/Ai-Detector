@@ -161,3 +161,7 @@ Collector вызывается на event loop после проверки ак�
 ## M11: loitering и CSV
 
 Matched inside source timestamps → existing ZoneEngine Visit → strict threshold once → DomainEvent/LoiteringMetadata → existing event outbox/live/ingest/JPEG → UI history/detail/dashboard. LOST/outside/gap reset observed timer, не создаёт фиктивной непрерывности. CSV использует те же SQL predicates, что history, не live buffer или loaded page; complete bounded bytes после query/codec, потом200 attachment. Ошибка до200 остаётся JSON. См. ADR-038.
+
+## M12 — measured performance
+
+M12: capture source.read → frame.captured_monotonic → latest buffer0/1 → fair selected batch≤4 → detector whole-call timer → result delivery/local latency histogram. Это локальная граница, не sensor-to-browser и не DB commit. Метрики не меняют event/snapshot/analytics wire format.

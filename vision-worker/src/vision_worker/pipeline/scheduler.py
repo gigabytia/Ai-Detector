@@ -5,7 +5,7 @@ import logging
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from uuid import UUID
 
 from ai_detector_core.cameras.source import SourceType
@@ -19,6 +19,7 @@ from vision_worker.inference.adapters.scripted import ScriptedPersonDetector
 from vision_worker.inference.detector import PersonDetector
 from vision_worker.messaging.events import EventPublisher
 from vision_worker.pipeline.analytics import AnalyticsCollector
+from vision_worker.pipeline.metrics import PipelineMetrics
 from vision_worker.pipeline.preview import PreviewHub
 from vision_worker.pipeline.results import DetectionResult
 from vision_worker.pipeline.telemetry import TelemetryHub
@@ -35,6 +36,7 @@ class WorkItem:
     frame: Frame
     confidence: float
     spec: CameraSpec | None = None
+    selected_monotonic: float = field(default_factory=time.monotonic)
 
 
 class InferenceScheduler:
@@ -52,6 +54,7 @@ class InferenceScheduler:
         snapshots: SnapshotWriter | None = None,
         analytics: AnalyticsCollector | None = None,
     ) -> None:
+        self.metrics = PipelineMetrics()
         self._analytics = analytics
         self._snapshots = snapshots
         self._events = events
@@ -101,6 +104,20 @@ class InferenceScheduler:
                 break
         return items
 
+    def can_fill_batch(self, items: list[WorkItem]) -> bool:
+        """Never wait for another frame from a camera already represented in this batch.
+
+        Keep the configured deadline for other running cameras, including ones not due yet.
+        Reconnecting/starting cameras cannot supply a batch member until RUNNING.
+        """
+        selected = {item.session.camera_id for item in items}
+        return any(
+            isinstance(session, CameraSession)
+            and session.state in (CameraStatus.RUNNING, CameraStatus.DEGRADED)
+            and session.camera_id not in selected
+            for session in self._manager.sessions
+        )
+
     def _infer(self, items: list[WorkItem]) -> list[DetectionResult | Exception]:
         results: list[DetectionResult | Exception] = [RuntimeError("unprocessed frame")] * len(
             items
@@ -116,7 +133,8 @@ class InferenceScheduler:
                 )
                 if len(output) != len(real):
                     raise ValueError("detector returned an invalid batch size")
-                elapsed = (time.perf_counter() - started) * 1000 / len(real)
+                duration = time.perf_counter() - started
+                elapsed = duration * 1000 / len(real)
                 for i, detections in zip(real, output, strict=True):
                     item = items[i]
                     results[i] = DetectionResult(
@@ -130,6 +148,9 @@ class InferenceScheduler:
                 logger.exception("inference batch failed")
                 for i in real:
                     results[i] = exc
+            finally:
+                self.metrics.detector_call.labels("real").observe(time.perf_counter() - started)
+                self.metrics.batch_size.labels("real").observe(len(real))
         for i, item in enumerate(items):
             if i in real:
                 continue
@@ -139,12 +160,15 @@ class InferenceScheduler:
                     self._scripted[scenario] = ScriptedPersonDetector(load_scenario(scenario))
                 started = time.perf_counter()
                 detections = self._scripted[scenario].detect([item.frame], item.confidence)[0]
+                duration = time.perf_counter() - started
+                self.metrics.detector_call.labels("scripted").observe(duration)
+                self.metrics.batch_size.labels("scripted").observe(1)
                 results[i] = DetectionResult(
                     item.session.camera_id,
                     item.session.run_id,
                     item.frame,
                     tuple(detections),
-                    (time.perf_counter() - started) * 1000,
+                    duration * 1000,
                 )
             except Exception as exc:
                 logger.exception("scripted detection failed")
@@ -217,9 +241,11 @@ class InferenceScheduler:
                 if not items:
                     await asyncio.sleep(0.005)
                     continue
+                self.metrics.inflight.set(len(items))
                 deadline = time.monotonic() + self._max_wait
                 while (
                     len(items) < self._batch_size
+                    and self.can_fill_batch(items)
                     and time.monotonic() < deadline
                     and not stop.is_set()
                 ):
@@ -231,9 +257,14 @@ class InferenceScheduler:
                     )
                 if stop.is_set():
                     break
+                self.metrics.inflight.set(len(items))
+                self.metrics.batch_wait.observe(
+                    max(0, time.monotonic() - min(i.selected_monotonic for i in items))
+                )
                 results = await asyncio.get_running_loop().run_in_executor(
                     self._pool, self._process, items
                 )
+                self.metrics.inflight.set(0)
                 if stop.is_set():
                     break  # publisher may already be flushing; do not enqueue after shutdown
                 active = {s.run_id for s in self._manager.sessions if isinstance(s, CameraSession)}
@@ -242,11 +273,14 @@ class InferenceScheduler:
                         CameraStatus.RUNNING,
                         CameraStatus.DEGRADED,
                     ):
+                        self.metrics.stale.inc()
                         continue  # restart/stop happened during inference: discard obsolete results
                     if isinstance(result, Exception):
+                        self.metrics.errors.inc()
                         item.session.record_inference_error(result)
                     else:
                         for event in result.events:
+                            self.metrics.events.labels(event.type).inc()
                             if self._snapshots is not None:
                                 spec = item.spec if item.spec is not None else item.session.spec
                                 self._snapshots.offer(
@@ -270,6 +304,10 @@ class InferenceScheduler:
                         if self._analytics is not None:
                             self._analytics.offer(result)
                         item.session.record_result(result)
+                        self.metrics.processed.inc()
+                        captured = result.frame.captured_monotonic
+                        if captured is not None:
+                            self.metrics.local_latency.observe(max(0, time.monotonic() - captured))
                         self._preview.offer(result)
                         if self._telemetry is not None:
                             self._telemetry.offer(result)
@@ -277,6 +315,7 @@ class InferenceScheduler:
             self.healthy = False
             raise
         finally:
+            self.metrics.inflight.set(0)
             await asyncio.get_running_loop().run_in_executor(self._pool, self._retain, set())
             if self._analytics is not None:
                 self._analytics.retain(set())

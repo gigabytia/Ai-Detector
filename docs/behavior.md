@@ -155,3 +155,7 @@ People sampled1Hz latest, max не frame peak, mean не frame weighted. Missing
 LOITERING_THRESHOLD_SECONDS=10 в API, camera override nullable0..3600; worker SEVERITY_LOITERING=warning. Strict source duration>threshold, entry dwell включён, но outside/LOST/backward/gap>2с сбрасывает непрерывный таймер. Fired visit сохраняется до confirmed exit, затем cooldown/re-entry. Не меняет M6 entry/grace или PersonState. Подробнее ADR-038.
 
 CSV current camera/status/type/aware [start,end) filters, весь persisted набор, не page50/live-pending. All-time либо UI fixed1ч/24ч/7д+refresh. 50000rows/20MiB cap→422 без truncation, DB/timeout→503 без download. UTC/UTF8BOM/comma/CRLF, formula mitigation; native Excel import не проверен.
+
+## M12 — measured performance
+
+M12: восстановить INFERENCE_THREADS после одноразового Ultralytics warmup; default2 теперь реальный. Batch не ждёт других frames той же камеры, но сохраняет deadline для остальных RUNNING/DEGRADED. Local monotonic handoff clock только для performance, source timestamps правил не меняются.

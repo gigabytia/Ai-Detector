@@ -9,9 +9,10 @@ from datetime import datetime
 
 from ai_detector_core.cameras.spec import CameraSpec
 from ai_detector_core.cameras.status import CameraRuntimeStatus, CameraStatus
+from ai_detector_core.people.track import PersonState
 from ai_detector_core.ports.clock import Clock
 from vision_worker.cameras.lifecycle import CameraLifecycle
-from vision_worker.cameras.metrics import RateMeter
+from vision_worker.cameras.metrics import CameraPerformance, RateMeter
 from vision_worker.cameras.reconnect import Backoff, BackoffPolicy
 from vision_worker.cameras.source import FrameSource, SourceFatalError, SourceUnavailableError
 from vision_worker.pipeline.frame_buffer import LatestFrameBuffer
@@ -45,6 +46,9 @@ class CameraSession:
         self._rate = RateMeter()
         self._processed_rate = RateMeter()
         self._result: DetectionResult | None = None
+        self._processed_total = 0
+        self._result_monotonic: float | None = None
+        self._local_latency: float | None = None
         self._inference_error: str | None = None
         self._low_fps_since: float | None = None
         self._lock = threading.Lock()
@@ -64,9 +68,28 @@ class CameraSession:
     def record_result(self, result: DetectionResult) -> None:
         with self._lock:
             self._result = result
+            self._processed_total += 1
+            self._result_monotonic = time.monotonic()
+            captured = result.frame.captured_monotonic
+            self._local_latency = (
+                max(0, self._result_monotonic - captured) if captured is not None else None
+            )
             self._processed_rate.tick()
             self._inference_error = None
         self.check_performance()
+
+    def performance(self) -> CameraPerformance:
+        with self._lock:
+            return CameraPerformance(
+                self._processed_total,
+                sum(t.state != PersonState.LOST for t in self._result.tracks)
+                if self._result
+                else 0,
+                max(0, time.monotonic() - self._result_monotonic)
+                if self._result_monotonic is not None
+                else None,
+                self._local_latency,
+            )
 
     def record_inference_error(self, error: Exception) -> None:
         with self._lock:
@@ -157,7 +180,9 @@ class CameraSession:
         while not self._stop.is_set() and (frame := self._source.read()) is not None:
             if first or frame.discontinuity:
                 self._source_epoch += 1
-            frame = replace(frame, source_epoch=self._source_epoch)
+            frame = replace(
+                frame, source_epoch=self._source_epoch, captured_monotonic=time.monotonic()
+            )
             if first:
                 first = False
                 self._backoff.reset()

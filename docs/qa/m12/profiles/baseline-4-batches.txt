@@ -1,0 +1,16 @@
+## /data/raw/m12/baseline-4/batches.jsonl
+
+- Shape: 73 rows x 3 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s, duration_ms
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 73 | 0.1182 → 20.06, mean 10.34 |
+| size | number | 100% | 1 | 4 → 4, mean 4 |
+| duration_ms | number | 100% | 73 | 245.8 → 313.5, mean 274.8 |
+
+**Warnings:**
+
+- ⚠️ `size` is constant
+

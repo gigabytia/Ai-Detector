@@ -1,0 +1,16 @@
+## /data/raw/m12/wait-legacy-1/batches.jsonl
+
+- Shape: 196 rows x 3 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s, duration_ms
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 196 | 0.03401 → 20.07, mean 10.05 |
+| size | number | 100% | 1 | 1 → 1, mean 1 |
+| duration_ms | number | 100% | 196 | 43.12 → 76.28, mean 48.63 |
+
+**Warnings:**
+
+- ⚠️ `size` is constant
+

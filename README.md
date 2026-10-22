@@ -2,7 +2,7 @@
 
 Система видеонаблюдения: детекция и трекинг **людей**, события входа в опасную зону, пересечения линии и долгого нахождения в зоне, интерфейс оператора.
 
-**Статус:** Milestone 11 завершён — loitering и CSV-экспорт с общими фильтрами журнала, в дополнение к YOLO/ByteTrack, зонам/линиям, SSE/истории, снимкам и dashboard/timeline. Следующий — M12: измерения и оптимизация. Обновление — [UPDATE_MILESTONE_11.md](UPDATE_MILESTONE_11.md), проверки — [PROGRESS.md](PROGRESS.md).
+**Статус:** Milestone 12 завершён в CPU-среде: reproducible benchmark CLI, Prometheus /metrics, исправлено применение inference threads и лишнее ожидание batch. M11 loitering/CSV и предыдущая pipeline сохранены. GPU/реальные RTSP/длительная end-to-end нагрузка не проверены. Обновление — [UPDATE_MILESTONE_12.md](UPDATE_MILESTONE_12.md), проверки — [PROGRESS.md](PROGRESS.md), [измерения](docs/qa/m12/REPORT.md).
 
 ## Архитектура
 
@@ -68,3 +68,11 @@ Focus камеры → редактор первой линии, две точк
 Непрерывное наблюдение человека внутри danger zone **дольше10с** даёт одно `PERSON_LOITERING_IN_DANGER_ZONE` на подтверждённый визит, warning по умолчанию. Настройки камеры → «Порог долгого нахождения» (пусто = API default `LOITERING_THRESHOLD_SECONDS=10`); worker `SEVERITY_LOITERING=warning`. Подтверждение входа входит в длительность. Любой наблюдаемый выход/LOST/gap>2с сбрасывает непрерывный таймер; короткий выход в пределах grace не перевооружает уже сработавший визит. Новый alarm возможен после подтверждённого выхода и повторного захода. Это правило наблюдений, не физическая идентификация.
 
 «События» → камера / статус / тип / период → **«Скачать CSV»**. Выгружаются все сохранённые строки по фильтрам, не только загруженная страница; live-pending не включены. Всё время либо фиксированные1ч/24ч/7д, «Обновить период» сдвигает окно. CSV UTF-8 BOM, comma/CRLF, UTC ISO8601, quoted multiline fields, mitigation формул префиксом апострофа. Лимит50000 строк/20МиБ: при превышении422 с предложением сузить фильтры, **без молчаливого обрезания**. При отказе БД503/JSON, не файл ошибки. Семантика/ограничения — [ADR-038](docs/decisions/ADR-038-loitering-csv.md).
+
+## Производительность M12
+
+`GET http://localhost:8001/metrics` — worker-local Prometheus, без PG/Redis I/O на scrape; только доверенная сеть. Whole-call detector latency отдельно от прежнего amortized inference_ms; local frame latency — monotonic capture handoff→delivery, не sensor-to-browser. FPS/capture buffer/outbox depth/active tracks/health/CPU/RSS — [docs/metrics.md](docs/metrics.md).
+
+`uv run python benchmarks/pipeline.py --source /path/to/video.mp4 --cameras 8 --threads 2 --batch 4 --duration 20 --out /tmp/benchmark-8` — isolated pipeline, no storage I/O; не менять label/clip/железо при сравнении. Выводит meta+frames/batches/samples JSONL; повторный completed out не перезаписывает. Для native Windows заменить пути. Exact runtime QA MP4 не вложен, source SHA есть в raw meta.
+
+INFERENCE_THREADS теперь восстанавливается после Ultralytics predictor warmup. Старое значение2 фактически могло быть перезаписано library default1: это исправление может повысить CPU consumption. Не применять tuning вслепую. INFERENCE_BATCH_SIZE4 и maxwait20 сохранены; если все RUNNING камеры уже в batch, лишнее ожидание не выполняется.

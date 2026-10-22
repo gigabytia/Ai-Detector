@@ -1,0 +1,15 @@
+## /data/raw/m12/optimized-8/frames.jsonl
+
+- Shape: 272 rows x 6 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 272 | 0.06914 → 20.1, mean 9.79 |
+| camera_id | text | 100% | 8 | top: 00000000-0000-0000-0000-000000000005 (34), 00000000-0000-0000-0000-000000000006 (34), 00000000-0000-0000-0000-000000000007 (34), 00000000-0000-0000-0000-000000000008 (34), 00000000-0000-0000-0000-000000000001 (34) |
+| frame_id | number | 100% | 96 | 72 → 373, mean 217.6 |
+| local_latency_ms | number | 100% | 271 | 251 → 441.1, mean 333.7 |
+| amortized_inference_ms | number | 100% | 68 | 62.14 → 95.09, mean 73.85 |
+| tracks | number | 100% | 2 | 0 → 4, mean 3.529 |
+

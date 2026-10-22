@@ -1,0 +1,15 @@
+## /data/raw/m12/final-repeat-8/frames.jsonl
+
+- Shape: 468 rows x 6 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): elapsed_s
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| elapsed_s | number | 100% | 468 | 0.05455 → 19.99, mean 10.09 |
+| camera_id | text | 100% | 8 | top: 00000000-0000-0000-0000-000000000001 (59), 00000000-0000-0000-0000-000000000002 (59), 00000000-0000-0000-0000-000000000003 (59), 00000000-0000-0000-0000-000000000004 (59), 00000000-0000-0000-0000-000000000005 (58) |
+| frame_id | number | 100% | 153 | 74 → 373, mean 224 |
+| local_latency_ms | number | 100% | 467 | 151.8 → 318.8, mean 206 |
+| amortized_inference_ms | number | 100% | 117 | 36.59 → 62.04, mean 42.33 |
+| tracks | number | 100% | 2 | 0 → 4, mean 3.726 |
+
