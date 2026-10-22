@@ -18,3 +18,8 @@
 # Preserve the accepted CSV fixture byte-for-byte (BOM + CRLF).
 /docs/qa/m13/raw/events.csv -text
 /docs/qa/m13/*.log -whitespace
+
+# Preserve raw QA log whitespace; not source-code style errors.
+/docs/qa/m14/*.log -whitespace
+
+/start.cmd text eol=crlf

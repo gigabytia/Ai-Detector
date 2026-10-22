@@ -10,6 +10,10 @@
 
 `make` не обязателен: у каждой команды есть эквивалент для PowerShell. Команды одинаковые в PowerShell, bash и cmd, кроме копирования файла.
 
+## Автоматический локальный запуск (M14)
+
+Windows: `.\start.cmd` из корня — см. [START_WINDOWS.md](../START_WINDOWS.md). Python launcher также запускается на Linux: `uv run --no-project --python 3.12 python scripts/dev.py`. Он использует frozen dependencies, проверяет реальные PG/Redis, сохраняет existing .env, seeding только пустой таблицы cameras и owner-only process cleanup. Docker не эмулируется: для своих уже запущенных локальных серверов есть `--no-infra`.
+
 ## Первый запуск без Docker для приложений (Windows и Linux)
 
 ```powershell
@@ -73,7 +77,7 @@ docker compose --profile media up    # + MediaMTX (Уровень 3)
 | `make frontend` | `npm --prefix frontend run dev` |
 | `make test` | `uv run pytest; npm --prefix frontend test` |
 | `make test-integration` | `uv run pytest -m integration` (нужны запущенные PostgreSQL и Redis) |
-| `make lint` | `uv run ruff check .; uv run ruff format --check .; uv run mypy shared/src backend/src vision-worker/src tests; npm --prefix frontend run lint; npm --prefix frontend run format:check; npm --prefix frontend run typecheck` |
+| `make lint` | `uv run ruff check .; uv run ruff format --check .; uv run mypy shared/src backend/src vision-worker/src tests scripts; npm --prefix frontend run lint; npm --prefix frontend run format:check; npm --prefix frontend run typecheck` |
 | `make fmt` | `uv run ruff check --fix .; uv run ruff format .; npm --prefix frontend run format` |
 | `make api-types` | `uv run ai-detector-openapi frontend/openapi.json; npm --prefix frontend run api:types` |
 | `make build` | `npm --prefix frontend run build` |
@@ -155,3 +159,5 @@ npm --prefix frontend test
 Исторические упоминания Redis DB13 выше **не означают достаточную изоляцию**: Pub/Sub общие для всех logical DB. Используйте отдельный Redis **instance/port**, а не только номер DB, и отдельную одноразовую PostgreSQL БД. Тесты очищают таблицы и Redis DB13 тестового instance. Не запускайте их параллельно с рабочим API/worker на том же Redis process. Fault-скрипты из QA останавливают только выделенные тестовые сервисы.
 
 M13 добавляет regression tests конкурентного лимита камер, пустого source update, токена с не-ASCII, cursor types, streamed upload cap и закрытия spool, CSV batch/caps/concurrency, snapshot burst/byte budget, UI ошибок proxy/storage. Команды прежние: `make check`; затем на изолированных сервисах `uv run pytest -m integration`. См. `docs/qa/m13/README.md`.
+
+M14 toolchain regression command: `npm --prefix frontend run test:toolchain`; включён в `make test/check`. Проверки launcher/preflight входят в Python unit suite.

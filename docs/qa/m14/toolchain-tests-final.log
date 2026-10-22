@@ -1,0 +1,19 @@
+
+> ai-detector-frontend@0.1.0 test:toolchain
+> node --test scripts/check-toolchain.test.mjs
+
+✔ coherent pins work from another cwd and a path with spaces (36.137225ms)
+✔ old Vue config is rejected (28.30145ms)
+✔ ESLint9 instead of the tested ESLint10 is rejected (30.537938ms)
+✔ lock resolved version mismatch is rejected (28.809342ms)
+✔ lock root declaration mismatch is rejected (28.51309ms)
+✔ legacy peer bypass is rejected (30.810245ms)
+✔ force bypass is rejected (28.145039ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 267.482512

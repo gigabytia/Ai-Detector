@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     database_url: PostgresDsn = PostgresDsn(
         "postgresql+asyncpg://ai_detector:ai_detector@localhost:5432/ai_detector"
     )
-    redis_url: RedisDsn = RedisDsn("redis://localhost:6379/0")
+    redis_url: RedisDsn = RedisDsn("redis://127.0.0.1:6379/0")
 
     api_host: str = "127.0.0.1"
     api_port: int = Field(default=8000, ge=1, le=65535)

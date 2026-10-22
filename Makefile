@@ -35,6 +35,7 @@ frontend:
 test:
 	uv run pytest
 	npm --prefix frontend test
+	npm --prefix frontend run test:toolchain
 
 test-integration: migrate
 	uv run pytest -m integration
@@ -42,7 +43,7 @@ test-integration: migrate
 lint:
 	uv run ruff check .
 	uv run ruff format --check .
-	uv run mypy shared/src backend/src vision-worker/src tests
+	uv run mypy shared/src backend/src vision-worker/src tests scripts
 	npm --prefix frontend run lint
 	npm --prefix frontend run format:check
 	npm --prefix frontend run typecheck

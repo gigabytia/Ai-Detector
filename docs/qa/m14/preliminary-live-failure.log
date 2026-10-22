@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/data/m14/live_check.py", line 29, in <module>
+    run=subprocess.run([str(R/'.venv/bin/python'),str(R/'scripts/dev.py'),'--no-infra','--skip-install','--setup-only'],cwd=P,env=env,capture_output=True,text=True,timeout=60);(P/'second-setup.log').write_text(run.stdout+run.stderr);assert run.returncode==0;assert 'Keeping existing cameras/zones unchanged' in run.stdout
+                                                                                                                                                                                                                                                ^^^^^^^^^^^^^^^^^
+AssertionError

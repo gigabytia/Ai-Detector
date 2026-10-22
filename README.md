@@ -2,13 +2,21 @@
 
 Система видеонаблюдения: детекция и трекинг **людей**, события входа в опасную зону, пересечения линии и долгого нахождения в зоне, интерфейс оператора.
 
-**Статус:** **Milestone 13 — финальный доступный аудит и исправления.** База M12 `ac41f76`, автор Kostya, настоящая исходная `.git` сохранена. 265 unit +46 integration +134 frontend, linters/strict types/build, empty-DB migration roundtrip/lock/OpenAPI, production browser28 checks, CSV50000 rows/concurrency/caps, full CPU file pipeline4×180с/8×300с, Redis/PG outages и cold backup/restore проверены. Найденные quota/upload/CSV/snapshot/dependency/deploy дефекты исправлены. Подробности и доказательства — [docs/AUDIT_REPORT.md](docs/AUDIT_REPORT.md), [QA](docs/qa/m13/README.md). **Public/shared production NO-GO:** operator auth нет, target RTSP/GPU/Docker/Windows/24h и10FPS/camera не подтверждены. Обновление — [UPDATE_MILESTONE_13.md](UPDATE_MILESTONE_13.md). Предыдущие этапы ниже исторические.
+**Статус:** M14 — воспроизводимый локальный запуск и защита от конфликтов npm поверх проверенного M13. На Windows: [START_WINDOWS.md](START_WINDOWS.md), команда `.\start.cmd` из корня. Нужны uv, поддерживаемый Node и запущенный Docker Desktop. `.env`/данные не включены в архив и не перезаписываются. [Обновление](UPDATE_MILESTONE_14.md), [QA](docs/qa/m14/README.md). Production gates M13 остаются открытыми: [аудит](docs/AUDIT_REPORT.md).
 
 ## Архитектура
 
 Frontend (Vue 3) ↔ API (FastAPI) ↔ PostgreSQL / Redis ↔ Vision worker. Inference — только в worker'е. Подробно: [architecture.md](docs/architecture.md), [data-flow.md](docs/data-flow.md), [database.md](docs/database.md), [behavior.md](docs/behavior.md), [решения](docs/decisions/README.md).
 
 ## Быстрый старт
+
+**Windows, рекомендованный путь:** после установки prerequisites запустите из корня:
+
+```powershell
+.\start.cmd
+```
+
+Он сам выполнит frozen install, поднимет/проверит инфраструктуру и запустит три приложения. URL после READY: http://localhost:5173. Подробности и сохранение старых данных — [START_WINDOWS.md](START_WINDOWS.md). Ниже остаётся ручной путь.
 
 ```powershell
 Copy-Item .env.example .env        # bash: cp .env.example .env

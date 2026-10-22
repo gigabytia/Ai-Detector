@@ -1,0 +1,27 @@
+Toolchain PASS: supported Node; coherent pinned ESLint trio (/data/m14/source/Ai-Detector/frontend/).
+Keeping existing .env unchanged.
+Checked 89 packages in 0.52ms
+
+> ai-detector-frontend@0.1.0 preinstall
+> node scripts/check-toolchain.mjs
+
+Toolchain PASS: supported Node; coherent pinned ESLint trio (/data/m14/source/Ai-Detector/frontend/).
+
+added 368 packages, and audited 369 packages in 4s
+
+103 packages are looking for funding
+  run `npm fund` for details
+
+4 high severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+Redis PING + PostgreSQL SELECT 1: PASS
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+Keeping existing cameras/zones unchanged; no automatic seed.
+Redis PING + PostgreSQL SELECT 1: PASS
+/data/m14/source/Ai-Detector/models/person-detector/yolo26n.pt
+Setup PASS. Local databases remain running; no app processes started.

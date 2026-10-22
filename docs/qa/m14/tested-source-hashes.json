@@ -1,0 +1,14 @@
+{
+  ".env.example": "4e79743475c4484e4ba5896705f060acc76a8b4597a032690a67657a78937f00",
+  "backend/src/app/core/config.py": "2f8ff9b4673750b52c3eb1ae1000c4ef6a66289738999dc9f7360c1982216f76",
+  "vision-worker/src/vision_worker/config.py": "208486b37475c5f7ec769cdbdff66e062f91cb2a530e8a8cef99e1fb53b96265",
+  "frontend/package.json": "90241171e677f4a81046df6e958ea1038778f67ad8102964dcca431c9ba67457",
+  "frontend/package-lock.json": "22adc86296f3b0f453d7eb3246444f12aaff24e0e65ec4032d4d7251505dfbaf",
+  "frontend/.npmrc": "df3e638639e5ac7702e8110ef64c2cf959461353f7edf234ec5ec48cb5fa64d4",
+  "frontend/scripts/check-toolchain.mjs": "92844ce3e9791e654c859b4c3ba599af47fef17d91c6b90f4ed789e1660b5019",
+  "frontend/scripts/check-toolchain.test.mjs": "7b226da58086ef84aa3cd01bfb03b258e9d8ba056d5ccf245b7e6b1db0a0afdf",
+  "scripts/dev.py": "7b5ff5eb14e1341e0ce4221aeab385c04b593acb0b5fe9f4aa312f578b57e243",
+  "scripts/dev_check.py": "b95cc3bec2b6a97c1b2f967bc7bfcef2390a055f4a6a2effba00ed5b32a525bf",
+  "start.cmd": "273b9d79c1d38c0bf013b330de5d1121189be7a83ec7d703991a24f0b95b3d1d",
+  "Makefile": "db65efc72e5745a9af3681a2a035f8bb64274ecaefc83f65e27b2d5198daa78f"
+}

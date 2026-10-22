@@ -14,7 +14,7 @@ class WorkerSettings(BaseSettings):
 
     app_env: Literal["development", "test", "production"] = "development"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
-    redis_url: RedisDsn = RedisDsn("redis://localhost:6379/0")
+    redis_url: RedisDsn = RedisDsn("redis://127.0.0.1:6379/0")
 
     # Stable id across restarts of the same deployment; hostname is unique per container.
     worker_id: str = Field(default_factory=socket.gethostname, min_length=1, max_length=128)

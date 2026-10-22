@@ -1,0 +1,9 @@
+Toolchain PASS: supported Node; coherent pinned ESLint trio (/data/m14/source/Ai-Detector/frontend/).
+Keeping existing .env unchanged.
+Redis PING + PostgreSQL SELECT 1: PASS
+Keeping existing cameras/zones unchanged; no automatic seed.
+Redis PING + PostgreSQL SELECT 1: PASS
+/data/m14/source/Ai-Detector/models/person-detector/yolo26n.pt
+Setup PASS. Local databases remain running; no app processes started.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.

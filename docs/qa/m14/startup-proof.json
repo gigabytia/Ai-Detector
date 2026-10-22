@@ -1,0 +1,11 @@
+{
+  "pass": true,
+  "scope": "Linux real native local PG/Valkey, subprocess launcher from a different cwd; Windows branch unit-tested, not an actual Windows OS or Docker run",
+  "api_worker_frontend_ready": true,
+  "fresh_db_demo_cameras": 2,
+  "zones_events_jpeg": true,
+  "existing_env_byte_unchanged": true,
+  "ctrl_c_exit_zero": true,
+  "owned_ports_closed": true,
+  "second_setup_no_seed": true
+}

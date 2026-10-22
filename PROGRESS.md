@@ -4,11 +4,11 @@
 
 ## Текущий этап
 
-**Milestone 13 — финальный доступный аудит и исправления.** База M12 `ac41f76`, автор Kostya, настоящая исходная `.git` сохранена. 265 unit +46 integration +134 frontend, linters/strict types/build, empty-DB migration roundtrip/lock/OpenAPI, production browser28 checks, CSV50000 rows/concurrency/caps, full CPU file pipeline4×180с/8×300с, Redis/PG outages и cold backup/restore проверены. Найденные quota/upload/CSV/snapshot/dependency/deploy дефекты исправлены. Подробности и доказательства — [docs/AUDIT_REPORT.md](docs/AUDIT_REPORT.md), [QA](docs/qa/m13/README.md). **Public/shared production NO-GO:** operator auth нет, target RTSP/GPU/Docker/Windows/24h и10FPS/camera не подтверждены. Обновление — [UPDATE_MILESTONE_13.md](UPDATE_MILESTONE_13.md). Предыдущие этапы ниже исторические.
+**Milestone 14 — локальный запуск после распаковки.** База полный M13 c76adca, настоящая Git-история и веса сохранены. Fixed npm lint trio/lock, preinstall guard/strict engines, IPv4 Redis defaults, start.cmd → Python launcher с frozen installs, infrastructure/protocol preflight, migration/model checks, empty-only demo seed, readiness/logs/owned-process shutdown. START_WINDOWS.md и UPDATE_MILESTONE_14.md. Existing .env/data не перезаписывать/не паковать. QA в docs/qa/m14; Windows-native/контейнерный запуск не заявлять. Production NO-GO M13 сохраняется. Ниже этапы исторические.
 
 Реализация заново восстановлена на базе присланного архива Milestone 3 после утраты предыдущего рабочего окружения. Это не побайтовое восстановление незавершённой сессии: использованы сохранённые архитектурные документы, ADR и доступный контекст. Исходный `AI_DETECTOR_v2_MASTER_PROMPT.md` в архиве отсутствовал.
 
-## Milestone 13 — результат текущей сессии
+## Milestone 13 — результат предыдущей сессии
 
 4832 persisted events /4832 snapshots после controlled shutdown; SQL/CSV/dashboard ID sets согласованы, both Streams0. Выявленные проблемы и принятые решения — ADR-040. БД migration не добавлена, head b6b7cfcd87c5. Фактический scope и все незакрытые production gates см. AUDIT_REPORT: auth/target capacity/dependencies/licenses/durability не маскируются успешными тестами. Не пересоздавать Git, не включать private env/runtime/DB/video в архив.
 
