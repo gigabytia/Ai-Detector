@@ -149,3 +149,7 @@ REST зоны → PostgreSQL commit → camera.changed → internal CameraSpec (
 ## Реализованный поток M8
 
 DetectionResult.frame (без рисования) → bounded SnapshotWriter → JPEG/storage.put → EventMessage(snapshot?) → существующий RAM-outbox/Lua XADD+PUBLISH → ingest event+snapshot в одной DB-транзакции → ACK/XDEL. Pub/sub содержит только DomainEvent, не storage_key. При ошибке optional capture — обычное событие. Browser получает URL по REST, не файл из Stream/SSE. Retention удаляет файл, затем metadata, сохраняя events; orphan scan по mtime старше retention window. Очереди JPEG (4) и event outbox (1000+inflight) имеют разные ограничения.
+
+## Реализованный поток M9
+
+CRUD линии → hot CAMERA_CHANGED/reconcile → CameraSpec.lines. После tracking/ZoneEngine LineEngine вычисляет signed side по anchor и finite segment, emit только подтверждённую смену знака вне hysteresis. События обоих типов объединяются в одном DetectionResult; preview JPEG/bbox/lines синхронны. Дальше прежние snapshot/outbox → Redis Stream/pubsub → transactional ingest + SSE + REST. Метаданные line_name/P1/P2/direction являются историческим снимком, текущая lines не перерисовывает прошлое событие. Удаление линии обнуляет FK, не удаляет alarm/JPEG. Покадрового persistence/analytics нет.

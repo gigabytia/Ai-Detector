@@ -139,3 +139,7 @@ OUTSIDE ──anchor внутри──► ENTERING ──внутри ≥ dwell
 ## Реализованная граница M8
 
 Снимки и event detail реализованы согласно ADR-015/035: один полный JPEG без графики, bbox/anchor overlay Vue (polygon snapshot пока не сохраняется). `SNAPSHOT_ENABLED=true` API default, per-camera inherit/on/off; `SNAPSHOT_PATH=data/snapshots` общий API/worker; `SNAPSHOT_RETENTION_DAYS=30` (1…3650), `SNAPSHOT_CLEANUP_INTERVAL_SECONDS=3600` (10…86400). Snapshot failure не блокирует inference/само событие. История M7 сохраняется и без файла. Строки выше про неготовый snapshot относятся к историческим границам M6/M7. Линии/loitering/analytics по-прежнему не реализованы.
+
+## Граница реализации M9
+
+Правила §5 реализованы LineEngine (ADR-036): конечный отрезок, projection текущего anchor при подтверждении, оба signed направления, hysteresis, LOST freeze/recovery, bounded confidence window, wall-clock cooldown отдельно от зоны. Crossing — событие, не состояние PersonTrack. Линии hot CRUD и историческая геометрия в event detail доступны; loitering, dashboard и аналитика пока нет.

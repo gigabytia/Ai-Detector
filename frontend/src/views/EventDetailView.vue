@@ -48,6 +48,23 @@ const cameraName = computed(
     <EventSnapshot :event="event" />
     <div class="min-w-0 space-y-4">
       <EventCard :event="event" :camera-name="cameraName" detail />
+      <div
+        v-if="event.type === 'PERSON_CROSSED_LINE'"
+        class="bg-card space-y-2 rounded-lg border p-4 text-sm"
+      >
+        <p class="font-semibold">{{ t('lines.crossed') }}</p>
+        <p class="break-words">{{ event.metadata.line_name }}</p>
+        <p>
+          {{
+            t(
+              event.metadata.direction === 'LEFT_TO_RIGHT'
+                ? 'lines.negativePositive'
+                : 'lines.positiveNegative',
+            )
+          }}
+        </p>
+        <p class="text-muted-foreground text-xs">{{ t('lines.directionHint') }}</p>
+      </div>
       <dl class="bg-card space-y-3 rounded-lg border p-4 text-xs">
         <div>
           <dt class="text-muted-foreground">{{ t('snapshots.eventId') }}</dt>

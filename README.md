@@ -2,7 +2,7 @@
 
 Система видеонаблюдения: детекция и трекинг **людей**, события входа в опасную зону, пересечения линии и долгого нахождения в зоне, интерфейс оператора.
 
-**Статус:** Milestone 8 завершён — YOLO/ByteTrack, опасные зоны, event bus/история/SSE, операторские статусы и исходные снимки событий с экраном деталей. Снимки optional, retention по умолчанию 30 дней; история событий сохраняется. Следующий — Milestone 9 (линия/crossing). Обновление — [UPDATE_MILESTONE_8.md](UPDATE_MILESTONE_8.md), проверки — [PROGRESS.md](PROGRESS.md).
+**Статус:** Milestone 9 завершён — YOLO/ByteTrack, опасные зоны и направленные линии, event bus/история/SSE, операторские статусы и исходные снимки с исторической геометрией. Следующий — M10 (dashboard/статистика/таймлайн). Обновление — [UPDATE_MILESTONE_9.md](UPDATE_MILESTONE_9.md), проверки — [PROGRESS.md](PROGRESS.md).
 
 ## Архитектура
 
@@ -52,3 +52,7 @@ npm --prefix frontend run dev      # терминал 3 → http://localhost:517
 ## Снимки (M8)
 
 `SNAPSHOT_PATH` — один private directory для API и worker (compose: shared volume). Камера наследует API `SNAPSHOT_ENABLED=true` либо override. На событие — один исходный JPEG; ошибка диска/перегрузка не отменяет тревогу. `SNAPSHOT_RETENTION_DAYS=30`, cleanup каждый час; файлы и metadata удаляются без удаления событий. Подробности — [ADR-035](docs/decisions/ADR-035-event-snapshots.md).
+
+## Линии (M9)
+
+Focus камеры → редактор первой линии, две точки P1 → P2 на кадре/keyboard; API поддерживает16. Оба направления, hysteresis0.01, конечный отрезок, нижний bbox anchor. LEFT_TO_RIGHT = −→+, RIGHT_TO_LEFT = +→− относительно вектора линии; не лево/право экрана. Новая линия/новая геометрия сначала получает baseline. Событие PERSON_CROSSED_LINE идёт через прежние SSE/историю/снимки; старое событие хранит своё имя и endpoints после изменения/удаления линии. Требуется PostgreSQL UTF8. Детали — [ADR-036](docs/decisions/ADR-036-line-crossing-runtime.md).

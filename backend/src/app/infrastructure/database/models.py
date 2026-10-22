@@ -99,6 +99,32 @@ class ZoneModel(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class LineModel(Base):
+    __tablename__ = "lines"
+    __table_args__ = (
+        CheckConstraint(
+            "p1_x BETWEEN 0 AND 1 AND p1_y BETWEEN 0 AND 1 "
+            "AND p2_x BETWEEN 0 AND 1 AND p2_y BETWEEN 0 AND 1",
+            name="coordinates",
+        ),
+        CheckConstraint(
+            "(p1_x-p2_x)*(p1_x-p2_x)+(p1_y-p2_y)*(p1_y-p2_y) > 1e-12", name="distinct_endpoints"
+        ),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    camera_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cameras.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(100))
+    p1_x: Mapped[float] = mapped_column(Float)
+    p1_y: Mapped[float] = mapped_column(Float)
+    p2_x: Mapped[float] = mapped_column(Float)
+    p2_y: Mapped[float] = mapped_column(Float)
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class EventModel(Base):
     __tablename__ = "events"
     __table_args__ = (
@@ -124,6 +150,9 @@ class EventModel(Base):
     detector_confidence: Mapped[float] = mapped_column(Float)
     event_confidence: Mapped[float] = mapped_column(Float)
     message: Mapped[str] = mapped_column(Text)
+    line_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("lines.id", ondelete="SET NULL")
+    )
     event_metadata: Mapped[dict[str, object]] = mapped_column("metadata", JSONB)
     note: Mapped[str | None] = mapped_column(String(2000))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { EventRead } from '@/api/events'
-import { eventGeometry } from '@/lib/eventGeometry'
+import { eventGeometry, eventLine } from '@/lib/eventGeometry'
 import { Button } from '@/components/ui/button'
 const props = defineProps<{ event: EventRead }>()
 const { t } = useI18n()
@@ -10,6 +10,9 @@ const failed = ref(false)
 const loaded = ref(false)
 const overlay = ref(true)
 const attempt = ref(0)
+const line = computed(() =>
+  props.event.type === 'PERSON_CROSSED_LINE' ? eventLine(props.event.metadata) : null,
+)
 const geometry = computed(() => eventGeometry(props.event.metadata))
 watch(
   () => [props.event.id, props.event.snapshot_url],
@@ -55,6 +58,14 @@ function retry() {
         aria-hidden="true"
         data-snapshot-overlay
       >
+        <line
+          v-if="line"
+          v-bind="line"
+          stroke="#38bdf8"
+          stroke-width="3"
+          vector-effect="non-scaling-stroke"
+          data-historic-line
+        />
         <rect
           v-if="geometry.bbox"
           v-bind="geometry.bbox"

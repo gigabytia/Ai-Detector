@@ -42,7 +42,7 @@ async def transport(
     await redis.flushdb()  # dedicated integration DB 13 only
     engine = create_async_engine(str(settings.database_url))
     async with engine.begin() as conn:
-        await conn.execute(text("TRUNCATE events, zones, camera_configs, cameras CASCADE"))
+        await conn.execute(text("TRUNCATE events, lines, zones, camera_configs, cameras CASCADE"))
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     yield redis, sessions, configured
     await redis.flushdb()
@@ -595,3 +595,157 @@ async def test_retention_lease_cannot_renew_or_release_another_owners_lock(
     assert await redis.eval(RENEW, 1, LOCK, "new-owner") == 1
     assert await redis.ttl(LOCK) >= 119
     assert await redis.eval(RELEASE, 1, LOCK, "new-owner") == 1
+
+
+async def test_line_event_snapshot_duplicate_operator_state_and_deleted_geometry(
+    transport: tuple[Redis, async_sessionmaker[AsyncSession], Settings],
+    tmp_path: Path,
+) -> None:
+    from ai_detector_core.events.domain import LineCrossMetadata
+    from ai_detector_core.events.transport import EventMessage, SnapshotMetadata
+    from ai_detector_core.storage.snapshots import LocalSnapshotStorage, snapshot_key
+    from app.infrastructure.database.models import LineModel
+
+    redis, sessions, configured = transport
+    configured = configured.model_copy(update={"snapshot_path": tmp_path})
+    base = await make_event(sessions)
+    line_id, snapshot_id = uuid4(), uuid4()
+    async with sessions() as session, session.begin():
+        session.add(
+            LineModel(
+                id=line_id,
+                camera_id=base.camera_id,
+                name="Исходная",
+                p1_x=0.2,
+                p1_y=0.5,
+                p2_x=0.8,
+                p2_y=0.5,
+                enabled=True,
+            )
+        )
+    event = DomainEvent(
+        **{
+            **base.model_dump(),
+            "type": "PERSON_CROSSED_LINE",
+            "zone_id": None,
+            "line_id": line_id,
+            "severity": "warning",
+            "metadata": LineCrossMetadata(
+                bbox=(0.4, 0.2, 0.6, 0.7),
+                anchor=(0.5, 0.7),
+                stability=1,
+                direction="LEFT_TO_RIGHT",
+                line_name="Исходная",
+                p1=(0.2, 0.5),
+                p2=(0.8, 0.5),
+            ),
+        }
+    )
+    key = snapshot_key(base.camera_id, event.occurred_at, snapshot_id)
+    storage = LocalSnapshotStorage(tmp_path)
+    storage.put(key, b"\xff\xd8image")
+    snapshot = SnapshotMetadata(
+        id=snapshot_id,
+        event_id=event.id,
+        storage_key=key,
+        width=100,
+        height=100,
+        size_bytes=7,
+        created_at=datetime.now(UTC),
+    )
+    message = EventMessage(**event.model_dump(), snapshot=snapshot)
+    publisher = EventPublisher(redis)
+    ingest = EventIngest(redis, sessions)
+    await publisher.publish(message)
+    await publisher.publish(message)
+    batch = await read_batch(ingest)
+    await ingest.process(batch)
+    app = create_app(configured)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client,
+    ):
+        url = f"/api/v1/events/{event.id}"
+        result = (await client.get(url)).json()
+        assert (
+            result["line_id"] == str(line_id)
+            and result["zone_id"] is None
+            and result["type"] == "PERSON_CROSSED_LINE"
+        )
+        assert result["metadata"]["direction"] == "LEFT_TO_RIGHT" and result["snapshot_id"] == str(
+            snapshot_id
+        )
+        assert (await client.get(result["snapshot_url"])).status_code == 200
+        assert (
+            await client.patch(url, json={"status": "FALSE_POSITIVE", "note": "проверено"})
+        ).status_code == 200
+        linepath = f"/api/v1/cameras/{base.camera_id}/lines/{line_id}"
+        assert (
+            await client.put(
+                linepath,
+                json={"name": "Изменено", "p1": {"x": 0.1, "y": 0.1}, "p2": {"x": 0.9, "y": 0.9}},
+            )
+        ).status_code == 200
+        assert (await client.delete(linepath)).status_code == 204
+        result = (await client.get(url)).json()
+        assert (
+            result["line_id"] is None
+            and result["metadata"]["line_name"] == "Исходная"
+            and result["metadata"]["p1"] == [0.2, 0.5]
+        )
+        # Replay after FK deletion preserves history/operator state and does not restore FK.
+        await ingest.process(batch)
+        result = (await client.get(url)).json()
+        assert (
+            result["line_id"] is None
+            and result["status"] == "FALSE_POSITIVE"
+            and result["note"] == "проверено"
+        )
+        assert len((await client.get("/api/v1/events")).json()["items"]) == 1
+
+
+async def test_cross_camera_line_reference_becomes_null_not_a_wrong_fk(
+    transport: tuple[Redis, async_sessionmaker[AsyncSession], Settings],
+) -> None:
+    from ai_detector_core.events.domain import LineCrossMetadata
+    from app.infrastructure.database.models import LineModel
+
+    redis, sessions, _ = transport
+    first, other = await make_event(sessions), await make_event(sessions)
+    line_id = uuid4()
+    async with sessions() as session, session.begin():
+        session.add(
+            LineModel(
+                id=line_id,
+                camera_id=other.camera_id,
+                name="other",
+                p1_x=0,
+                p1_y=0,
+                p2_x=1,
+                p2_y=1,
+                enabled=True,
+            )
+        )
+    event = DomainEvent(
+        **{
+            **first.model_dump(),
+            "type": "PERSON_CROSSED_LINE",
+            "zone_id": None,
+            "line_id": line_id,
+            "metadata": LineCrossMetadata(
+                bbox=(0, 0, 1, 1),
+                anchor=(0.5, 0.5),
+                stability=1,
+                direction="RIGHT_TO_LEFT",
+                line_name="other",
+                p1=(0, 0),
+                p2=(1, 1),
+            ),
+        }
+    )
+    await EventPublisher(redis).publish(event)
+    ingest = EventIngest(redis, sessions)
+    await ingest.process(await read_batch(ingest))
+    async with sessions() as session:
+        saved = await session.get(EventModel, event.id)
+        assert saved and saved.line_id is None and saved.type == "PERSON_CROSSED_LINE"

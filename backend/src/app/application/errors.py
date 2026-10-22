@@ -69,3 +69,10 @@ class ZoneNotFoundError(NotFoundError):
 
     def __init__(self) -> None:
         super().__init__("Zone not found")
+
+
+class LineNotFoundError(NotFoundError):
+    code = "LINE_NOT_FOUND"
+
+    def __init__(self) -> None:
+        super().__init__("Line not found")

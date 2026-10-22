@@ -37,3 +37,5 @@
 | [ADR-033](ADR-033-danger-zone-runtime.md) | Danger zone: геометрия, правила, редактор и граница M6 |
 | [ADR-034](ADR-034-event-delivery-realtime.md) | Event bus, идемпотентный ingest, SSE и WS-телеметрия |
 | [ADR-035](ADR-035-event-snapshots.md) | Снимки событий, безопасное local storage, event detail и retention |
+
+| [ADR-036](ADR-036-line-crossing-runtime.md) | Направленная линия, crossing, typed metadata и историческая геометрия |

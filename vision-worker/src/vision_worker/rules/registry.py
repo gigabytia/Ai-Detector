@@ -1,4 +1,4 @@
-"""Own zone engines on the same executor as trackers; scene generation is durable."""
+"""Own zone/line engines on the same executor as trackers; scene generation is durable."""
 
 from dataclasses import dataclass, replace
 from typing import Literal
@@ -6,6 +6,7 @@ from typing import Literal
 from ai_detector_core.cameras.config import CameraConfig
 from ai_detector_core.ports.clock import Clock, SystemClock
 from vision_worker.pipeline.results import DetectionResult
+from vision_worker.rules.line_engine import LineEngine
 from vision_worker.rules.zone_engine import ZoneEngine
 from vision_worker.tracking.registry import TrackKey
 
@@ -13,6 +14,7 @@ from vision_worker.tracking.registry import TrackKey
 @dataclass
 class Entry:
     engine: ZoneEngine
+    lines: LineEngine
     epoch: int
     size: tuple[int, int]
 
@@ -23,7 +25,10 @@ class SceneRegistry:
         clock: Clock | None = None,
         min_hits: int = 3,
         severity: Literal["critical", "warning", "info"] = "critical",
+        line_hysteresis: float = 0.01,
+        line_severity: Literal["critical", "warning", "info"] = "warning",
     ) -> None:
+        self._line_hysteresis, self._line_severity = line_hysteresis, line_severity
         self._clock = clock if clock is not None else SystemClock()
         self._min_hits = min_hits
         self._severity = severity
@@ -45,9 +50,11 @@ class SceneRegistry:
         ):
             entry = Entry(
                 ZoneEngine(self._clock, self._min_hits, self._severity),
+                LineEngine(self._clock, self._min_hits, self._line_hysteresis, self._line_severity),
                 frame.source_epoch,
                 frame.size,
             )
             self._entries[key] = entry
         tracks, events = entry.engine.update(frame, result.tracks, result.zones, config)
-        return replace(result, tracks=tracks, events=events)
+        crossings = entry.lines.update(frame, tracks, result.lines, config)
+        return replace(result, tracks=tracks, events=events + crossings)

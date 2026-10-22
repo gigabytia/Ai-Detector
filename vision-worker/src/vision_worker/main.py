@@ -76,7 +76,11 @@ def build_supervisor(settings: WorkerSettings) -> Supervisor:
             events=events,
             telemetry=telemetry,
             scenes=SceneRegistry(
-                clock, settings.event_min_track_hits, settings.severity_zone_enter
+                clock,
+                settings.event_min_track_hits,
+                settings.severity_zone_enter,
+                settings.line_hysteresis,
+                settings.severity_line_cross,
             ),
             trackers=TrackerRegistry(
                 lambda camera_id, run_id: ByteTrackPersonTracker(

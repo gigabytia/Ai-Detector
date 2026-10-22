@@ -170,3 +170,7 @@ cameras 1─1 camera_configs
 ## Реализовано в Milestone 8
 
 Миграция `48f1a410c0ce` после `14d6499b16a2`: snapshots с UUID PK, event_id UNIQUE FK CASCADE, storage_key UNIQUE varchar(200), content_type CHECK image/jpeg, positive width/height/size_bytes, UTC created_at index. CameraConfig nullable boolean snapshot_enabled. Событие и metadata пишутся одной ingest-транзакцией (ON CONFLICT DO NOTHING), файл — до доставки, не часть PostgreSQL transaction. Retention удаляет metadata только после успешного unlink/missing file; event остаётся. Повтор старше текущего retention cutoff не воскрешает metadata. Downgrade M8 удаляет snapshots/config override, но не events; физические файлы не удаляются миграцией. Не использовать downgrade как обновление.
+
+## Реализовано в Milestone 9
+
+Миграция e2c6db45c9b8 после48f1a410c0ce: lines (UUID, camera_id FK CASCADE/index, name varchar100, p1_x/p1_y/p2_x/p2_y double, enabled, UTC timestamps); CHECK 0..1 и distance²>1e-12. events.line_id nullable FK SET NULL. Лимит16/API проверяется под parent FOR UPDATE. Для line events zone_id=None, metadata JSONB хранит name/endpoints/direction/bbox/anchor/stability; геометрия не нормализуется через текущую lines при чтении истории. Ingest проверяет line ownership, после удаления ссылка null, metadata остаётся. База должна быть UTF8 для локализованных JSONB строк. Downgrade M9 удаляет lines и events.line_id, но не events/snapshots.

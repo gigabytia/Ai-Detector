@@ -1,0 +1,2 @@
+{"postgres_offline": true, "event_type": "PERSON_CROSSED_LINE", "direction": "RIGHT_TO_LEFT", "live_uuid": "c44295b0-a8fe-4881-b74c-a2026303308a", "image_written_before_ingest": true, "snapshot_id": "07d0902b-d3d9-5e15-a0c7-15cd72c66f16", "pending_patch": 409, "live_storage_key_leaked": false}
+{"postgres_recovered": true, "same_event": "c44295b0-a8fe-4881-b74c-a2026303308a", "same_snapshot": "07d0902b-d3d9-5e15-a0c7-15cd72c66f16", "same_jpeg_sha256": "30a5b171e04235971c4c11c841f0bc00fe22c683757a0560466ed28b0176ba35", "stream_backlog": 0}

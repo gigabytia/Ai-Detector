@@ -4,8 +4,9 @@ export interface LiveEvent {
   camera_id: string
   run_id: string
   track_id: number
-  zone_id: string
-  type: 'PERSON_ENTERED_DANGER_ZONE'
+  zone_id: string | null
+  line_id?: string | null
+  type: 'PERSON_ENTERED_DANGER_ZONE' | 'PERSON_CROSSED_LINE'
   severity: 'critical' | 'warning' | 'info'
   occurred_at: string
   detector_confidence: number
@@ -17,14 +18,18 @@ export function parseLiveEvent(raw: string): LiveEvent | null {
     const e = JSON.parse(raw)
     if (
       !e ||
-      !['id', 'camera_id', 'run_id', 'zone_id'].every(
-        (k) => typeof e[k] === 'string' && uuid.test(e[k]),
-      )
+      !['id', 'camera_id', 'run_id'].every((k) => typeof e[k] === 'string' && uuid.test(e[k]))
     )
       return null
     if (
-      e.type !== 'PERSON_ENTERED_DANGER_ZONE' ||
+      !['PERSON_ENTERED_DANGER_ZONE', 'PERSON_CROSSED_LINE'].includes(e.type) ||
       !['critical', 'warning', 'info'].includes(e.severity)
+    )
+      return null
+    if (
+      e.type === 'PERSON_ENTERED_DANGER_ZONE'
+        ? !uuid.test(e.zone_id ?? '') || e.line_id != null
+        : !uuid.test(e.line_id ?? '') || e.zone_id != null
     )
       return null
     if (

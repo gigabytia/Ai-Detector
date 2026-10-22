@@ -6,7 +6,12 @@ import { fetchZones, saveZone, deleteZone, type Point } from '@/api/zones'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/api/http'
 import { errorMessageKey } from '@/lib/apiErrors'
-const props = defineProps<{ cameraId: string; points: Point[]; editing: boolean }>()
+const props = defineProps<{
+  cameraId: string
+  points: Point[]
+  editing: boolean
+  blocked?: boolean
+}>()
 const emit = defineEmits<{
   'update:points': [points: Point[]]
   'update:editing': [value: boolean]
@@ -126,14 +131,18 @@ function save() {
       <template v-if="!editing">
         <p class="mt-3 text-sm">{{ zone?.name ?? t('zones.empty') }}</p>
         <div class="mt-3 flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" :disabled="mutation.isPending.value" @click="start">{{
-            t(zone ? 'zones.edit' : 'zones.create')
-          }}</Button>
+          <Button
+            size="sm"
+            variant="outline"
+            :disabled="mutation.isPending.value || blocked"
+            @click="start"
+            >{{ t(zone ? 'zones.edit' : 'zones.create') }}</Button
+          >
           <Button
             v-if="zone"
             size="sm"
             variant="outline"
-            :disabled="mutation.isPending.value"
+            :disabled="mutation.isPending.value || blocked"
             @click="confirmDelete"
             >{{ t('zones.delete') }}</Button
           >

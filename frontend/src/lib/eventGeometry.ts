@@ -19,3 +19,15 @@ export function eventGeometry(metadata: Record<string, unknown>) {
       : null
   return { bbox, anchor }
 }
+
+export function eventLine(metadata: Record<string, unknown>) {
+  const point = (v: unknown): v is [number, number] =>
+    Array.isArray(v) &&
+    v.length === 2 &&
+    v.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1)
+  const a = metadata.p1,
+    b = metadata.p2
+  return point(a) && point(b) && Math.hypot(a[0] - b[0], a[1] - b[1]) > 1e-6
+    ? { x1: a[0] * 1000, y1: a[1] * 1000, x2: b[0] * 1000, y2: b[1] * 1000 }
+    : null
+}

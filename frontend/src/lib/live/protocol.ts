@@ -21,6 +21,14 @@ export interface PreviewMetadata {
   inference_ms: number
   detections: Detection[]
   tracks?: PersonTrack[]
+  lines?: {
+    id: string
+    camera_id: string
+    name: string
+    enabled: boolean
+    p1: { x: number; y: number }
+    p2: { x: number; y: number }
+  }[]
   zones?: {
     id: string
     camera_id: string
@@ -129,6 +137,33 @@ export function parsePacket(
       )
         throw new Error('Invalid zone')
       ids.add(z.id)
+    }
+  }
+  if (m.lines !== undefined) {
+    if (!Array.isArray(m.lines) || m.lines.length > 16) throw new Error('Invalid lines')
+    const ids = new Set<string>()
+    const point = (p: { x: number; y: number }) =>
+      p &&
+      Number.isFinite(p.x) &&
+      Number.isFinite(p.y) &&
+      p.x >= 0 &&
+      p.x <= 1 &&
+      p.y >= 0 &&
+      p.y <= 1
+    for (const line of m.lines) {
+      if (
+        !line ||
+        typeof line.id !== 'string' ||
+        ids.has(line.id) ||
+        line.camera_id !== cameraId ||
+        typeof line.name !== 'string' ||
+        typeof line.enabled !== 'boolean' ||
+        !point(line.p1) ||
+        !point(line.p2) ||
+        Math.hypot(line.p2.x - line.p1.x, line.p2.y - line.p1.y) <= 1e-6
+      )
+        throw new Error('Invalid line')
+      ids.add(line.id)
     }
   }
   return { metadata: m, jpeg: new Blob([data.slice(4 + size)], { type: 'image/jpeg' }) }

@@ -1,0 +1,57 @@
+import asyncio,json,hashlib
+from pathlib import Path
+import httpx,websockets,cv2,numpy as np
+OUT=Path('/data/work-m7/Ai-Detector/docs/qa/m9');OUT.mkdir(parents=True,exist_ok=True)
+async def main():
+ async with httpx.AsyncClient(base_url='http://127.0.0.1:18000',timeout=30) as c:
+  cams=(await c.get('/api/v1/cameras')).json();cam=next(x for x in cams if x['source_type']=='mock' and x['enabled']);cid=cam['id']
+  for old in (await c.get(f'/api/v1/cameras/{cid}/lines')).json(): (await c.delete(f"/api/v1/cameras/{cid}/lines/{old['id']}")).raise_for_status()
+  body={'name':'QA M9 — направленная линия','enabled':True,'p1':{'x':.5,'y':.05},'p2':{'x':.5,'y':.98}}
+  r=await c.post(f'/api/v1/cameras/{cid}/lines',json=body);r.raise_for_status();line=r.json();lid=line['id'];path=f'/api/v1/cameras/{cid}/lines/{lid}'
+  found={};packets=[]
+  async with websockets.connect(f'ws://127.0.0.1:18001/cameras/{cid}/preview') as ws:
+   for i in range(220):
+    packet=await asyncio.wait_for(ws.recv(),8);n=int.from_bytes(packet[:4],'big');meta=json.loads(packet[4:4+n]);packets.append(meta)
+    rows=(await c.get('/api/v1/events',params={'camera_id':cid,'limit':200})).json()['items']
+    for e in rows:
+     if e['type']=='PERSON_CROSSED_LINE' and e['line_id']==lid:found[e['metadata']['direction']]=e
+    if found and any(x['id']==lid for x in meta.get('lines',[])):break
+    await asyncio.sleep(.2)
+  assert len(found)==1, list(found)
+  # walk_through goes left to right, then starts a new source epoch. Reverse
+  # endpoints to exercise the other signed direction without a fake loop crossing.
+  reversed_body={**body,'p1':body['p2'],'p2':body['p1']}
+  (await c.put(path,json=reversed_body)).raise_for_status()
+  for _ in range(120):
+   rows=(await c.get('/api/v1/events',params={'camera_id':cid,'limit':200})).json()['items']
+   for e in rows:
+    if e['type']=='PERSON_CROSSED_LINE' and e['line_id']==lid:found[e['metadata']['direction']]=e
+   if len(found)==2:break
+   await asyncio.sleep(.25)
+  assert len(found)==2, list(found)
+  assert any(any(x['id']==lid and x['p1']==body['p1'] for x in m.get('lines',[])) for m in packets)
+  selected=next(iter(found.values()));run=selected['run_id']
+  for e in found.values():
+   assert e['zone_id'] is None and e['severity']=='warning' and e['snapshot_url'] and e['metadata']['line_name']==body['name']
+   r=await c.get(e['snapshot_url']);r.raise_for_status();im=cv2.imdecode(np.frombuffer(r.content,np.uint8),cv2.IMREAD_COLOR);assert im.shape[:2]==(e['snapshot_height'],e['snapshot_width'])
+   print(json.dumps({'direction':e['metadata']['direction'],'event':e['id'],'run':e['run_id'],'snapshot':[im.shape[1],im.shape[0]],'sha256':hashlib.sha256(r.content).hexdigest()}),flush=True)
+  # Hot geometry edit: new preview uses new geometry while old event keeps its own.
+  edited={**body,'name':'QA M9 — изменённая линия','p1':{'x':.55,'y':.05},'p2':{'x':.55,'y':.98}}
+  (await c.put(path,json=edited)).raise_for_status();await asyncio.sleep(2)
+  async with websockets.connect(f'ws://127.0.0.1:18001/cameras/{cid}/preview') as ws:
+   packet=await asyncio.wait_for(ws.recv(),5);n=int.from_bytes(packet[:4],'big');meta=json.loads(packet[4:4+n]);assert any(x['id']==lid and x['p1']==edited['p1'] for x in meta['lines'])
+  old=(await c.get('/api/v1/events/'+selected['id'])).json();assert old['metadata']['p1']==[.5,.05] and old['metadata']['line_name']==body['name']
+  (await c.put(path,json={**edited,'enabled':False})).raise_for_status();await asyncio.sleep(2)
+  before={x['id'] for x in (await c.get('/api/v1/events',params={'camera_id':cid,'limit':200})).json()['items'] if x['type']=='PERSON_CROSSED_LINE'}
+  await asyncio.sleep(22)
+  after=(await c.get('/api/v1/events',params={'camera_id':cid,'limit':200})).json()['items'];assert not [x for x in after if x['type']=='PERSON_CROSSED_LINE' and x['id'] not in before]
+  (await c.put(path,json=edited)).raise_for_status()
+  newer=None
+  for _ in range(100):
+   rows=(await c.get('/api/v1/events',params={'camera_id':cid,'limit':200})).json()['items'];newer=next((e for e in rows if e['type']=='PERSON_CROSSED_LINE' and e['id'] not in before),None)
+   if newer:break
+   await asyncio.sleep(.25)
+  assert newer and newer['run_id']==run
+  (OUT/'targets.json').write_text(json.dumps({'camera':cid,'line':lid,'event':selected['id'],'new_event':newer['id'],'run':run}))
+  print(json.dumps({'hot_geometry':True,'disabled_suppressed_22s':True,'reenabled_run_preserved':run,'historical_geometry_preserved':True}),flush=True)
+asyncio.run(main())

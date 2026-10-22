@@ -1,6 +1,6 @@
 # Архитектура AI Detector v2
 
-> Реализован Milestone 8: камеры, детекция, ByteTrack, preview, зоны, event bus/история/SSE, статусы, WS-телеметрия, event snapshots/detail и snapshot retention. Линии/loitering/аналитика — позже. Целевая архитектура ниже шире реализации; актуальная граница — PROGRESS.md, ADR-034/035.
+> Реализован M9: камеры, YOLO/ByteTrack, зоны, направленные линии/crossing, event bus/история/SSE, статусы, telemetry, snapshots/detail/retention. Dashboard/loitering/аналитика — позже. Текущая граница — PROGRESS.md, ADR-034/035/036.
 
 Система видеонаблюдения: находит **людей** на видеопотоках, отслеживает их (track ID внутри камеры) и сообщает оператору о входе в опасную зону, пересечении линии и долгом нахождении в зоне. Объекты, перенос груза и pose estimation в эту версию не входят (ТЗ §2, §27).
 
@@ -223,3 +223,7 @@ class EventRule(Protocol):
 ## Добавлено в Milestone 8
 
 Shared stdlib LocalSnapshotStorage, отдельный bounded SnapshotWriter/thread pool worker, optional EventMessage snapshot, одна DB-транзакция event+metadata, UUID JPEG endpoint и event detail Vue. API retention имеет независимую maintenance task (не включена в event_delivery readiness probe), Redis lease renewal и safe ownership release. Shutdown worker дожидается capture/encode до остановки publisher. См. [ADR-035](decisions/ADR-035-event-snapshots.md).
+
+## Добавлено M9
+
+Line CRUD → CameraSpec.lines → scheduler → SceneRegistry (ZoneEngine затем LineEngine) → общий immutable DetectionResult/events → M8 SnapshotWriter → M7 outbox/ingest/SSE. Без нового потока доставки и без нового PersonState. Side/confidence/cooldown bounded активными tracks/runs; geometry/epoch reset предотвращает синтетические crossing. См. ADR-036.

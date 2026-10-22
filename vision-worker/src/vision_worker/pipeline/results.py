@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from ai_detector_core.events.domain import DomainEvent
+from ai_detector_core.lines.model import LineSpec
 from ai_detector_core.people.track import PersonTrack
 from ai_detector_core.zones.model import ZoneSpec
 from vision_worker.cameras.frame import Frame
@@ -20,3 +21,4 @@ class DetectionResult:
     tracks: tuple[PersonTrack, ...] = ()
     zones: tuple[ZoneSpec, ...] = ()
     events: tuple[DomainEvent, ...] = ()
+    lines: tuple[LineSpec, ...] = ()

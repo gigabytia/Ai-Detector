@@ -172,7 +172,9 @@ class InferenceScheduler:
                 spec = items[i].spec
                 if spec is None:
                     spec = items[i].session.spec
-                tracked = replace(result, tracks=self._trackers.update(result), zones=spec.zones)
+                tracked = replace(
+                    result, tracks=self._trackers.update(result), zones=spec.zones, lines=spec.lines
+                )
                 results[i] = self._scenes.update(tracked, spec.config)
             except Exception as exc:
                 logger.exception(
@@ -248,7 +250,7 @@ class InferenceScheduler:
                             elif self._events is not None:
                                 self._events.offer(event)
                             logger.info(
-                                "person entered danger zone",
+                                "person rule event",
                                 extra={
                                     "event_id": str(event.id),
                                     "event": event.model_dump(mode="json"),
@@ -256,7 +258,8 @@ class InferenceScheduler:
                                     "camera_id": str(event.camera_id),
                                     "run_id": str(event.run_id),
                                     "track_id": event.track_id,
-                                    "zone_id": str(event.zone_id),
+                                    "zone_id": str(event.zone_id) if event.zone_id else None,
+                                    "line_id": str(event.line_id) if event.line_id else None,
                                 },
                             )
                         item.session.record_result(result)

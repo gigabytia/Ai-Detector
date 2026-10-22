@@ -1,0 +1,137 @@
+uv run ruff check .
+All checks passed!
+uv run ruff format --check .
+159 files already formatted
+uv run mypy shared/src backend/src vision-worker/src tests
+Success: no issues found in 158 source files
+npm --prefix frontend run lint
+
+> ai-detector-frontend@0.1.0 lint
+> eslint . --max-warnings 0
+
+npm --prefix frontend run format:check
+
+> ai-detector-frontend@0.1.0 format:check
+> prettier --check src
+
+Checking formatting...
+All matched files use Prettier code style!
+npm --prefix frontend run typecheck
+
+> ai-detector-frontend@0.1.0 typecheck
+> vue-tsc --build
+
+uv run pytest
+============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.6.0
+rootdir: /data/work-m7/Ai-Detector
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.15.1, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collected 232 items / 33 deselected / 199 selected
+
+tests/unit/backend/test_camera_config.py ........                        [  4%]
+tests/unit/backend/test_camera_schemas.py ..                             [  5%]
+tests/unit/backend/test_config.py ...                                    [  6%]
+tests/unit/backend/test_system_api.py ......                             [  9%]
+tests/unit/shared/test_camera_source.py ......................           [ 20%]
+tests/unit/shared/test_json_logging.py .                                 [ 21%]
+tests/unit/shared/test_zones.py ...............                          [ 28%]
+tests/unit/test_event_transport.py ..........                            [ 33%]
+tests/unit/test_snapshots.py ..............                              [ 40%]
+tests/unit/worker/test_camera_manager.py ....                            [ 42%]
+tests/unit/worker/test_camera_session.py .......                         [ 46%]
+tests/unit/worker/test_camera_status_publisher.py ..                     [ 47%]
+tests/unit/worker/test_capture_primitives.py .........                   [ 51%]
+tests/unit/worker/test_command_listener.py ....                          [ 53%]
+tests/unit/worker/test_detection.py ................                     [ 61%]
+tests/unit/worker/test_file_source.py ....                               [ 63%]
+tests/unit/worker/test_heartbeat.py ...                                  [ 65%]
+tests/unit/worker/test_line_engine.py ......................             [ 76%]
+tests/unit/worker/test_mock_source.py .......                            [ 79%]
+tests/unit/worker/test_preview_api.py ......                             [ 82%]
+tests/unit/worker/test_tracking.py ....................                  [ 92%]
+tests/unit/worker/test_zone_engine.py ..............                     [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /data/work-m7/Ai-Detector/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================ 199 passed, 33 deselected, 1 warning in 4.07s =================
+npm --prefix frontend test
+
+> ai-detector-frontend@0.1.0 test
+> vitest run
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.3 [39m[90m/data/work-m7/Ai-Detector/frontend[39m
+
+ [32m✓[39m src/components/cameras/ZoneEditor.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 338[2mms[22m[39m
+ [32m✓[39m src/components/cameras/LineEditor.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 332[2mms[22m[39m
+ [32m✓[39m src/components/cameras/CameraConfigPanel.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 195[2mms[22m[39m
+ [32m✓[39m src/components/events/EventSnapshot.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 89[2mms[22m[39m
+ [32m✓[39m src/composables/useRealtime.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m src/stores/realtime.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/lib/live/protocol.test.ts [2m([22m[2m36 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/lib/live/source.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/stores/ui.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/composables/useCameraLive.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/api/events.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/lib/live/overlay.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/lib/eventGeometry.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/lib/live/events.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/lib/cameraStatus.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/lib/live/geometry.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/lib/systemHealth.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/lib/apiErrors.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m18 passed[39m[22m[90m (18)[39m
+[2m      Tests [22m [1m[32m115 passed[39m[22m[90m (115)[39m
+[2m   Start at [22m 08:59:53
+[2m   Duration [22m 16.30s[2m (environment 69%, import 15%, tests 7%, transform 7%, worker 1%)[22m
+
+[2mEnvironment [22m [33mjsdom was created 18 times[39m[2m · 9.91s total, 69% of tracked time[22m
+[2m            [22m [2mcreate it once per worker with [22m[33mpool: 'vmThreads'[39m[2m (keeps per-file isolation) or [22m[33misolate: false[39m[2m (shares it across files)[22m
+[2m            [22m [2mlearn more: https://vitest.dev/guide/improving-performance#test-environments[22m
+
+npm --prefix frontend run build
+
+> ai-detector-frontend@0.1.0 build
+> vue-tsc --build && vite build
+
+vite v8.3.3 building client environment for production...
+transforming...
+✓ 2751 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                              0.70 kB │ gzip:  0.36 kB
+dist/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2     10.25 kB
+dist/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2      11.23 kB
+dist/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2       18.74 kB
+dist/assets/inter-greek-wght-normal-CkhJZR-_.woff2          18.99 kB
+dist/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2   25.96 kB
+dist/assets/inter-latin-wght-normal-Dx4kXJAl.woff2          48.25 kB
+dist/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2      85.06 kB
+dist/assets/index-D6XtfyYZ.css                              48.22 kB │ gzip:  9.61 kB
+dist/assets/PageHeader-B6q_T1OK.js                           0.34 kB │ gzip:  0.28 kB
+dist/assets/AnalyticsView-XrDAjyXD.js                        0.46 kB │ gzip:  0.31 kB
+dist/assets/CamerasEmptyState-DJ7k4tc0.js                    1.09 kB │ gzip:  0.65 kB
+dist/assets/MonitoringView-DgUu_LwF.js                       2.00 kB │ gzip:  0.98 kB
+dist/assets/SettingsView-GPVK8kAT.js                         2.13 kB │ gzip:  1.04 kB
+dist/assets/createLucideIcon-Co-nIu7I.js                     2.53 kB │ gzip:  1.27 kB
+dist/assets/EventCard-DWopCT9p.js                            3.69 kB │ gzip:  1.76 kB
+dist/assets/useCameras-Bt7jHMlg.js                           4.16 kB │ gzip:  1.69 kB
+dist/assets/EventsView-CEwLmJqL.js                           4.21 kB │ gzip:  1.86 kB
+dist/assets/EventDetailView-_nlM5m9-.js                      6.26 kB │ gzip:  2.60 kB
+dist/assets/CameraStatusBadge-CzoV0hpj.js                    7.00 kB │ gzip:  2.87 kB
+dist/assets/CameraLiveView-CJ_Df0NP.js                      10.28 kB │ gzip:  4.18 kB
+dist/assets/CameraFocusView-DMF0r1Fg.js                     22.16 kB │ gzip:  5.36 kB
+dist/assets/http-DAjC4RF2.js                                23.97 kB │ gzip:  8.07 kB
+dist/assets/CamerasView-DzZ6C1AS.js                         70.67 kB │ gzip: 20.91 kB
+dist/assets/vue-i18n-Di060L66.js                           142.89 kB │ gzip: 51.93 kB
+dist/assets/index-6ih9WpMY.js                              148.15 kB │ gzip: 51.58 kB
+
+✓ built in 1.16s

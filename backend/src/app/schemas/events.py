@@ -15,7 +15,8 @@ class EventRead(BaseModel):
     run_id: UUID
     track_id: int
     zone_id: UUID | None
-    type: Literal["PERSON_ENTERED_DANGER_ZONE"]
+    line_id: UUID | None = None
+    type: Literal["PERSON_ENTERED_DANGER_ZONE", "PERSON_CROSSED_LINE"]
     severity: Literal["critical", "warning", "info"]
     status: EventStatus
     occurred_at: AwareDatetime

@@ -11,3 +11,15 @@ it('does not render malformed or reversed geometry', () => {
     expect(eventGeometry({ bbox, anchor: [Infinity, 0] })).toEqual({ bbox: null, anchor: null })
   }
 })
+
+it('validates saved line coordinates independently of bounding box', async () => {
+  const { eventLine } = await import('./eventGeometry')
+  expect(eventLine({ p1: [0.1, 0.2], p2: [0.7, 0.9] })).toEqual({
+    x1: 100,
+    y1: 200,
+    x2: 700,
+    y2: 900,
+  })
+  for (const p2 of [[NaN, 0], [2, 1], [0.1, 0.2], null])
+    expect(eventLine({ p1: [0.1, 0.2], p2 })).toBeNull()
+})

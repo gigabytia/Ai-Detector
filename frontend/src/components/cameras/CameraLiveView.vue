@@ -10,7 +10,12 @@ import { useCameraLive } from '@/composables/useCameraLive'
 import { useNow } from '@/composables/useNow'
 import { overlayPeople } from '@/lib/live/overlay'
 
-const props = defineProps<{ camera: Camera; editing?: boolean; draft?: Point[] }>()
+const props = defineProps<{
+  camera: Camera
+  editing?: boolean
+  draft?: Point[]
+  draftKind?: 'line' | 'zone'
+}>()
 const emit = defineEmits<{ point: [point: Point] }>()
 const { t } = useI18n()
 const root = ref<HTMLElement | null>(null)
@@ -120,10 +125,53 @@ onBeforeUnmount(() => cancelAnimationFrame(raf))
       preserveAspectRatio="xMidYMid meet"
       class="absolute inset-0 h-full w-full"
       :class="editing ? 'cursor-crosshair' : 'pointer-events-none'"
-      :aria-label="t('zones.canvas')"
+      :aria-label="t(draftKind === 'line' ? 'lines.canvas' : 'zones.canvas')"
       @click="addPoint"
     >
+      <defs>
+        <marker
+          :id="`line-arrow-${camera.id}`"
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="6"
+          markerHeight="6"
+          orient="auto-start-reverse"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8" />
+        </marker>
+      </defs>
       <template v-if="!editing">
+        <g v-for="line in frame.metadata.lines ?? []" :key="line.id" data-preview-line>
+          <line
+            :x1="line.p1.x * frame.image.width"
+            :y1="line.p1.y * frame.image.height"
+            :x2="line.p2.x * frame.image.width"
+            :y2="line.p2.y * frame.image.height"
+            stroke="#38bdf8"
+            stroke-width="2"
+            vector-effect="non-scaling-stroke"
+            :marker-end="`url(#line-arrow-${camera.id})`"
+          >
+            <title>{{ line.name }} (P1 → P2)</title>
+          </line>
+          <text
+            :x="line.p1.x * frame.image.width"
+            :y="line.p1.y * frame.image.height - 6"
+            fill="#38bdf8"
+            font-size="12"
+          >
+            P1
+          </text>
+          <text
+            :x="line.p2.x * frame.image.width"
+            :y="line.p2.y * frame.image.height - 6"
+            fill="#38bdf8"
+            font-size="12"
+          >
+            P2
+          </text>
+        </g>
         <polygon
           v-for="zone in frame.metadata.zones ?? []"
           :key="zone.id"
@@ -159,6 +207,16 @@ onBeforeUnmount(() => cancelAnimationFrame(raf))
           :r="frame.image.width / 150"
           fill="#fbbf24"
         />
+        <text
+          v-for="(p, i) in draftKind === 'line' ? (draft ?? []) : []"
+          :key="`label-${i}`"
+          :x="p.x * frame.image.width + 6"
+          :y="p.y * frame.image.height - 6"
+          fill="#fbbf24"
+          font-size="12"
+        >
+          P{{ i + 1 }}
+        </text>
       </template>
     </svg>
     <div

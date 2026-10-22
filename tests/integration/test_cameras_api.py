@@ -30,7 +30,9 @@ MOCK = {"name": "Склад", "source_type": "mock", "source_url": "mock://walk_
 async def _truncate(url: str) -> None:
     engine = create_async_engine(url)
     async with engine.begin() as conn:
-        await conn.execute(text("TRUNCATE snapshots, events, zones, camera_configs, cameras"))
+        await conn.execute(
+            text("TRUNCATE snapshots, events, lines, zones, camera_configs, cameras")
+        )
     await engine.dispose()
 
 
@@ -280,3 +282,67 @@ def test_zone_timing_overrides_persist_and_resolve(client: TestClient) -> None:
         assert client.put(url, json={key: -1}).status_code == 422
     reset = client.put(url, json={}).json()
     assert reset["effective"] == reset["defaults"]
+
+
+def test_line_crud_scope_validation_worker_spec_and_delete(
+    client: TestClient, commands: redis.client.PubSub
+) -> None:
+    camera = client.post("/api/v1/cameras", json=MOCK).json()["id"]
+    other = client.post("/api/v1/cameras", json={**MOCK, "name": "Другая"}).json()["id"]
+    path = f"/api/v1/cameras/{camera}/lines"
+    shape = {
+        "name": "Проход",
+        "p1": {"x": 0.2, "y": 0.5},
+        "p2": {"x": 0.8, "y": 0.5},
+        "enabled": True,
+    }
+    assert client.get(path).json() == []
+    for bad in [
+        {**shape, "p2": shape["p1"]},
+        {**shape, "p1": {"x": -1, "y": 0}},
+        {**shape, "name": ""},
+    ]:
+        assert client.post(path, json=bad).status_code == 422
+    created = client.post(path, json=shape)
+    assert created.status_code == 201
+    line = created.json()
+    lid = line["id"]
+    assert line["p1"] == shape["p1"] and line["p2"] == shape["p2"] and line["camera_id"] == camera
+    # drain any camera notifications; assert the line save is represented.
+    import time
+
+    deadline = time.monotonic() + 2
+    found = False
+    while time.monotonic() < deadline:
+        message = commands.get_message(timeout=0.1)
+        if message:
+            value = json.loads(message["data"])
+            if value.get("type") == "camera.changed" and value.get("camera_id") == camera:
+                found = True
+                break
+    assert found
+    assert client.put(f"/api/v1/cameras/{other}/lines/{lid}", json=shape).status_code == 404
+    assert client.delete(f"/api/v1/cameras/{other}/lines/{lid}").status_code == 404
+    updated = client.put(f"{path}/{lid}", json={**shape, "enabled": False, "name": "Выход"})
+    assert updated.status_code == 200 and not updated.json()["enabled"]
+    spec = client.get(f"/api/v1/internal/worker/cameras/{camera}", headers=AUTH)
+    assert spec.status_code == 200 and spec.json()["lines"][0]["id"] == lid
+    assert (
+        spec.json()["lines"][0]["name"] == "Выход" and spec.json()["lines"][0]["enabled"] is False
+    )
+    assert client.delete(f"{path}/{lid}").status_code == 204
+    assert client.get(path).json() == []
+    assert client.delete(f"{path}/{lid}").status_code == 404
+    assert client.delete(f"/api/v1/cameras/{camera}").status_code == 204
+    assert client.post(path, json=shape).status_code == 404
+
+
+def test_line_limit_is_per_camera(client: TestClient) -> None:
+    camera = client.post("/api/v1/cameras", json=MOCK).json()["id"]
+    path = f"/api/v1/cameras/{camera}/lines"
+    shape = {"name": "линия", "p1": {"x": 0, "y": 0}, "p2": {"x": 1, "y": 1}}
+    for _ in range(16):
+        assert client.post(path, json=shape).status_code == 201
+    assert client.post(path, json=shape).status_code == 422
+    first = client.get(path).json()[0]["id"]
+    assert client.put(path + "/" + first, json={**shape, "enabled": False}).status_code == 200

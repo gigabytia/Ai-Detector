@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
 import type { Point } from '@/api/zones'
+import LineEditor from '@/components/cameras/LineEditor.vue'
 import ZoneEditor from '@/components/cameras/ZoneEditor.vue'
 import CameraTelemetry from '@/components/cameras/CameraTelemetry.vue'
 import CameraConfigPanel from '@/components/cameras/CameraConfigPanel.vue'
@@ -19,16 +20,24 @@ const route = useRoute()
 const { data: cameras, isPending, isError } = useCameras()
 const camera = computed(() => cameras.value?.find((c) => c.id === route.params.cameraId))
 const { action } = useCameraMutations()
+const lineEditing = ref(false)
+const linePoints = ref<Point[]>([])
 const editing = ref(false)
 const points = ref<Point[]>([])
 watch(
   () => route.params.cameraId,
   () => {
+    lineEditing.value = false
+    linePoints.value = []
     editing.value = false
     points.value = []
   },
 )
 function addPoint(point: Point) {
+  if (lineEditing.value) {
+    if (linePoints.value.length < 2) linePoints.value = [...linePoints.value, point]
+    return
+  }
   if (points.value.length < 64) points.value = [...points.value, point]
 }
 </script>
@@ -51,8 +60,9 @@ function addPoint(point: Point) {
       <CameraLiveView
         :key="camera.id"
         :camera="camera"
-        :editing="editing"
-        :draft="points"
+        :editing="editing || lineEditing"
+        :draft="lineEditing ? linePoints : points"
+        :draft-kind="lineEditing ? 'line' : 'zone'"
         @point="addPoint"
       />
       <div class="space-y-4 p-4">
@@ -77,7 +87,15 @@ function addPoint(point: Point) {
         :key="camera.id"
         v-model:editing="editing"
         v-model:points="points"
+        :blocked="lineEditing"
         :camera-id="camera.id"
+      />
+      <LineEditor
+        :key="camera.id"
+        v-model:editing="lineEditing"
+        v-model:points="linePoints"
+        :camera-id="camera.id"
+        :blocked="editing"
       />
       <CameraConfigPanel :key="camera.id" :camera-id="camera.id" />
     </aside>

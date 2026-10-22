@@ -40,3 +40,16 @@ it('shows an explicit placeholder for old/disabled events and resets on navigati
   await wrapper.setProps({ event })
   expect(wrapper.get('img').attributes('src')).toBe(event.snapshot_url)
 })
+
+it('uses saved line geometry, even when current camera geometry changes', async () => {
+  const wrapper = render({
+    ...event,
+    type: 'PERSON_CROSSED_LINE',
+    metadata: { ...event.metadata, p1: [0.2, 0.5], p2: [0.8, 0.5], direction: 'LEFT_TO_RIGHT' },
+  })
+  await wrapper.get('img').trigger('load')
+  const line = wrapper.get('[data-historic-line]')
+  expect(line.attributes('x1')).toBe('200')
+  expect(line.attributes('x2')).toBe('800')
+  expect(line.attributes('y1')).toBe('500')
+})

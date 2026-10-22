@@ -52,7 +52,9 @@ async function save(next?: 'ACKNOWLEDGED' | 'FALSE_POSITIVE') {
   <article class="bg-card space-y-3 rounded-lg border p-4" :data-event-id="event.id">
     <div class="flex flex-wrap items-start justify-between gap-2">
       <div class="min-w-0">
-        <p class="text-sm font-semibold">{{ t('events.entered') }}</p>
+        <p class="text-sm font-semibold">
+          {{ t(event.type === 'PERSON_CROSSED_LINE' ? 'lines.crossed' : 'events.entered') }}
+        </p>
         <RouterLink
           :to="`/monitoring/${event.camera_id}`"
           class="text-muted-foreground text-sm break-words underline"

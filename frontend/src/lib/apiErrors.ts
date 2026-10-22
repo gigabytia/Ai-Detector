@@ -3,6 +3,7 @@ import { ApiError } from '@/api/http'
 const KNOWN_CODES = new Set([
   'CAMERA_NOT_FOUND',
   'ZONE_NOT_FOUND',
+  'LINE_NOT_FOUND',
   'CAMERA_ALREADY_EXISTS',
   'CAMERA_LIMIT_REACHED',
   'INVALID_CAMERA_SOURCE',

@@ -39,6 +39,7 @@ def encode_packet(result: DetectionResult, max_width: int) -> bytes:
             "height": height,
             "inference_ms": result.inference_ms,
             "zones": [z.model_dump(mode="json") for z in result.zones if z.enabled],
+            "lines": [line.model_dump(mode="json") for line in result.lines if line.enabled],
             "tracks": [
                 {
                     "track_id": t.track_id,

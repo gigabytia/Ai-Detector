@@ -1,0 +1,3 @@
+{"direction": "RIGHT_TO_LEFT", "event": "6d790ec8-05a0-47e4-ac5a-6a2523991038", "run": "41ea50ce-5f16-4d49-86ea-df6687cf1b10", "snapshot": [1280, 720], "sha256": "f7a3f482388db475ca36c830fa65c91f92b2c2c609b5599a2d62648d5cc4ac68"}
+{"direction": "LEFT_TO_RIGHT", "event": "b85a73b4-f877-4cef-8672-9ef07e3364c6", "run": "41ea50ce-5f16-4d49-86ea-df6687cf1b10", "snapshot": [1280, 720], "sha256": "f7a3f482388db475ca36c830fa65c91f92b2c2c609b5599a2d62648d5cc4ac68"}
+{"hot_geometry": true, "disabled_suppressed_22s": true, "reenabled_run_preserved": "41ea50ce-5f16-4d49-86ea-df6687cf1b10", "historical_geometry_preserved": true}

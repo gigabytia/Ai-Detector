@@ -158,3 +158,12 @@ Worker readiness дополнительно учитывает publisher/backpre
 * `/events/:eventId` — frontend route, не новый event API. Poll раз в 5 с, retry и заглушка для image failure. Исторический overlay использует bbox/anchor event.metadata, не current camera zones; оригинальный JPEG не изменяется.
 
 Авторизации пока нет: API и storage доступны только в доверенной локальной сети; HTTPS/reverse-proxy/доступ к источникам настраивает оператор.
+
+## Направленные линии (Milestone 9)
+
+* GET/POST `/api/v1/cameras/{camera_id}/lines` → list/201 LineRead.
+* PUT/DELETE `/api/v1/cameras/{camera_id}/lines/{line_id}` → LineRead/204; чужая/несуществующая ссылка404 LINE_NOT_FOUND, отсутствующая/soft-deleted камера404, invalid/limit422.
+* Body LineShape: `{name, enabled:true, p1:{x,y}, p2:{x,y}}`. name trim1..100, finite coords0..1, distance>1e-6; максимум16. LineRead добавляет id/camera_id/created_at/updated_at. PUT полная замена shape, не PATCH.
+* Internal CameraSpec.lines добавлен с default пустым tuple, preview metadata.lines — enabled lines из того же результата; старые preview без lines принимаются.
+* DomainEvent.type дополнен PERSON_CROSSED_LINE, line_id добавлен nullable. Zone payload требует zone_id и zone metadata, line payload — line_id/zone_id=null и LineCrossMetadata. Последний содержит bbox/anchor/stability, direction LEFT_TO_RIGHT (−→+) либо RIGHT_TO_LEFT (+→−), line_name, p1/p2 как пары [x,y]. Направление относительно P1→P2, не экрана.
+* EventRead допускает null FK после удаления shape, сохраняет исторические metadata. Новых REST type filters нет; camera/status/pagination и PATCH status/note прежние. SSE type тот же event.created с новым domain type, private storage_key не раскрывается. Snapshot API/optional поля не меняются.

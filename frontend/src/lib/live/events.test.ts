@@ -43,3 +43,10 @@ describe('selected camera telemetry', () => {
   it('rejects invalid count', () =>
     expect(parseTelemetry(JSON.stringify({ ...value, persons: -1 }), id)).toBeNull())
 })
+
+it('accepts line crossing with line reference and rejects mixed/wrong references', () => {
+  const crossing = { ...event, type: 'PERSON_CROSSED_LINE', zone_id: null, line_id: event.zone_id }
+  expect(parseLiveEvent(JSON.stringify(crossing))?.type).toBe('PERSON_CROSSED_LINE')
+  expect(parseLiveEvent(JSON.stringify({ ...crossing, line_id: null }))).toBeNull()
+  expect(parseLiveEvent(JSON.stringify({ ...crossing, zone_id: event.zone_id }))).toBeNull()
+})

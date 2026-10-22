@@ -27,7 +27,13 @@ from ai_detector_core.telemetry.event_bus import (
     INGEST_STREAM,
     pending_event_key,
 )
-from app.infrastructure.database.models import CameraModel, EventModel, SnapshotModel, ZoneModel
+from app.infrastructure.database.models import (
+    CameraModel,
+    EventModel,
+    LineModel,
+    SnapshotModel,
+    ZoneModel,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,13 +89,23 @@ class EventIngest:
                         select(CameraModel.id).where(CameraModel.id.in_(camera_ids))
                     )
                 )
-                zone_ids = {event.zone_id for _, event in valid}
+                zone_ids = {event.zone_id for _, event in valid if event.zone_id is not None}
                 # Hold key-share locks so concurrent zone delete cannot race the FK insert.
                 zones = dict(
                     (
                         await session.execute(
                             select(ZoneModel.id, ZoneModel.camera_id)
                             .where(ZoneModel.id.in_(zone_ids))
+                            .with_for_update(read=True, key_share=True)
+                        )
+                    ).all()
+                )
+                line_ids = {event.line_id for _, event in valid if event.line_id is not None}
+                lines = dict(
+                    (
+                        await session.execute(
+                            select(LineModel.id, LineModel.camera_id)
+                            .where(LineModel.id.in_(line_ids))
                             .with_for_update(read=True, key_share=True)
                         )
                     ).all()
@@ -111,7 +127,14 @@ class EventIngest:
                     if event.snapshot is not None and event.snapshot.created_at >= cutoff:
                         snapshots.append(event.snapshot.model_dump())
                     row["zone_id"] = (
-                        event.zone_id if zones.get(event.zone_id) == event.camera_id else None
+                        event.zone_id
+                        if event.zone_id is not None and zones.get(event.zone_id) == event.camera_id
+                        else None
+                    )
+                    row["line_id"] = (
+                        event.line_id
+                        if event.line_id is not None and lines.get(event.line_id) == event.camera_id
+                        else None
                     )
                     row["metadata"] = event.metadata.model_dump(mode="json")
                     rows.append(row)

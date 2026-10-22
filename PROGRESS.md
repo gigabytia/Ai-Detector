@@ -4,11 +4,42 @@
 
 ## Текущий этап
 
-**Milestone 8 — snapshots/event detail: выполнен.** Следующий — Milestone 9 (линия и crossing detection). Полная история Git и результаты M7/M6/M5 сохранены.
+**Milestone 9 — directed line/crossing: выполнен.** Следующий — Milestone 10 (dashboard: event/camera statistics, timeline). Полная история Git M4 → M5 → M6 → M7 → M8 сохранена и включена вместе с M9.
 
 Реализация заново восстановлена на базе присланного архива Milestone 3 после утраты предыдущего рабочего окружения. Это не побайтовое восстановление незавершённой сессии: использованы сохранённые архитектурные документы, ADR и доступный контекст. Исходный `AI_DETECTOR_v2_MASTER_PROMPT.md` в архиве отсутствовал.
 
-## Milestone 8 — результат текущей сессии
+## Milestone 9 — результат текущей сессии
+
+База — полный M8, HEAD `01ff302` (Kostya). История не пересоздавалась; новый архив содержит настоящую `.git`, исходники, веса и QA. Прежние разделы ниже — история этапов.
+
+### Сделано
+
+* Camera-scoped CRUD lines, max16 под parent row lock, normalized distinct ordered P1/P2, enabled/name/timestamps. Миграция `e2c6db45c9b8`, nullable events.line_id с SET NULL; geometry/name исторического события не исчезают при редактировании/удалении.
+* Per-run LineEngine после ZoneEngine: bottom anchor, signed distance/hysteresis0.01, finite segment projection, обе стороны; baseline без тревоги, LOST freeze и crossing при recovery. Min hits3, bounded confidence window, wall-clock cooldown camera/run/track/type (общий линиям, отдельный от зоны). Crossing не создаёт PersonState.
+* Side reset при geometry/disable/delete; rename сохраняет side; source epoch/discontinuity/size/run/lifecycle очищают scene. Hot worker spec/atomic preview lines без смены run.
+* Typed PERSON_CROSSED_LINE/LineCrossMetadata, validator соответствия refs/type/metadata, line ownership при ingest. Прежний M7/M8 путь SSE/history/snapshot/status/note, optional JPEG; исторические line_name/endpoints/direction сохранены.
+* Редактор первой линии: две упорядоченные точки на кадре/keyboard, undo/clear/cancel/enable/save/delete-confirm, взаимная блокировка с зоной, arrow/P1/P2 preview. Новый alarm title и детали с сохранённой линией/направлением поверх исходного JPEG. OpenAPI/TS, ADR-036 и UPDATE_MILESTONE_9.md.
+
+### Проверено
+
+| Проверка | Результат |
+|---|---|
+| make check | ruff/format, strict mypy **158 файлов**, ESLint/Prettier/vue-tsc, **199 Python unit + 115 Vitest**, production build |
+| PostgreSQL/Valkey integration | **33 passed**: прежние29 + line CRUD/notify/scope/spec/limit, event+snapshot/replay/operator state, historical geometry/delete и cross-camera FK |
+| Живой поток | Оба signed направления при развороте endpoints mock-линии, JPEG1280×720; hot geometry и disable22с/re-enable без смены run, старые metadata неизменны |
+| PostgreSQL outage | PERSON_CROSSED_LINE по SSE до ingest, JPEG уже записан, PATCH409; после восстановления тот же event/snapshot UUID и JPEG SHA-256, backlog0 |
+| Chromium | Historical SVG coordinates, note persisted, keyboard editor→REST→hot preview, click cap2/undo/cancel, zone edit blocked; 390px без overflow, pageerror0; PNG/DOM/layout, без экспертной visual оценки |
+| Миграции/контракты | Пустая UTF8 DB, M8→M9, downgrade/upgrade test-only, alembic no diff, frozen lock/OpenAPI match, production audit0 |
+
+Shutdown worker **1.19с**, API с SSE **3.24с**, runtime keys удалены/Stream0, JPEG доступны после worker stop. Доказательства — [docs/qa/m9/README.md](docs/qa/m9/README.md), обновление — [UPDATE_MILESTONE_9.md](UPDATE_MILESTONE_9.md).
+
+### Ограничения и следующий этап
+
+Для локализованных имён в JSONB нужен PostgreSQL UTF8. Исходные SQL_ASCII sandbox базы сохранены, QA перенесён backup/restore в отдельную UTF8 базу; схема сама кодировку не меняет. Новый type требует согласованного обновления API/worker. Line CRUD до16, редактор только первой с явной подсказкой; direction относительно P1→P2, не экрана. Нет direction filter/loitering/track sessions/CSV/auth/dashboard. Качество crossings на реальном движущемся CCTV, Windows, Docker/CI, GPU, RTSP и нагрузка4/8 не проверялись; CPU YOLO на статичном bus MP4 — только регрессия существующего пути. Redis outage M8 не повторялся, RAM/AOF/filesystem/retention ограничения сохраняются. Node24.14.1 sandbox ниже engine: использовать поддерживаемый Node.
+
+Следующий — **M10: dashboard, event statistics, camera statistics, timeline**. Не смешивать с будущим loitering.
+
+## Milestone 8 — результат предыдущей сессии
 
 База — полный M7, HEAD `2d6aca3` (Kostya). Реальная полная `.git` и цепочка M4 → M5 → M6 → M7 сохранены; новый архив содержит и M8. Прежние результаты ниже — история этапов, не описание текущих ограничений, если M8 их явно снимает.
 

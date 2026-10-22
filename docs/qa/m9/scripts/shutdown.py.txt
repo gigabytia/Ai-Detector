@@ -1,0 +1,49 @@
+import asyncio,json,os,signal,time,subprocess
+import httpx,websockets
+from redis.asyncio import Redis
+from pathlib import Path
+
+def pid(name):
+ lines=subprocess.check_output(['ps','-eo','pid,args'],text=True).splitlines()
+ return next(int(line.split()[0]) for line in lines if '/.venv/bin/'+name in line and 'uv run' not in line)
+async def main():
+ worker,api=pid('ai-detector-worker'),pid('ai-detector-api')
+ async with httpx.AsyncClient(timeout=10) as http:
+  cameras=(await http.get('http://127.0.0.1:18000/api/v1/cameras')).json();camera=next(c['id'] for c in cameras if c['enabled'])
+  ready=asyncio.Event()
+  async def sse():
+   try:
+    async with http.stream('GET','http://127.0.0.1:18000/api/v1/events/stream') as response:
+     async for line in response.aiter_lines():
+      if line:ready.set()
+   except httpx.HTTPError:pass
+  stream=asyncio.create_task(sse());await asyncio.wait_for(ready.wait(),3)
+  async with websockets.connect(f'ws://127.0.0.1:18001/cameras/{camera}/telemetry') as ws:
+   await asyncio.wait_for(ws.recv(),3)
+   started=time.monotonic();os.kill(worker,signal.SIGTERM)
+   try:
+    while True:await asyncio.wait_for(ws.recv(),5)
+   except websockets.ConnectionClosed:pass
+  redis=Redis.from_url('redis://127.0.0.1:16379/0')
+  for _ in range(100):
+   if not await redis.keys('ad:camera:*:status') and not await redis.keys('ad:worker:*:heartbeat') and not Path(f'/proc/{worker}').exists():break
+   await asyncio.sleep(.05)
+  worker_time=round(time.monotonic()-started,2)
+  assert not await redis.keys('ad:camera:*:status') and not await redis.keys('ad:worker:*:heartbeat')
+  assert not Path(f'/proc/{worker}').exists()
+  for _ in range(100):
+   if await redis.xlen('ad:ingest')==0:break
+   await asyncio.sleep(.05)
+  assert await redis.xlen('ad:ingest')==0
+  events=(await http.get('http://127.0.0.1:18000/api/v1/events?limit=50')).json()['items']
+  snapshots=[e for e in events if e.get('snapshot_url')]
+  assert snapshots
+  for event in snapshots[:5]:assert (await http.get('http://127.0.0.1:18000'+event['snapshot_url'])).status_code==200
+  started=time.monotonic();os.kill(api,signal.SIGTERM);await asyncio.wait_for(stream,6)
+  for _ in range(100):
+   if not Path(f'/proc/{api}').exists():break
+   await asyncio.sleep(.05)
+  assert not Path(f'/proc/{api}').exists()
+  print(json.dumps({'worker_shutdown_seconds':worker_time,'api_with_sse_shutdown_seconds':round(time.monotonic()-started,2),'runtime_keys_removed':True,'stream_backlog':0,'recent_snapshot_reads_after_worker_stop':min(len(snapshots),5)}))
+  await redis.aclose()
+asyncio.run(main())

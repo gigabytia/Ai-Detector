@@ -1,0 +1,8 @@
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> a43b43e08e6b, create cameras
+INFO  [alembic.runtime.migration] Running upgrade a43b43e08e6b -> b452b4c88e6b, Per-camera detection configuration.
+INFO  [alembic.runtime.migration] Running upgrade b452b4c88e6b -> c631d038af01, Danger zones and per-camera zone timing overrides.
+INFO  [alembic.runtime.migration] Running upgrade c631d038af01 -> 14d6499b16a2, event history and operator status
+INFO  [alembic.runtime.migration] Running upgrade 14d6499b16a2 -> 48f1a410c0ce, event snapshots and camera snapshot config
+INFO  [alembic.runtime.migration] Running upgrade 48f1a410c0ce -> e2c6db45c9b8, camera lines and crossing event reference

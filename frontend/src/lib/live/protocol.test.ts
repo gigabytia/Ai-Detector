@@ -126,3 +126,32 @@ it.each([
 ])('rejects invalid zone %j', (bad) => {
   expect(() => parsePacket(packet({ ...metadata, zones: [bad] }), 'camera-1')).toThrow()
 })
+
+it('accepts directed finite line and rejects invalid line metadata', () => {
+  const line = {
+    id: 'l1',
+    camera_id: 'cam',
+    name: 'Линия',
+    enabled: true,
+    p1: { x: 0.2, y: 0.5 },
+    p2: { x: 0.8, y: 0.5 },
+  }
+  const packet = (lines: unknown) => {
+    const header = new TextEncoder().encode(
+      JSON.stringify({ ...metadata, camera_id: 'cam', lines }),
+    )
+    const result = new Uint8Array(4 + header.length + 2)
+    new DataView(result.buffer).setUint32(0, header.length)
+    result.set(header, 4)
+    result.set([255, 216], 4 + header.length)
+    return result.buffer
+  }
+  expect(parsePacket(packet([line]), 'cam').metadata.lines?.[0]?.name).toBe('Линия')
+  for (const lines of [
+    [{ ...line, p2: line.p1 }],
+    [line, line],
+    [{ ...line, p1: { x: 2, y: 0 } }],
+    [{ ...line, camera_id: 'other' }],
+  ])
+    expect(() => parsePacket(packet(lines), 'cam')).toThrow()
+})
