@@ -153,3 +153,7 @@ DetectionResult.frame (без рисования) → bounded SnapshotWriter →
 ## Реализованный поток M9
 
 CRUD линии → hot CAMERA_CHANGED/reconcile → CameraSpec.lines. После tracking/ZoneEngine LineEngine вычисляет signed side по anchor и finite segment, emit только подтверждённую смену знака вне hysteresis. События обоих типов объединяются в одном DetectionResult; preview JPEG/bbox/lines синхронны. Дальше прежние snapshot/outbox → Redis Stream/pubsub → transactional ingest + SSE + REST. Метаданные line_name/P1/P2/direction являются историческим снимком, текущая lines не перерисовывает прошлое событие. Удаление линии обнуляет FK, не удаляет alarm/JPEG. Покадрового persistence/analytics нет.
+
+## M10 — наблюдения и завершённые треки
+
+Collector вызывается на event loop после проверки актуального run. Flush прошлого секундного bucket, последний sample при stop; финальная track session при removal/retain/shutdown. Independent RAM outbox → analytics Stream → validated ingest/DB commit → ACK/XDEL. При PG outage backlog сохраняется, при Redis outage живой worker retry через bounded RAM. Overflow/crash может терять analytics, не блокируя alarm pipeline. Сегменты gap>2с явно LOST, завершённые сессии появляются с задержкой. Dashboard SQL не читает frames и не суммирует asynchronous multicamera occupancy. Полная семантика ADR-037; данные не backfill до M10.

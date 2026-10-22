@@ -8,6 +8,7 @@ import httpx
 from redis.asyncio import Redis
 
 from vision_worker.cameras.manager import CameraManager
+from vision_worker.messaging.analytics import AnalyticsPublisher
 from vision_worker.messaging.camera_status import CameraStatusPublisher
 from vision_worker.messaging.commands import CommandListener
 from vision_worker.messaging.events import EventPublisher
@@ -37,7 +38,10 @@ class Supervisor:
         events: EventPublisher | None = None,
         telemetry: TelemetryHub | None = None,
         snapshots: SnapshotWriter | None = None,
+        analytics: AnalyticsPublisher | None = None,
     ) -> None:
+        self.analytics = analytics
+        self._analytics_task: asyncio.Task[None] | None = None
         self.snapshots = snapshots
         self._delivery_stop = asyncio.Event()
         self._event_task: asyncio.Task[None] | None = None
@@ -78,11 +82,21 @@ class Supervisor:
             )
             self._event_task.add_done_callback(_report_crash)
             self._event_task.add_done_callback(self._event_delivery_finished)
+        if self.analytics is not None:
+            self._analytics_task = asyncio.create_task(
+                self.analytics.run(self._delivery_stop), name="analytics"
+            )
+            self._analytics_task.add_done_callback(_report_crash)
+            self._analytics_task.add_done_callback(self._analytics_finished)
         for name, loop in loops.items():
             task = asyncio.create_task(loop(self._stop), name=name)
             task.add_done_callback(_report_crash)
             self._tasks.append(task)
         logger.info("worker started")
+
+    def _analytics_finished(self, task: asyncio.Task[None]) -> None:
+        if not self._delivery_stop.is_set() and self.analytics is not None:
+            self.analytics.healthy = False
 
     def _event_delivery_finished(self, task: asyncio.Task[None]) -> None:
         if not self._delivery_stop.is_set() and self.events is not None:
@@ -99,6 +113,9 @@ class Supervisor:
         if self._event_task is not None:
             await asyncio.gather(self._event_task, return_exceptions=True)
             self._event_task = None
+        if self._analytics_task is not None:
+            await asyncio.gather(self._analytics_task, return_exceptions=True)
+            self._analytics_task = None
         await self._manager.stop_all()
         await self.preview.close()
         await self.telemetry.close()

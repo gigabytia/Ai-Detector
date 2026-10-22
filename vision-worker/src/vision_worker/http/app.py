@@ -23,6 +23,8 @@ class WorkerReadinessRead(BaseModel):
     status: Literal["ready", "not_ready"]
     detector_loaded: bool
     detector: dict[str, str]
+    analytics_ok: bool = True
+    analytics_dropped: int = 0
     redis_ok: bool
     last_heartbeat_at: AwareDatetime | None
 
@@ -58,6 +60,8 @@ def create_http_app(supervisor: Supervisor, allowed_origins: list[str] | None = 
             response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return WorkerReadinessRead(
             status="ready" if is_ready else "not_ready",
+            analytics_ok=supervisor.analytics is None or supervisor.analytics.healthy,
+            analytics_dropped=supervisor.analytics.dropped if supervisor.analytics else 0,
             detector_loaded=True,
             detector=supervisor.detector_info,
             redis_ok=heartbeat.redis_ok,

@@ -9,11 +9,13 @@ logger = logging.getLogger(__name__)
 class EventTasksProbe:
     name = "event_delivery"
 
-    def __init__(self) -> None:
+    def __init__(self, expected_count: int = 2, name: str = "event_delivery") -> None:
+        self.expected_count = expected_count
+        self.name = name
         self.tasks: list[asyncio.Task[None]] = []
 
     async def check(self) -> None:
-        if len(self.tasks) != 2 or any(task.done() for task in self.tasks):
+        if len(self.tasks) != self.expected_count or any(task.done() for task in self.tasks):
             raise RuntimeError("Event delivery task stopped")
 
 

@@ -229,6 +229,7 @@ async def test_supervisor_drains_snapshots_before_stopping_delivery() -> None:
         _delivery_stop=delivery_stop,
         _tasks=[asyncio.create_task(inference())],
         _event_task=asyncio.create_task(delivery()),
+        _analytics_task=None,
         snapshots=SimpleNamespace(close=close_snapshots),
         _manager=SimpleNamespace(stop_all=cleanup),
         preview=SimpleNamespace(close=cleanup),

@@ -16,10 +16,12 @@ from vision_worker.cameras.spec_client import CameraSpecClient, create_api_http_
 from vision_worker.config import WorkerSettings, get_settings
 from vision_worker.http.app import create_http_app
 from vision_worker.inference.adapters.ultralytics import UltralyticsPersonDetector
+from vision_worker.messaging.analytics import AnalyticsPublisher
 from vision_worker.messaging.camera_status import CameraStatusPublisher
 from vision_worker.messaging.commands import CommandListener
 from vision_worker.messaging.events import EventPublisher
 from vision_worker.messaging.heartbeat import HeartbeatPublisher
+from vision_worker.pipeline.analytics import AnalyticsCollector
 from vision_worker.pipeline.preview import PreviewHub
 from vision_worker.pipeline.scheduler import InferenceScheduler
 from vision_worker.pipeline.telemetry import TelemetryHub
@@ -60,9 +62,11 @@ def build_supervisor(settings: WorkerSettings) -> Supervisor:
     )
     preview = PreviewHub(settings.preview_fps, settings.preview_max_width)
     events = EventPublisher(redis)
+    analytics = AnalyticsPublisher(redis)
     telemetry = TelemetryHub()
     snapshots = SnapshotWriter(LocalSnapshotStorage(settings.snapshot_path), events)
     return Supervisor(
+        analytics=analytics,
         snapshots=snapshots,
         events=events,
         telemetry=telemetry,
@@ -72,6 +76,7 @@ def build_supervisor(settings: WorkerSettings) -> Supervisor:
             preview,
             settings.inference_batch_size,
             settings.inference_max_wait_ms,
+            analytics=AnalyticsCollector(analytics),
             snapshots=snapshots,
             events=events,
             telemetry=telemetry,

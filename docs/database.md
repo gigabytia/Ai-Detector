@@ -2,7 +2,7 @@
 
 SQLAlchemy 2.x (async, asyncpg), миграции Alembic (имена на английском). Все `timestamptz` в UTC. UUID генерирует приложение (`uuid4`), для событий — worker. Пишет в БД только backend (REST + ingest).
 
-> Фактически созданы `cameras`, `camera_configs` и `zones` (M6). Остальная схема ниже — целевой план, не существующие таблицы.
+> На M10 существуют cameras, camera_configs, zones, lines, events, snapshots, camera_samples и track_sessions (segments JSONB). Ранние таблицы/формулы ниже — **целевой исторический план**, не описание текущей реализации analytics_aggregates/track_segments. Фактическое уточнение M10 и ADR-037 — в конце документа.
 
 ## Схема
 
@@ -174,3 +174,9 @@ cameras 1─1 camera_configs
 ## Реализовано в Milestone 9
 
 Миграция e2c6db45c9b8 после48f1a410c0ce: lines (UUID, camera_id FK CASCADE/index, name varchar100, p1_x/p1_y/p2_x/p2_y double, enabled, UTC timestamps); CHECK 0..1 и distance²>1e-12. events.line_id nullable FK SET NULL. Лимит16/API проверяется под parent FOR UPDATE. Для line events zone_id=None, metadata JSONB хранит name/endpoints/direction/bbox/anchor/stability; геометрия не нормализуется через текущую lines при чтении истории. Ingest проверяет line ownership, после удаления ссылка null, metadata остаётся. База должна быть UTF8 для локализованных JSONB строк. Downgrade M9 удаляет lines и events.line_id, но не events/snapshots.
+
+## Реализовано в Milestone 10 — приоритет над ранним планом
+
+Миграция a9345caf81b1 после e2c6db45c9b8 создаёт camera_samples (UUID PK, camera FK, run, at UTC, persons/in_zone nonnegative, observed_seconds≥0; indexes at и camera/at), track_sessions (UUID PK, camera FK, run, track_id≥1, started/ended UTC ordered, segments JSONB, truncated; indexes ended и camera/started). Soft-delete камеры историю не удаляет. INSERT ON CONFLICT DO NOTHING; UUID5 выдаёт worker. Сегменты валидируются транспортной схемой до INSERT: ordered, внутри session,≤2048. Отдельных track_segments/analytics_aggregates сейчас **нет**.
+
+По одному последнему наблюдению на наблюдаемую секунду. mean(persons)/max(persons) по доступным observations, а не frame-weighted mean/peak. observed_seconds — сумма коротких gaps≤2с, без missing-second extrapolation. Completed sessions считаются overlap-window, не уникальные люди. People chart SQL group по≤120 buckets одной камеры; no-sample=null. Events count/group по occurred_at с текущим operator status, включая FP. Все KPI/charts persisted data в REPEATABLE READ READ ONLY snapshot, active-now — отдельный Redis read. До31д запроса; track keyset/end,id≤50. Нет automatic retention/rollup для новых таблиц; мониторить рост. Старые formulas/schema выше не выдавать за реализованные. Downgrade M10 удалит только новые таблицы и их данные, production update — upgrade head.

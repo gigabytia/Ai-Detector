@@ -4,11 +4,49 @@
 
 ## Текущий этап
 
-**Milestone 9 — directed line/crossing: выполнен.** Следующий — Milestone 10 (dashboard: event/camera statistics, timeline). Полная история Git M4 → M5 → M6 → M7 → M8 сохранена и включена вместе с M9.
+**Milestone 10 — dashboard/статистика/track timeline: выполнен.** Следующий — M11: loitering и CSV. Полная настоящая `.git` M4 → M5 → M6 → M7 → M8 → M9 → M10, без git init. Обновление: UPDATE_MILESTONE_10.md. Ниже результаты прежних этапов исторические; текущие ограничения — в разделе M10.
 
 Реализация заново восстановлена на базе присланного архива Milestone 3 после утраты предыдущего рабочего окружения. Это не побайтовое восстановление незавершённой сессии: использованы сохранённые архитектурные документы, ADR и доступный контекст. Исходный `AI_DETECTOR_v2_MASTER_PROMPT.md` в архиве отсутствовал.
 
-## Milestone 9 — результат текущей сессии
+## Milestone 10 — результат текущей сессии
+
+База — полный M9, `c30a4d8` (Kostya), восстановленный из проверенного полного архива. История не пересоздана. Исходники, веса, QA и настоящая `.git` включены в новый архив.
+
+### Сделано
+
+* Отдельный bounded analytics outbox/Redis Stream → backend ingest → camera_samples и track_sessions. До одного последнего наблюдения в секунду, не покадровый INSERT. UUID5 при retry, commit перед ACK/XDEL, pending/reclaim и poison dead letter; тревоги идут прежним независимым путём.
+* Collector завершает track session при удалении трека, stop/restart камеры и graceful shutdown. Сегменты NORMAL/IN_DANGER_ZONE/LOST; gap >2 с явно LOST, максимум2048 сегментов с truncated marker. Identity camera/run/track, не re-ID/уникальные посетители.
+* Миграция a9345caf81b1 после M9; прежние камеры, геометрия, события и снимки сохранены. REST dashboard с SQL GROUP BY в одном read-only REPEATABLE READ snapshot, UTC [start,end), максимум31 день и120 временных бакетов. Completed-track keyset pagination, limit≤50.
+* Dashboard: total/critical/false positives, active-now cameras (nullable при Redis error), average events per registered camera, completed tracks; ECharts/SVG события по времени/камерам/типам, статистика камер и отдельный TrackTimeline. Фильтры1ч/24ч/7д, камера, ручное обновление, loading/empty/error/retry, mobile/light/dark. People chart только выбранной камеры, пропуски не превращаются в нули.
+* OpenAPI/TS, ADR-037, QA и UPDATE_MILESTONE_10.md. Зафиксировано отличие от раннего целевого analytics_aggregates: фактически хранятся последние 1Hz observations; среднее и максимум не frame-weighted и не истинный покадровый пик. Observed seconds — сумма коротких межкадровых интервалов, не uptime.
+
+### Проверено
+
+| Проверка | Результат |
+|---|---|
+| make check | ruff/format, strict mypy **168 файлов**, ESLint/Prettier/vue-tsc, **213 Python unit +123 Vitest**, production build на **Node24.15.0** |
+| PostgreSQL17/Valkey9 integration | **37 passed**: предыдущие33 + dashboard cross-foot/half-open/UTC offsets/archived/nulls, keyset ties/overlap, ingest replay/poison/rollback и invalid/empty states |
+| Живой стенд | 2 mock + CPU YOLO на статичном bus MP4; fixed-window SQL = dashboard = суммы всех3 event breakdown:47. На точке проверки862 observations,100 completed sessions; stop → active0/Stream0 |
+| PostgreSQL outage | dashboard503, inference продолжает;22 pending analytics UUID сохранены после восстановления, backlog0 |
+| Redis outage8с |24 наблюдения периода доставлены после AOF restart, backlog0; живой worker/RAM queue, не гарантия сохранности при падении процесса |
+| Chromium |3 ECharts SVG непустых, фильтры, people chart, раскрытие timeline,390px без overflow, error не показывает нули/retry, pageerror0; PNG/DOM/layout, без экспертной оценки изображений |
+| Миграции/контракты | empty UTF8 DB, M9→M10, downgrade/upgrade test-only, alembic check no diff, frozen lock/OpenAPI match, production npm audit0 |
+
+Graceful shutdown: worker **0.82с**, API с SSE **3.22с**, оба Streams0/runtime keys removed;7 новых финальных sessions и5 JPEG после worker stop.
+
+Полные доказательства и логи — [docs/qa/m10/README.md](docs/qa/m10/README.md).
+
+### Ограничения и следующий этап
+
+* Незавершённые треки при аварии worker теряются (ADR-019); live-active sessions не записываются каждыеNсек. RAM outbox1000 и AOF everysec имеют окно потери; переполнение аналитики логируется/видно в worker readiness, inference/alarms продолжаются. Collector≤4096 активных треков;2048 segments/session, payload≤512KiB.
+* 1Hz last sample: mean/max не всекадровые, no-observation=null, factual zero=0. Observed seconds не wall-clock uptime: gap>2с исключён, короткий gap начисляется конечной секунде, границы периода приблизительны. Occupancy по разным камерам не суммируется. Все зарегистрированные, включая archived/zero-event, входят в знаменатель среднего событий; false positives включены в total, их статус текущий.
+* Автоматического retention/rollup для новых таблиц нет: контролировать рост, indexes/backup/disk/Stream. До31д/120бакетов ограничивает ответ, не объём сохраняемой истории. Full track session при пересечении окна не обрезается по фильтру. Live cameras из Redis не часть исторического MVCC snapshot.
+* Lazy ECharts route chunk ~557kB minified/~189kB gzip даёт предупреждение Vite >500kB; build успешен, размер не скрыт. Dev audit4high из прежних зависимостей, production0.
+* Нет auth/CSV/loitering; trusted-network only. Windows, Docker/CI, GPU, RTSP, moving-CCTV accuracy и4/8-camera throughput в M10 не проверены. Статичное YOLO видео — регрессия интеграции, не качество трекинга на реальном движении. Прежние snapshot/disk/retention ограничения сохраняются.
+
+Следующий — **M11: loitering и экспорт событий CSV** (§171), без преждевременной оптимизации M12.
+
+## Milestone 9 — результат предыдущей сессии
 
 База — полный M8, HEAD `01ff302` (Kostya). История не пересоздавалась; новый архив содержит настоящую `.git`, исходники, веса и QA. Прежние разделы ниже — история этапов.
 

@@ -167,3 +167,12 @@ Worker readiness дополнительно учитывает publisher/backpre
 * Internal CameraSpec.lines добавлен с default пустым tuple, preview metadata.lines — enabled lines из того же результата; старые preview без lines принимаются.
 * DomainEvent.type дополнен PERSON_CROSSED_LINE, line_id добавлен nullable. Zone payload требует zone_id и zone metadata, line payload — line_id/zone_id=null и LineCrossMetadata. Последний содержит bbox/anchor/stability, direction LEFT_TO_RIGHT (−→+) либо RIGHT_TO_LEFT (+→−), line_name, p1/p2 как пары [x,y]. Направление относительно P1→P2, не экрана.
 * EventRead допускает null FK после удаления shape, сохраняет исторические metadata. Новых REST type filters нет; camera/status/pagination и PATCH status/note прежние. SSE type тот же event.created с новым domain type, private storage_key не раскрывается. Snapshot API/optional поля не меняются.
+
+## Аналитика (M10)
+
+* `GET /api/v1/analytics?start=...&end=...&camera_id=...` → Dashboard: total_events, critical_events, false_positives, active_cameras (nullable), enabled_cameras, average_events_per_camera (nullable), completed_tracks, by_type/by_camera/events_over_time/people_over_time и bucket_seconds.
+* `GET /api/v1/analytics/tracks?start=...&end=...&camera_id=...&limit=20&cursor=...` → items: camera/run/track + ordered state segments/truncated, next_cursor. limit1..50, keyset ended_at/id DESC, возвращается полная session при пересечении окна. Cursor reuse только с теми же фильтрами.
+
+Aware UTC-normalized [start,end), default24ч, max31д; invalid order/naive time/cursor→422. PostgreSQL unavailable→503. Неизвестный camera UUID даёт пустой набор200. События по occurred_at, FP включены/текущий статус, архивные камеры включены в by_camera/denominator. Active cameras now из Redis, при отказе null, исторические данные остаются. People buckets только для одной выбранной камеры; среднее сохранённых last-in-second samples, no zero-fill. Observed duration не uptime; completed_tracks не unique people. Подробности ADR-037. Контракт OpenAPI/TS regenerated.
+
+API readiness содержит отдельный `analytics_ingest` probe. Worker readiness дополнен analytics_ok/analytics_dropped; это состояние RAM/Redis publisher, не подтверждение DB commit. Невосстановимый analytics overflow логируется и не выключает inference/alarm.

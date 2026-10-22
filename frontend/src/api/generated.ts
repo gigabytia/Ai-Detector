@@ -38,6 +38,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dashboard */
+        get: operations["dashboard_api_v1_analytics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tracks */
+        get: operations["tracks_api_v1_analytics_tracks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events": {
         parameters: {
             query?: never;
@@ -464,6 +498,30 @@ export interface components {
              */
             updated_at: string;
         };
+        /** CameraStatistics */
+        CameraStatistics: {
+            /**
+             * Camera Id
+             * Format: uuid
+             */
+            camera_id: string;
+            /** Name */
+            name: string;
+            /** Archived */
+            archived: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Events */
+            events: number;
+            /** Observed Seconds */
+            observed_seconds: number;
+            /** Average Persons */
+            average_persons: number | null;
+            /** Max Persons */
+            max_persons: number | null;
+            /** Completed Tracks */
+            completed_tracks: number;
+        };
         /**
          * CameraStatus
          * @enum {string}
@@ -476,6 +534,50 @@ export interface components {
             source_type?: components["schemas"]["SourceType"] | null;
             /** Source Url */
             source_url?: string | null;
+        };
+        /** Dashboard */
+        Dashboard: {
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /** Camera Id */
+            camera_id: string | null;
+            /** Total Events */
+            total_events: number;
+            /** Critical Events */
+            critical_events: number;
+            /** False Positives */
+            false_positives: number;
+            /** Active Cameras */
+            active_cameras?: number | null;
+            /** Enabled Cameras */
+            enabled_cameras: number;
+            /** Average Events Per Camera */
+            average_events_per_camera: number | null;
+            /** Completed Tracks */
+            completed_tracks: number;
+            /** By Type */
+            by_type: components["schemas"]["EventCount"][];
+            /** By Camera */
+            by_camera: components["schemas"]["CameraStatistics"][];
+            /** Events Over Time */
+            events_over_time: components["schemas"]["TimeBucket"][];
+            /** People Over Time */
+            people_over_time: components["schemas"]["PeopleBucket"][];
+            /** Bucket Seconds */
+            bucket_seconds: number;
         };
         /** DependencyStatusRead */
         DependencyStatusRead: {
@@ -500,6 +602,13 @@ export interface components {
         /** ErrorResponse */
         ErrorResponse: {
             error: components["schemas"]["ErrorBody"];
+        };
+        /** EventCount */
+        EventCount: {
+            /** Key */
+            key: string;
+            /** Count */
+            count: number;
         };
         /** EventPage */
         EventPage: {
@@ -654,6 +763,20 @@ export interface components {
             /** Y */
             y: number;
         };
+        /** PeopleBucket */
+        PeopleBucket: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Persons */
+            persons: number;
+            /** Persons In Zone */
+            persons_in_zone: number;
+            /** Samples */
+            samples: number;
+        };
         /** ReadinessRead */
         ReadinessRead: {
             /**
@@ -663,6 +786,24 @@ export interface components {
             status: "ready" | "not_ready";
             /** Dependencies */
             dependencies: components["schemas"]["DependencyStatusRead"][];
+        };
+        /** Segment */
+        Segment: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "NORMAL" | "LOST" | "IN_DANGER_ZONE";
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
         };
         /**
          * SourceType
@@ -685,6 +826,72 @@ export interface components {
             dependencies: components["schemas"]["DependencyStatusRead"][];
             /** Workers */
             workers: components["schemas"]["WorkerStatusRead"][];
+        };
+        /** TimeBucket */
+        TimeBucket: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Events */
+            events: number;
+        };
+        /** TrackPage */
+        TrackPage: {
+            /** Items */
+            items: components["schemas"]["TrackSession"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** TrackSession */
+        TrackSession: {
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Camera Id
+             * Format: uuid
+             */
+            camera_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /**
+             * Kind
+             * @default track
+             * @constant
+             */
+            kind: "track";
+            /** Track Id */
+            track_id: number;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Ended At
+             * Format: date-time
+             */
+            ended_at: string;
+            /** Segments */
+            segments: components["schemas"]["Segment"][];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
         };
         /** UploadRead */
         UploadRead: {
@@ -814,6 +1021,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadinessRead"];
+                };
+            };
+        };
+    };
+    dashboard_api_v1_analytics_get: {
+        parameters: {
+            query?: {
+                start?: string | null;
+                end?: string | null;
+                camera_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    tracks_api_v1_analytics_tracks_get: {
+        parameters: {
+            query?: {
+                start?: string | null;
+                end?: string | null;
+                camera_id?: string | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrackPage"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

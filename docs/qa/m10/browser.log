@@ -1,0 +1,1 @@
+{"echartsSvg":[{"label":"События во времени","width":1150,"height":256,"paths":133},{"label":"События по камерам","width":550,"height":256,"paths":12},{"label":"События по типам","width":550,"height":256,"paths":9}],"cameraFilter":true,"periodFilter":true,"trackDetails":true,"mobileOverflow":false,"errorDoesNotShowZeros":true,"retry":true,"pageerrors":[]}

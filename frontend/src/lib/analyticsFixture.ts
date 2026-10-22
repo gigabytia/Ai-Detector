@@ -1,0 +1,35 @@
+import type { Dashboard } from '@/api/analytics'
+export const fixture: Dashboard = {
+  generated_at: '2026-01-01T01:00:00Z',
+  start: '2026-01-01T00:00:00Z',
+  end: '2026-01-01T01:00:00Z',
+  camera_id: null,
+  total_events: 2,
+  critical_events: 1,
+  false_positives: 1,
+  active_cameras: 1,
+  enabled_cameras: 1,
+  average_events_per_camera: 2,
+  completed_tracks: 1,
+  by_type: [{ key: 'PERSON_CROSSED_LINE', count: 2 }],
+  by_camera: [
+    {
+      camera_id: 'cam',
+      name: 'Склад',
+      enabled: true,
+      archived: false,
+      events: 2,
+      observed_seconds: 1,
+      average_persons: 2,
+      max_persons: 3,
+      completed_tracks: 1,
+    },
+  ],
+  events_over_time: [
+    { at: '2026-01-01T00:00:00Z', events: 2 },
+    { at: '2026-01-01T00:01:00Z', events: 0 },
+    { at: '2026-01-01T00:02:00Z', events: 0 },
+  ],
+  people_over_time: [{ at: '2026-01-01T00:00:00Z', persons: 2, persons_in_zone: 1, samples: 1 }],
+  bucket_seconds: 60,
+}

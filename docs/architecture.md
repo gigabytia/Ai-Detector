@@ -1,6 +1,6 @@
 # Архитектура AI Detector v2
 
-> Реализован M9: камеры, YOLO/ByteTrack, зоны, направленные линии/crossing, event bus/история/SSE, статусы, telemetry, snapshots/detail/retention. Dashboard/loitering/аналитика — позже. Текущая граница — PROGRESS.md, ADR-034/035/036.
+> Реализован M10: прежний M9 pipeline плюс independent analytics ingest, persisted 1Hz observations/completed track sessions, dashboard ECharts и timeline. Loitering/CSV — M11. Текущая граница — PROGRESS.md и ADR-037; ранние планы ниже не отменяют фактические границы этапа.
 
 Система видеонаблюдения: находит **людей** на видеопотоках, отслеживает их (track ID внутри камеры) и сообщает оператору о входе в опасную зону, пересечении линии и долгом нахождении в зоне. Объекты, перенос груза и pose estimation в эту версию не входят (ТЗ §2, §27).
 
@@ -227,3 +227,7 @@ Shared stdlib LocalSnapshotStorage, отдельный bounded SnapshotWriter/th
 ## Добавлено M9
 
 Line CRUD → CameraSpec.lines → scheduler → SceneRegistry (ZoneEngine затем LineEngine) → общий immutable DetectionResult/events → M8 SnapshotWriter → M7 outbox/ingest/SSE. Без нового потока доставки и без нового PersonState. Side/confidence/cooldown bounded активными tracks/runs; geometry/epoch reset предотвращает синтетические crossing. См. ADR-036.
+
+## M10: отдельная аналитика
+
+Accepted inference result → event-loop AnalyticsCollector → bounded AnalyticsPublisher → ad:analytics:ingest → backend AnalyticsIngest → PostgreSQL camera_samples/track_sessions → AnalyticsRepository (SQL aggregates) → AnalyticsService (window/status policy) → thin REST route → dashboard/TrackTimeline. Alarm pub/sub/Stream, JPEG writer и preview не заменены. API analytics task имеет отдельный readiness probe; worker analytics_ok/dropped не объявляют успешную запись в БД. Нет DB connection в worker. См. ADR-037 для семантики и caps.

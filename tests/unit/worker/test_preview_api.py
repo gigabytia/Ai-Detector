@@ -22,6 +22,7 @@ def supervisor(*, healthy: bool = True, redis_ok: bool = True) -> Supervisor:
             heartbeat=SimpleNamespace(redis_ok=redis_ok, last_published_at=None),
             scheduler=SimpleNamespace(healthy=healthy),
             events=None,
+            analytics=None,
             detector_info={"backend": "test"},
             manager=SimpleNamespace(sessions=[]),
             preview=PreviewHub(),

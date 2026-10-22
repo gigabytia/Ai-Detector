@@ -39,3 +39,5 @@
 | [ADR-035](ADR-035-event-snapshots.md) | Снимки событий, безопасное local storage, event detail и retention |
 
 | [ADR-036](ADR-036-line-crossing-runtime.md) | Направленная линия, crossing, typed metadata и историческая геометрия |
+
+| [ADR-037](ADR-037-observed-analytics.md) | 1Hz observations, independent ingest, dashboard semantics и completed-track timeline |

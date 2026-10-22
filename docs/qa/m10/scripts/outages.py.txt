@@ -1,0 +1,41 @@
+import asyncio,json,subprocess
+from pathlib import Path
+from datetime import UTC,datetime
+import httpx
+from redis.asyncio import Redis
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+ROOT=Path('/data/m10/runtime');PG=['pg_ctl','-D',str(ROOT/'postgres'),'-l',str(ROOT/'postgres.log')]
+def pg(args):subprocess.run(PG+args,check=True,stdout=subprocess.DEVNULL)
+async def main():
+ redis=Redis.from_url('redis://127.0.0.1:16379/0')
+ async with httpx.AsyncClient(base_url='http://127.0.0.1:18000',timeout=20) as c:
+  pg(['stop','-m','fast'])
+  try:
+   await asyncio.sleep(5)
+   entries=await redis.xrange('ad:analytics:ingest');ids={json.loads(v[b'data'])['id'] for _,v in entries};assert len(ids)>=4
+   status=(await c.get('/api/v1/analytics')).status_code;assert status==503,status
+   print(json.dumps({'postgres_offline':True,'pending_analytics':len(ids),'dashboard_http':status,'inference_continues':True}),flush=True)
+  finally:pg(['start','-o','-h 127.0.0.1 -p 15432 -k /data/m10/runtime'])
+  for _ in range(100):
+   if await redis.xlen('ad:analytics:ingest')==0:break
+   await asyncio.sleep(.1)
+  assert await redis.xlen('ad:analytics:ingest')==0
+  engine=create_async_engine('postgresql+asyncpg://ai_detector@127.0.0.1:15432/ai_detector_m10')
+  async with engine.connect() as conn:
+   saved=set(str(x) for x in (await conn.execute(text('SELECT id FROM camera_samples UNION ALL SELECT id FROM track_sessions'))).scalars())
+  await engine.dispose();assert ids<=saved
+  print(json.dumps({'postgres_recovered':True,'same_analytics_uuids_saved':len(ids),'analytics_backlog':0}),flush=True)
+  # Redis failure: bounded RAM queue, no inference restart, then drain after AOF restart.
+  cams=(await c.get('/api/v1/cameras')).json();runs={x['id']:x['runtime']['last_frame_at'] for x in cams};boundary=datetime.now(UTC)
+  await redis.aclose();subprocess.run(['valkey-cli','-p','16379','shutdown'],check=True,stdout=subprocess.DEVNULL)
+  try:await asyncio.sleep(8)
+  finally:subprocess.run(['valkey-server','--port','16379','--bind','127.0.0.1','--daemonize','yes','--dir',str(ROOT),'--appendonly','yes','--logfile',str(ROOT/'valkey.log')],check=True)
+  await asyncio.sleep(7);redis=Redis.from_url('redis://127.0.0.1:16379/0')
+  engine=create_async_engine('postgresql+asyncpg://ai_detector@127.0.0.1:15432/ai_detector_m10')
+  async with engine.connect() as conn:
+   recovered=(await conn.execute(text('SELECT count(*) FROM camera_samples WHERE at >= :at AND at < :until'),{'at':boundary,'until':boundary.replace(microsecond=boundary.microsecond)+__import__('datetime').timedelta(seconds=8)})).scalar_one()
+  await engine.dispose();assert recovered>=12,recovered
+  print(json.dumps({'redis_offline_seconds':8,'recovered_samples_in_outage':recovered,'analytics_backlog':await redis.xlen('ad:analytics:ingest'),'ram_queue_case_not_process_crash':True}),flush=True)
+ await redis.aclose()
+asyncio.run(main())

@@ -19,6 +19,7 @@ from app.infrastructure.database.session import (
     create_engine,
     create_session_factory,
 )
+from app.infrastructure.redis.analytics import AnalyticsIngest
 from app.infrastructure.redis.client import (
     RedisProbe,
     RedisWorkerHeartbeatReader,
@@ -44,6 +45,9 @@ class AppResources:
     system_service: SystemService
     live: LiveHub | None = None
     event_tasks: EventTasksProbe = field(default_factory=EventTasksProbe)
+    analytics_tasks: EventTasksProbe = field(
+        default_factory=lambda: EventTasksProbe(1, "analytics_ingest")
+    )
 
 
 def build_resources(settings: Settings) -> AppResources:
@@ -52,8 +56,9 @@ def build_resources(settings: Settings) -> AppResources:
     clock = SystemClock()
     redis_probe = RedisProbe(redis)
     event_tasks = EventTasksProbe()
+    analytics_tasks = EventTasksProbe(1, "analytics_ingest")
     system_service = SystemService(
-        probes=[DatabaseProbe(engine), redis_probe, event_tasks],
+        probes=[DatabaseProbe(engine), redis_probe, event_tasks, analytics_tasks],
         heartbeats=RedisWorkerHeartbeatReader(redis),
         redis_probe_name=redis_probe.name,
         clock=clock,
@@ -72,6 +77,7 @@ def build_resources(settings: Settings) -> AppResources:
         uploads=uploads,
         system_service=system_service,
         event_tasks=event_tasks,
+        analytics_tasks=analytics_tasks,
     )
 
 
@@ -95,8 +101,13 @@ def make_lifespan(settings: Settings) -> Callable[[FastAPI], AbstractAsyncContex
                 name="event-ingest",
             ),
             asyncio.create_task(resources.live.run(stop), name="event-live"),
+            asyncio.create_task(
+                AnalyticsIngest(resources.redis, resources.session_factory).run(stop),
+                name="analytics-ingest",
+            ),
         ]
-        resources.event_tasks.tasks = tasks
+        resources.event_tasks.tasks = tasks[:2]
+        resources.analytics_tasks.tasks = tasks[2:3]
         maintenance = asyncio.create_task(
             SnapshotRetention(
                 resources.redis,

@@ -1,0 +1,1 @@
+{"status":"ready","detector_loaded":true,"detector":{"backend":"ultralytics","model":"yolo26n-coco","device":"cpu"},"analytics_ok":true,"analytics_dropped":0,"redis_ok":true,"last_heartbeat_at":"2026-10-22T09:55:06.415726Z"}

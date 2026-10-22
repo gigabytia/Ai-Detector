@@ -179,3 +179,38 @@ class SnapshotModel(Base):
     height: Mapped[int] = mapped_column(Integer)
     size_bytes: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class CameraSampleModel(Base):
+    __tablename__ = "camera_samples"
+    __table_args__ = (
+        Index("ix_camera_samples_camera_time", "camera_id", "at"),
+        Index("ix_camera_samples_at", "at"),
+        CheckConstraint(
+            "persons >= 0 AND persons_in_zone >= 0 AND observed_seconds >= 0", name="counts"
+        ),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    camera_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cameras.id"))
+    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    persons: Mapped[int] = mapped_column(Integer)
+    persons_in_zone: Mapped[int] = mapped_column(Integer)
+    observed_seconds: Mapped[float] = mapped_column(Float)
+
+
+class TrackSessionModel(Base):
+    __tablename__ = "track_sessions"
+    __table_args__ = (
+        Index("ix_track_sessions_camera_time", "camera_id", "started_at"),
+        Index("ix_track_sessions_ended_at", "ended_at"),
+        CheckConstraint("ended_at >= started_at AND track_id > 0", name="ordered"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    camera_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cameras.id"))
+    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    track_id: Mapped[int] = mapped_column(Integer)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    segments: Mapped[list[dict[str, object]]] = mapped_column(JSONB)
+    truncated: Mapped[bool] = mapped_column(Boolean, server_default="false")

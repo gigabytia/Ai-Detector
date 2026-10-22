@@ -31,7 +31,10 @@ async def _truncate(url: str) -> None:
     engine = create_async_engine(url)
     async with engine.begin() as conn:
         await conn.execute(
-            text("TRUNCATE snapshots, events, lines, zones, camera_configs, cameras")
+            text(
+                "TRUNCATE camera_samples, track_sessions, snapshots, events, lines, "
+                "zones, camera_configs, cameras"
+            )
         )
     await engine.dispose()
 

@@ -57,6 +57,223 @@
         }
       }
     },
+    "/api/v1/analytics": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Dashboard",
+        "operationId": "dashboard_api_v1_analytics_get",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "camera_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/tracks": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Tracks",
+        "operationId": "tracks_api_v1_analytics_tracks_get",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "camera_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
     "/api/v1/events": {
       "get": {
         "tags": [
@@ -2192,6 +2409,74 @@
         ],
         "title": "CameraRuntimeRead"
       },
+      "CameraStatistics": {
+        "properties": {
+          "camera_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Camera Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "archived": {
+            "type": "boolean",
+            "title": "Archived"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "events": {
+            "type": "integer",
+            "title": "Events"
+          },
+          "observed_seconds": {
+            "type": "number",
+            "title": "Observed Seconds"
+          },
+          "average_persons": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Persons"
+          },
+          "max_persons": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Persons"
+          },
+          "completed_tracks": {
+            "type": "integer",
+            "title": "Completed Tracks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "name",
+          "archived",
+          "enabled",
+          "events",
+          "observed_seconds",
+          "average_persons",
+          "max_persons",
+          "completed_tracks"
+        ],
+        "title": "CameraStatistics"
+      },
       "CameraStatus": {
         "type": "string",
         "enum": [
@@ -2247,6 +2532,130 @@
         "additionalProperties": false,
         "type": "object",
         "title": "CameraUpdate"
+      },
+      "Dashboard": {
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End"
+          },
+          "camera_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera Id"
+          },
+          "total_events": {
+            "type": "integer",
+            "title": "Total Events"
+          },
+          "critical_events": {
+            "type": "integer",
+            "title": "Critical Events"
+          },
+          "false_positives": {
+            "type": "integer",
+            "title": "False Positives"
+          },
+          "active_cameras": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Cameras"
+          },
+          "enabled_cameras": {
+            "type": "integer",
+            "title": "Enabled Cameras"
+          },
+          "average_events_per_camera": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Events Per Camera"
+          },
+          "completed_tracks": {
+            "type": "integer",
+            "title": "Completed Tracks"
+          },
+          "by_type": {
+            "items": {
+              "$ref": "#/components/schemas/EventCount"
+            },
+            "type": "array",
+            "title": "By Type"
+          },
+          "by_camera": {
+            "items": {
+              "$ref": "#/components/schemas/CameraStatistics"
+            },
+            "type": "array",
+            "title": "By Camera"
+          },
+          "events_over_time": {
+            "items": {
+              "$ref": "#/components/schemas/TimeBucket"
+            },
+            "type": "array",
+            "title": "Events Over Time"
+          },
+          "people_over_time": {
+            "items": {
+              "$ref": "#/components/schemas/PeopleBucket"
+            },
+            "type": "array",
+            "title": "People Over Time"
+          },
+          "bucket_seconds": {
+            "type": "integer",
+            "title": "Bucket Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "generated_at",
+          "start",
+          "end",
+          "camera_id",
+          "total_events",
+          "critical_events",
+          "false_positives",
+          "enabled_cameras",
+          "average_events_per_camera",
+          "completed_tracks",
+          "by_type",
+          "by_camera",
+          "events_over_time",
+          "people_over_time",
+          "bucket_seconds"
+        ],
+        "title": "Dashboard"
       },
       "DependencyStatusRead": {
         "properties": {
@@ -2322,6 +2731,24 @@
           "error"
         ],
         "title": "ErrorResponse"
+      },
+      "EventCount": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "count"
+        ],
+        "title": "EventCount"
       },
       "EventPage": {
         "properties": {
@@ -2716,6 +3143,35 @@
         ],
         "title": "NormalizedPoint"
       },
+      "PeopleBucket": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "persons": {
+            "type": "number",
+            "title": "Persons"
+          },
+          "persons_in_zone": {
+            "type": "number",
+            "title": "Persons In Zone"
+          },
+          "samples": {
+            "type": "integer",
+            "title": "Samples"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "persons",
+          "persons_in_zone",
+          "samples"
+        ],
+        "title": "PeopleBucket"
+      },
       "ReadinessRead": {
         "properties": {
           "status": {
@@ -2740,6 +3196,37 @@
           "dependencies"
         ],
         "title": "ReadinessRead"
+      },
+      "Segment": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "LOST",
+              "IN_DANGER_ZONE"
+            ],
+            "title": "State"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state",
+          "start",
+          "end"
+        ],
+        "title": "Segment"
       },
       "SourceType": {
         "type": "string",
@@ -2788,6 +3275,125 @@
           "workers"
         ],
         "title": "SystemStatusRead"
+      },
+      "TimeBucket": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "events": {
+            "type": "integer",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "events"
+        ],
+        "title": "TimeBucket"
+      },
+      "TrackPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrackSession"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "TrackPage"
+      },
+      "TrackSession": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "camera_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Camera Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "kind": {
+            "type": "string",
+            "const": "track",
+            "title": "Kind",
+            "default": "track"
+          },
+          "track_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Track Id"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ended At"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/Segment"
+            },
+            "type": "array",
+            "maxItems": 2048,
+            "minItems": 1,
+            "title": "Segments"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "camera_id",
+          "run_id",
+          "track_id",
+          "started_at",
+          "ended_at",
+          "segments"
+        ],
+        "title": "TrackSession"
       },
       "UploadRead": {
         "properties": {

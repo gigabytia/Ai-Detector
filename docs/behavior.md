@@ -143,3 +143,9 @@ OUTSIDE ──anchor внутри──► ENTERING ──внутри ≥ dwell
 ## Граница реализации M9
 
 Правила §5 реализованы LineEngine (ADR-036): конечный отрезок, projection текущего anchor при подтверждении, оба signed направления, hysteresis, LOST freeze/recovery, bounded confidence window, wall-clock cooldown отдельно от зоны. Crossing — событие, не состояние PersonTrack. Линии hot CRUD и историческая геометрия в event detail доступны; loitering, dashboard и аналитика пока нет.
+
+## M10 — dashboard/track timeline
+
+Период UTC [start,end), default24ч, REST≤31д, UI1ч/24ч/7д с ручным обновлением. Events включают false positives, current status; среднее событий делится на все зарегистрированные выбранные камеры, включая архивные/нулевые. Active cameras — сейчас (RUNNING/DEGRADED), Redis error неизвестно/null. Нет PostgreSQL →503/повторить, не нулевые KPI.
+
+People sampled1Hz latest, max не frame peak, mean не frame weighted. Missing observations не zero. Observed duration суммирует gaps≤2с без extrapolation; gap>2с исключён и в retained track timeline обозначается LOST. Треки camera/run/track, не физические уникальные люди, только завершённые, полные сессии при overlap периода. Collector4096/cap2048segments/truncated, outbox1000; caps — implementation safety, не новые env settings. Нет automatic analytics retention. См. ADR-037.

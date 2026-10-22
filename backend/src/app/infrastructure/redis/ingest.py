@@ -45,6 +45,10 @@ def stream_messages(result: object) -> list[tuple[bytes, dict[bytes, bytes]]]:
 
 
 class EventIngest:
+    stream = INGEST_STREAM
+    group = INGEST_GROUP
+    dead = DEAD_STREAM
+
     def __init__(
         self, redis: Redis, sessions: async_sessionmaker[AsyncSession], retention_days: int = 30
     ) -> None:
@@ -55,7 +59,7 @@ class EventIngest:
 
     async def ensure_group(self) -> None:
         try:
-            await self.redis.xgroup_create(INGEST_STREAM, INGEST_GROUP, id="0", mkstream=True)
+            await self.redis.xgroup_create(self.stream, self.group, id="0", mkstream=True)
         except ResponseError as exc:
             if "BUSYGROUP" not in str(exc):
                 raise
@@ -155,7 +159,7 @@ class EventIngest:
         async with self.redis.pipeline(transaction=True) as pipe:
             for message_id, fields, reason in dead:
                 pipe.xadd(
-                    DEAD_STREAM,
+                    self.dead,
                     {
                         "message_id": message_id,
                         "reason": reason,
@@ -172,8 +176,8 @@ class EventIngest:
                 pipe.delete(pending_event_key(event_id))
             ids = [message_id for message_id, _ in messages]
             if ids:
-                pipe.xack(INGEST_STREAM, INGEST_GROUP, *ids)
-                pipe.xdel(INGEST_STREAM, *ids)
+                pipe.xack(self.stream, self.group, *ids)
+                pipe.xdel(self.stream, *ids)
             await pipe.execute()
 
     async def run(self, stop: asyncio.Event) -> None:
@@ -184,16 +188,16 @@ class EventIngest:
                 await self.ensure_group()
                 # Retry our failed batch first, then recover a crashed API consumer.
                 result = await self.redis.xreadgroup(
-                    INGEST_GROUP,
+                    self.group,
                     self.consumer,
-                    {INGEST_STREAM: "0"},
+                    {self.stream: "0"},
                     count=200,
                 )
                 messages = stream_messages(result)
                 if not messages:
                     claimed = await self.redis.xautoclaim(
-                        INGEST_STREAM,
-                        INGEST_GROUP,
+                        self.stream,
+                        self.group,
                         self.consumer,
                         min_idle_time=30000,
                         start_id=claim_cursor,
@@ -203,9 +207,9 @@ class EventIngest:
                     messages = cast(list[tuple[bytes, dict[bytes, bytes]]], claimed[1])
                 if not messages:
                     result = await self.redis.xreadgroup(
-                        INGEST_GROUP,
+                        self.group,
                         self.consumer,
-                        {INGEST_STREAM: ">"},
+                        {self.stream: ">"},
                         count=200,
                         block=500,
                     )

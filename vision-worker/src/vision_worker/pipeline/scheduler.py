@@ -18,6 +18,7 @@ from vision_worker.cameras.session import CameraSession
 from vision_worker.inference.adapters.scripted import ScriptedPersonDetector
 from vision_worker.inference.detector import PersonDetector
 from vision_worker.messaging.events import EventPublisher
+from vision_worker.pipeline.analytics import AnalyticsCollector
 from vision_worker.pipeline.preview import PreviewHub
 from vision_worker.pipeline.results import DetectionResult
 from vision_worker.pipeline.telemetry import TelemetryHub
@@ -49,7 +50,9 @@ class InferenceScheduler:
         events: EventPublisher | None = None,
         telemetry: TelemetryHub | None = None,
         snapshots: SnapshotWriter | None = None,
+        analytics: AnalyticsCollector | None = None,
     ) -> None:
+        self._analytics = analytics
         self._snapshots = snapshots
         self._events = events
         self._telemetry = telemetry
@@ -207,6 +210,8 @@ class InferenceScheduler:
                     await asyncio.get_running_loop().run_in_executor(
                         self._pool, self._retain, current
                     )
+                    if self._analytics is not None:
+                        self._analytics.retain(current)
                     active_keys = current
                 items = self.collect(self._batch_size)
                 if not items:
@@ -262,6 +267,8 @@ class InferenceScheduler:
                                     "line_id": str(event.line_id) if event.line_id else None,
                                 },
                             )
+                        if self._analytics is not None:
+                            self._analytics.offer(result)
                         item.session.record_result(result)
                         self._preview.offer(result)
                         if self._telemetry is not None:
@@ -271,4 +278,6 @@ class InferenceScheduler:
             raise
         finally:
             await asyncio.get_running_loop().run_in_executor(self._pool, self._retain, set())
+            if self._analytics is not None:
+                self._analytics.retain(set())
             self._pool.shutdown(wait=True)

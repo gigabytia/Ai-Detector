@@ -1,0 +1,39 @@
+import asyncio,json
+from datetime import UTC,datetime,timedelta
+from pathlib import Path
+import httpx
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+from redis.asyncio import Redis
+OUT=Path('/data/m10/Ai-Detector/docs/qa/m10')
+async def main():
+ redis=Redis.from_url('redis://127.0.0.1:16379/0')
+ async with httpx.AsyncClient(base_url='http://127.0.0.1:18000',timeout=30) as c:
+  cams=(await c.get('/api/v1/cameras')).json()
+  for cam in cams:(await c.post(f"/api/v1/cameras/{cam['id']}/stop")).raise_for_status()
+  await asyncio.sleep(3)
+  for _ in range(100):
+   if await redis.xlen('ad:analytics:ingest')==0 and await redis.xlen('ad:ingest')==0:break
+   await asyncio.sleep(.1)
+  end=datetime.now(UTC);start=end-timedelta(hours=1);params={'start':start.isoformat(),'end':end.isoformat()}
+  r=await c.get('/api/v1/analytics',params=params);r.raise_for_status();d=r.json()
+  engine=create_async_engine('postgresql+asyncpg://ai_detector@127.0.0.1:15432/ai_detector_m10')
+  async with engine.connect() as conn:
+   count=(await conn.execute(text('SELECT count(*) FROM events WHERE occurred_at>=:s AND occurred_at<:e'),{'s':start,'e':end})).scalar_one()
+   samples=(await conn.execute(text('SELECT count(*) FROM camera_samples WHERE at>=:s AND at<:e'),{'s':start,'e':end})).scalar_one()
+   finished=(await conn.execute(text('SELECT count(*) FROM track_sessions WHERE started_at<:e AND ended_at>=:s'),{'s':start,'e':end})).scalar_one()
+  await engine.dispose()
+  assert d['total_events']==count==sum(b['events'] for b in d['events_over_time'])==sum(b['count'] for b in d['by_type'])==sum(b['events'] for b in d['by_camera'])
+  assert d['completed_tracks']==finished and d['active_cameras']==0
+  real=next(x for x in cams if x['source_type']=='file');realstats=next(x for x in d['by_camera'] if x['camera_id']==real['id']);assert realstats['max_persons']>0 and realstats['completed_tracks']>0
+  # All persisted track segments are ordered; no pretending that run/track IDs identify a person.
+  page=(await c.get('/api/v1/analytics/tracks',params={**params,'limit':50})).json()
+  assert page['items']
+  for track in page['items']:
+   assert track['started_at']<=track['ended_at']
+   for seg in track['segments']:assert seg['start']<=seg['end']
+  OUT.joinpath('live-dashboard.json').write_text(json.dumps(d,ensure_ascii=False,indent=2))
+  print(json.dumps({'sql_event_count':count,'dashboard_totals_crossfoot':True,'observations':samples,'completed_tracks':finished,'stop_finalized_tracks':True,'active_cameras_after_stop':0,'cpu_yolo_camera':realstats,'analytics_backlog':await redis.xlen('ad:analytics:ingest')}),flush=True)
+  for cam in cams:(await c.post(f"/api/v1/cameras/{cam['id']}/start")).raise_for_status()
+ await redis.aclose()
+asyncio.run(main())

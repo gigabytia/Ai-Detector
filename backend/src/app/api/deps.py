@@ -7,6 +7,7 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_detector_core.cameras.config import CameraConfig
+from app.application.analytics_service import AnalyticsService
 from app.application.camera_config_service import CameraConfigService
 from app.application.camera_service import CameraService
 from app.application.event_service import EventService
@@ -15,6 +16,7 @@ from app.application.system_service import SystemService
 from app.application.worker_spec_service import WorkerSpecService
 from app.application.zone_service import ZoneService
 from app.core.lifecycle import AppResources
+from app.infrastructure.database.repositories.analytics import AnalyticsRepository
 from app.infrastructure.database.repositories.cameras import CameraRepository
 from app.infrastructure.database.repositories.events import EventRepository
 from app.infrastructure.database.repositories.lines import LineRepository
@@ -87,4 +89,10 @@ def get_event_service(resources: Resources, session: Session) -> EventService:
 def get_line_service(resources: Resources, session: Session) -> LineService:
     return LineService(
         LineRepository(session), RedisCommandPublisher(resources.redis), resources.clock
+    )
+
+
+def get_analytics_service(resources: Resources, session: Session) -> AnalyticsService:
+    return AnalyticsService(
+        AnalyticsRepository(session), RedisCameraStatusReader(resources.redis), resources.clock
     )
