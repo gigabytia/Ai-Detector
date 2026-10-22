@@ -1,6 +1,6 @@
 # Архитектура AI Detector v2
 
-> Реализован M12 в CPU-среде: M11 pipeline сохранён, добавлены local Prometheus metrics/benchmark, исправлен predictor thread reset и лишний batch wait. Границы — PROGRESS.md, ADR-039, docs/qa/m12/REPORT.md. GPU/RTSP/full storage нагрузка не проверены.
+> Реализован M13: аудит и регрессии поверх M12; полнопайплайновые CPU/file проверки, bounded CSV/upload/snapshot и защита local deployment. Итог и границы — docs/AUDIT_REPORT.md и docs/deployment.md. Авторизации оператора нет; production gate не пройден.
 
 Система видеонаблюдения: находит **людей** на видеопотоках, отслеживает их (track ID внутри камеры) и сообщает оператору о входе в опасную зону, пересечении линии и долгом нахождении в зоне. Объекты, перенос груза и pose estimation в эту версию не входят (ТЗ §2, §27).
 

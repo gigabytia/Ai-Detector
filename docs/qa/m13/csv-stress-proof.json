@@ -1,0 +1,19 @@
+{
+  "exact_50000": {
+    "status": 200,
+    "rows": 50000,
+    "bytes": 11139098,
+    "seconds": 1.779547439999078,
+    "sha256": "d1a215c073e6b9704e808419c7244116636c6a4c1f8d2472f88213760dba370a"
+  },
+  "three_concurrent_exports": [
+    200,
+    200,
+    503
+  ],
+  "row_50001_rejected_without_partial_file": true,
+  "real_20_mib_cap_rejected_without_partial_file": true,
+  "server_rss_baseline_bytes": 99299328,
+  "server_sampled_peak_rss_bytes": 160886784,
+  "snapshot_db_outage_503": true
+}

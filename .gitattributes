@@ -14,3 +14,7 @@
 *.lock text eol=lf
 *.md text eol=lf
 .env.example text eol=lf
+
+# Preserve the accepted CSV fixture byte-for-byte (BOM + CRLF).
+/docs/qa/m13/raw/events.csv -text
+/docs/qa/m13/*.log -whitespace

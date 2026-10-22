@@ -1,0 +1,40 @@
+{
+  "ports": [
+    {
+      "service": "postgres",
+      "bind": "127.0.0.1:15432:5432"
+    },
+    {
+      "service": "redis",
+      "bind": "127.0.0.1:6379:6379"
+    },
+    {
+      "service": "api",
+      "bind": "127.0.0.1:8000:8000"
+    },
+    {
+      "service": "vision-worker",
+      "bind": "127.0.0.1:8001:8001"
+    },
+    {
+      "service": "frontend",
+      "bind": "127.0.0.1:8080:80"
+    },
+    {
+      "service": "mediamtx",
+      "bind": "127.0.0.1:8554:8554"
+    },
+    {
+      "service": "mediamtx",
+      "bind": "127.0.0.1:8889:8889"
+    },
+    {
+      "service": "mediamtx",
+      "bind": "127.0.0.1:8888:8888"
+    }
+  ],
+  "loopback_only": true,
+  "directories_before_user": true,
+  "nginx_default_cap_mib": 2049,
+  "docker_executed": false
+}

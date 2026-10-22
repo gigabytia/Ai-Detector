@@ -6,7 +6,11 @@ export type Theme = 'light' | 'dark'
 const THEME_STORAGE_KEY = 'ai-detector.theme'
 
 function readStoredTheme(): Theme {
-  return localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light'
+  try {
+    return localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light'
+  } catch {
+    return 'light'
+  }
 }
 
 /** Client-only UI preferences. Server data lives in Vue Query, never here. */
@@ -17,7 +21,11 @@ export const useUiStore = defineStore('ui', () => {
     theme,
     (value) => {
       document.documentElement.classList.toggle('dark', value === 'dark')
-      localStorage.setItem(THEME_STORAGE_KEY, value)
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, value)
+      } catch {
+        // Storage may be disabled; keep the selected theme in memory.
+      }
     },
     { immediate: true },
   )

@@ -11,6 +11,7 @@ from app.api.v1.router import api_v1_router
 from app.core.config import Settings, get_settings
 from app.core.lifecycle import make_lifespan
 from app.core.logging import configure_logging
+from app.middleware.upload_limit import UploadBodyLimitMiddleware
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -20,6 +21,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version=__version__,
         lifespan=make_lifespan(settings),
     )
+    app.add_middleware(UploadBodyLimitMiddleware, max_file_bytes=settings.upload_max_bytes)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

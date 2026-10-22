@@ -1,0 +1,42 @@
+"""Sandbox-only cold backup/restore drill; never point at a user database."""
+import asyncio,hashlib,json,os,shutil,subprocess,time
+from pathlib import Path
+import httpx
+P=Path('/data/audit13');R=Path('/data/m10/Ai-Detector');B=P/'runtime/backup';D=P/'runtime/restored';B.mkdir(exist_ok=True);D.mkdir(exist_ok=True)
+SOURCE='ai_detector_audit13_verified2';TARGET='ai_detector_audit13_restore'
+def cmd(*a):return subprocess.check_output(a,text=True).strip()
+def sql(db,s):return cmd('psql','-h','127.0.0.1','-p','15532','-d',db,'-At','-c',s)
+def counts(db):
+ tables=sql(db,"SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename").splitlines()
+ return {t:int(sql(db,'SELECT count(*) FROM "'+t+'"')) for t in tables}
+def digest(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+async def main():
+ assert (P/'full-pipeline-proof.json').exists(),'Finish and stop writers before the cold backup'
+ pids=json.loads((P/'runtime/pids.json').read_text());assert all(not Path(f'/proc/{p}').exists() for p in pids.values())
+ subprocess.run(['pg_dump','-h','127.0.0.1','-p','15532','-Fc','-f',str(B/'database.dump'),SOURCE],check=True)
+ original=counts(SOURCE);snapshots=json.loads(sql(SOURCE,"SELECT coalesce(json_agg(row_to_json(s)), '[]') FROM (SELECT id,storage_key FROM snapshots ORDER BY id) s"));manifest={}
+ for s in snapshots:
+  rel=Path(s['storage_key']).relative_to('snapshots');source=P/'runtime/snapshots'/rel;dest=B/'snapshots'/rel;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source,dest);manifest[s['storage_key']]=digest(source);assert digest(dest)==manifest[s['storage_key']]
+ shutil.copytree(P/'runtime/uploads',B/'uploads',dirs_exist_ok=True);shutil.copytree(B/'snapshots',D/'snapshots',dirs_exist_ok=True);shutil.copytree(B/'uploads',D/'uploads',dirs_exist_ok=True)
+ subprocess.run(['createdb','-h','127.0.0.1','-p','15532',TARGET],check=True);subprocess.run(['pg_restore','-h','127.0.0.1','-p','15532','-d',TARGET,'--no-owner','--exit-on-error',str(B/'database.dump')],check=True)
+ restored=counts(TARGET);assert original==restored
+ for key,h in manifest.items():assert digest(D/'snapshots'/Path(key).relative_to('snapshots'))==h
+ upload_manifest={str(f.relative_to(B/'uploads')):digest(f) for f in (B/'uploads').rglob('*') if f.is_file()}
+ assert upload_manifest=={str(f.relative_to(D/'uploads')):digest(f) for f in (D/'uploads').rglob('*') if f.is_file()}
+ env=json.loads((P/'runtime/env.json').read_text());env.update({'DATABASE_URL':f'postgresql+asyncpg://vercel-sandbox@127.0.0.1:15532/{TARGET}','API_PORT':'18210','SNAPSHOT_PATH':str(D/'snapshots'),'UPLOAD_PATH':str(D/'uploads')})
+ with (P/'api-restored.log').open('w') as log:proc=subprocess.Popen([str(R/'.venv/bin/ai-detector-api')],cwd=R,env=env,stdout=log,stderr=subprocess.STDOUT)
+ try:
+  async with httpx.AsyncClient(base_url='http://127.0.0.1:18210',timeout=30) as c:
+   for _ in range(100):
+    try:
+     if (await c.get('/health/ready')).status_code==200:break
+    except httpx.HTTPError:pass
+    await asyncio.sleep(.1)
+   else:raise AssertionError('Restored API not ready')
+   for s in snapshots[:5]:
+    response=await c.get('/api/v1/snapshots/'+s['id']);response.raise_for_status();assert hashlib.sha256(response.content).hexdigest()==manifest[s['storage_key']]
+   response=await c.get('/api/v1/events/export');response.raise_for_status();import csv,io;assert len(list(csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))))==original['events']
+   response=await c.get('/api/v1/analytics');response.raise_for_status();assert response.json()['total_events']==original['events']
+ finally:proc.terminate();await asyncio.to_thread(proc.wait,10)
+ (B/'file-manifest.json').write_text(json.dumps(manifest,indent=2));proof={'pass':True,'scope':'Cold isolated PostgreSQL + all DB-referenced JPEGs + upload files; service stopped and both Streams already drained; no Redis AOF/disaster-recovery/HA certification','table_counts':original,'restored_table_counts_equal':True,'snapshot_files_checked':len(manifest),'upload_files_checked':len(upload_manifest),'all_file_hashes_equal':True,'restored_api_jpegs_checked':min(5,len(snapshots)),'restored_csv_and_dashboard_match_events':True,'database_dump_sha256':digest(B/'database.dump'),'snapshot_manifest_sha256':digest(B/'file-manifest.json')};(P/'restore-proof.json').write_text(json.dumps(proof,indent=2));print(json.dumps(proof))
+asyncio.run(main())

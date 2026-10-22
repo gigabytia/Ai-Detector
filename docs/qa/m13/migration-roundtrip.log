@@ -1,0 +1,40 @@
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> a43b43e08e6b, create cameras
+INFO  [alembic.runtime.migration] Running upgrade a43b43e08e6b -> b452b4c88e6b, Per-camera detection configuration.
+INFO  [alembic.runtime.migration] Running upgrade b452b4c88e6b -> c631d038af01, Danger zones and per-camera zone timing overrides.
+INFO  [alembic.runtime.migration] Running upgrade c631d038af01 -> 14d6499b16a2, event history and operator status
+INFO  [alembic.runtime.migration] Running upgrade 14d6499b16a2 -> 48f1a410c0ce, event snapshots and camera snapshot config
+INFO  [alembic.runtime.migration] Running upgrade 48f1a410c0ce -> e2c6db45c9b8, camera lines and crossing event reference
+INFO  [alembic.runtime.migration] Running upgrade e2c6db45c9b8 -> a9345caf81b1, camera observations and completed track sessions
+INFO  [alembic.runtime.migration] Running upgrade a9345caf81b1 -> b6b7cfcd87c5, camera loitering threshold
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running downgrade b6b7cfcd87c5 -> a9345caf81b1, camera loitering threshold
+INFO  [alembic.runtime.migration] Running downgrade a9345caf81b1 -> e2c6db45c9b8, camera observations and completed track sessions
+INFO  [alembic.runtime.migration] Running downgrade e2c6db45c9b8 -> 48f1a410c0ce, camera lines and crossing event reference
+INFO  [alembic.runtime.migration] Running downgrade 48f1a410c0ce -> 14d6499b16a2, event snapshots and camera snapshot config
+INFO  [alembic.runtime.migration] Running downgrade 14d6499b16a2 -> c631d038af01, event history and operator status
+INFO  [alembic.runtime.migration] Running downgrade c631d038af01 -> b452b4c88e6b, Danger zones and per-camera zone timing overrides.
+INFO  [alembic.runtime.migration] Running downgrade b452b4c88e6b -> a43b43e08e6b, Per-camera detection configuration.
+INFO  [alembic.runtime.migration] Running downgrade a43b43e08e6b -> , create cameras
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> a43b43e08e6b, create cameras
+INFO  [alembic.runtime.migration] Running upgrade a43b43e08e6b -> b452b4c88e6b, Per-camera detection configuration.
+INFO  [alembic.runtime.migration] Running upgrade b452b4c88e6b -> c631d038af01, Danger zones and per-camera zone timing overrides.
+INFO  [alembic.runtime.migration] Running upgrade c631d038af01 -> 14d6499b16a2, event history and operator status
+INFO  [alembic.runtime.migration] Running upgrade 14d6499b16a2 -> 48f1a410c0ce, event snapshots and camera snapshot config
+INFO  [alembic.runtime.migration] Running upgrade 48f1a410c0ce -> e2c6db45c9b8, camera lines and crossing event reference
+INFO  [alembic.runtime.migration] Running upgrade e2c6db45c9b8 -> a9345caf81b1, camera observations and completed track sessions
+INFO  [alembic.runtime.migration] Running upgrade a9345caf81b1 -> b6b7cfcd87c5, camera loitering threshold
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.schemas
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.tables
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.types
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.constraints
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.defaults
+INFO  [alembic.runtime.plugins] setting up autogenerate plugin alembic.autogenerate.comments
+No new upgrade operations detected.
+Resolved 94 packages in 1ms

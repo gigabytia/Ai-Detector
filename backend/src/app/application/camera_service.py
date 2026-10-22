@@ -85,9 +85,10 @@ class CameraService:
     async def create_camera(
         self, name: str, source_type: SourceType, source_url: str, enabled: bool
     ) -> CameraView:
+        self._check_source(source_type, source_url)
+        await self._repo.lock_creation()
         if await self._repo.count_active() >= self._max_cameras:
             raise CameraLimitReachedError(self._max_cameras)
-        self._check_source(source_type, source_url)
         now = self._clock.now()
         camera = CameraModel(
             id=uuid.uuid4(),
@@ -108,7 +109,7 @@ class CameraService:
     async def update_camera(self, camera_id: uuid.UUID, changes: CameraChanges) -> CameraView:
         camera = await self._require(camera_id)
         source_type = changes.source_type or SourceType(camera.source_type)
-        source_url = changes.source_url or camera.source_url
+        source_url = changes.source_url if changes.source_url is not None else camera.source_url
         if changes.source_type is not None or changes.source_url is not None:
             self._check_source(source_type, source_url)
         if changes.name is not None:

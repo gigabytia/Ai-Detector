@@ -6,11 +6,12 @@ from uuid import UUID
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from ai_detector_core.storage.snapshots import LocalSnapshotStorage
 from app.api.deps import Resources, Session
 from app.api.errors import ErrorResponse
-from app.application.errors import NotFoundError
+from app.application.errors import NotFoundError, ServiceUnavailableError
 from app.infrastructure.database.models import SnapshotModel
 
 
@@ -32,7 +33,10 @@ router = APIRouter(prefix="/snapshots", tags=["snapshots"])
 async def get_snapshot(
     snapshot_id: UUID, resources: Resources, session: Session
 ) -> StreamingResponse:
-    model = await session.get(SnapshotModel, snapshot_id)
+    try:
+        model = await session.get(SnapshotModel, snapshot_id)
+    except (SQLAlchemyError, OSError) as exc:
+        raise ServiceUnavailableError("Snapshot metadata temporarily unavailable") from exc
     if model is None:
         raise SnapshotNotFoundError("Snapshot not found or expired")
     storage = LocalSnapshotStorage(resources.settings.snapshot_path)

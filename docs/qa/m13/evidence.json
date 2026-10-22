@@ -1,0 +1,56 @@
+{
+  "scope": "CPU local static 810x1080 15FPS MP4, real YOLO/ByteTrack + API/Redis/PostgreSQL/snapshots/analytics + WS previews + SSE; not RTSP/GPU/production certification",
+  "stages": [
+    {
+      "cameras": 4,
+      "seconds": 180.04447381499995,
+      "samples": 36,
+      "processed_frames": 3776.0,
+      "total_fps": 20.972595936934624,
+      "mean_fps_per_camera": 5.243148984233656,
+      "independent_raw_fps": 21.000163366172128,
+      "api_analytics_sampled_p95_ms": 29.71035899963681,
+      "max_event_stream_length_sampled": 0,
+      "max_analytics_stream_length_sampled": 0,
+      "pipeline_errors": 0,
+      "api_cpu_mean_percent_one_core": 2.7885714285714287,
+      "api_sampled_peak_rss_mib": 98.13671875,
+      "worker_cpu_mean_percent_one_core": 171.37142857142857,
+      "worker_sampled_peak_rss_mib": 765.93359375
+    },
+    {
+      "cameras": 8,
+      "seconds": 300.0742908070006,
+      "samples": 60,
+      "processed_frames": 5092.0,
+      "total_fps": 16.969131165172136,
+      "mean_fps_per_camera": 2.121141395646517,
+      "independent_raw_fps": 16.96030407580864,
+      "api_analytics_sampled_p95_ms": 40.61825130029319,
+      "max_event_stream_length_sampled": 14,
+      "max_analytics_stream_length_sampled": 0,
+      "pipeline_errors": 0,
+      "api_cpu_mean_percent_one_core": 5.415254237288136,
+      "api_sampled_peak_rss_mib": 98.74609375,
+      "worker_cpu_mean_percent_one_core": 168.30169491525427,
+      "worker_sampled_peak_rss_mib": 890.984375
+    }
+  ],
+  "comparison_plan": [
+    {
+      "grain": "whole audit",
+      "population": "tested local build",
+      "unit": "pass/fail",
+      "finding": "regressions and recoverability gates; no performance improvement claim",
+      "disposition": "prose",
+      "reason": "Primary question is testing/audit, not trends or ranking; per-stage numbers retained as diagnostic evidence only."
+    }
+  ],
+  "method_notes": [
+    "CSV grain is one persisted event, not person. line_id is intentionally null (only zone rules configured); note/acknowledged_at/false_positive_at are intentionally null (no operator edits in load). Status NEW is intentional. track_id is a non-additive identifier; profiler sum/day hint is rejected. processed_total is cumulative and must be differenced, never summed or interpreted as daily rate. ISO timestamps parsed UTC before validation.",
+    "Rows are ~5s samples; nested status and Prometheus samples stay raw. Constant camera count and zero error/drop fields are intentional, not missing data.",
+    "First CPU sample excluded: its psutil interval includes warmup/preceding stage. RSS/API quantiles are sampled diagnostics, not strict maxima or SLAs.",
+    "FPS uses complete-stage worker counter delta/wall seconds; independent adjacent-raw counter/time arithmetic must agree within3%. Latest-frame drops are intentional under capacity pressure, not event loss.",
+    "These are one sequential local-file run per stage, not a controlled before/after comparison, RTSP/GPU certification or a24h soak. Local latency is not sensor-to-browser; no latency percentiles inferred from the sampled latest-value gauge."
+  ]
+}

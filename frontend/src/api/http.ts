@@ -14,11 +14,15 @@ export class ApiError extends Error {
 }
 
 function isErrorResponse(value: unknown): value is ErrorResponse {
+  if (typeof value !== 'object' || value === null || !('error' in value)) return false
+  const error = value.error
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    'error' in value &&
-    typeof (value as { error: unknown }).error === 'object'
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    'message' in error &&
+    typeof error.code === 'string' &&
+    typeof error.message === 'string'
   )
 }
 

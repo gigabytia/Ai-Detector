@@ -2,7 +2,7 @@
 
 Система видеонаблюдения: детекция и трекинг **людей**, события входа в опасную зону, пересечения линии и долгого нахождения в зоне, интерфейс оператора.
 
-**Статус:** Milestone 12 завершён в CPU-среде: reproducible benchmark CLI, Prometheus /metrics, исправлено применение inference threads и лишнее ожидание batch. M11 loitering/CSV и предыдущая pipeline сохранены. GPU/реальные RTSP/длительная end-to-end нагрузка не проверены. Обновление — [UPDATE_MILESTONE_12.md](UPDATE_MILESTONE_12.md), проверки — [PROGRESS.md](PROGRESS.md), [измерения](docs/qa/m12/REPORT.md).
+**Статус:** **Milestone 13 — финальный доступный аудит и исправления.** База M12 `ac41f76`, автор Kostya, настоящая исходная `.git` сохранена. 265 unit +46 integration +134 frontend, linters/strict types/build, empty-DB migration roundtrip/lock/OpenAPI, production browser28 checks, CSV50000 rows/concurrency/caps, full CPU file pipeline4×180с/8×300с, Redis/PG outages и cold backup/restore проверены. Найденные quota/upload/CSV/snapshot/dependency/deploy дефекты исправлены. Подробности и доказательства — [docs/AUDIT_REPORT.md](docs/AUDIT_REPORT.md), [QA](docs/qa/m13/README.md). **Public/shared production NO-GO:** operator auth нет, target RTSP/GPU/Docker/Windows/24h и10FPS/camera не подтверждены. Обновление — [UPDATE_MILESTONE_13.md](UPDATE_MILESTONE_13.md). Предыдущие этапы ниже исторические.
 
 ## Архитектура
 

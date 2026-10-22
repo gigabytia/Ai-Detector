@@ -1,0 +1,3 @@
+{"cameras": 4, "measured_seconds": 180.04447381499995, "warmup_seconds": 15, "samples": 36, "processed_delta": 3776.0, "preview_jpegs": 2262, "sse_alarms_so_far": 1056}
+{"cameras": 8, "measured_seconds": 300.0742908070006, "warmup_seconds": 15, "samples": 60, "processed_delta": 5092.0, "preview_jpegs": 7353, "sse_alarms_so_far": 4448}
+{"pass": true, "persisted_counts": {"events": 4832, "snapshots": 4832, "camera_samples": 3612, "track_sessions": 2416}, "worker_shutdown_seconds": 1.2074113839989877, "api_open_sse_shutdown_seconds": 3.2103316229986376, "preview_jpeg_total": 7353}

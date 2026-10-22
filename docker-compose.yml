@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-ai_detector}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ai_detector}
       POSTGRES_DB: ${POSTGRES_DB:-ai_detector}
-    ports: ["15432:5432"]
+    ports: ["127.0.0.1:15432:5432"]
     volumes: ["postgres-data:/var/lib/postgresql"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -20,7 +20,7 @@ services:
   redis:
     image: redis:8.8-alpine
     command: ["redis-server", "--appendonly", "yes"]
-    ports: ["6379:6379"]
+    ports: ["127.0.0.1:6379:6379"]
     volumes: ["redis-data:/data"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -48,7 +48,7 @@ services:
       SNAPSHOT_CLEANUP_INTERVAL_SECONDS: ${SNAPSHOT_CLEANUP_INTERVAL_SECONDS:-3600}
       UPLOAD_PATH: /data/uploads
     volumes: ["uploads:/data/uploads", "snapshots:/data/snapshots"]
-    ports: ["8000:8000"]
+    ports: ["127.0.0.1:8000:8000"]
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -78,21 +78,21 @@ services:
       SNAPSHOT_PATH: /data/snapshots
       UPLOAD_PATH: /data/uploads
     volumes: ["uploads:/data/uploads:ro", "./models:/app/models:ro", "snapshots:/data/snapshots"]
-    ports: ["8001:8001"]
+    ports: ["127.0.0.1:8001:8001"]
     depends_on:
       redis: { condition: service_healthy }
       api: { condition: service_started }
 
   frontend:
     build: { context: ., dockerfile: docker/frontend.Dockerfile }
-    ports: ["8080:80"]
+    ports: ["127.0.0.1:8080:80"]
     depends_on: [api, vision-worker]
 
   # Level 3 (RTSP → WebRTC/HLS). Start with: docker compose --profile media up
   mediamtx:
     image: bluenviron/mediamtx:1.21.1
     profiles: ["media"]
-    ports: ["8554:8554", "8889:8889", "8888:8888"]
+    ports: ["127.0.0.1:8554:8554", "127.0.0.1:8889:8889", "127.0.0.1:8888:8888"]
 
 volumes:
   postgres-data:

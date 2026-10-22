@@ -249,3 +249,34 @@ def test_snapshot_key_uses_utc_calendar_day() -> None:
     camera, snapshot = uuid4(), uuid4()
     at = datetime(2026, 1, 2, 1, tzinfo=timezone(timedelta(hours=3)))
     assert snapshot_key(camera, at, snapshot) == f"snapshots/{camera}/2026/01/01/{snapshot}.jpg"
+
+
+async def test_snapshot_burst_of_32_alarms_is_bounded_and_all_written(tmp_path: Path) -> None:
+    publisher = EventPublisher(cast(Redis, object()))
+    writer = SnapshotWriter(LocalSnapshotStorage(tmp_path), publisher)
+    frame = Frame(np.zeros((10, 20, 3), np.uint8), 1, 0, datetime.now(UTC))
+    for _ in range(32):
+        writer.offer(event(), frame, True)
+    assert writer.pending_jobs == 32
+    assert writer.retained_bytes == 32 * frame.image.nbytes
+    await writer.close()
+    assert writer.results == {"written": 32, "busy": 0, "failed": 0, "disabled": 0}
+    assert writer.retained_bytes == writer.pending_jobs == 0
+    assert publisher.queue.qsize() == 32
+    assert all(isinstance(publisher.queue.get_nowait(), EventMessage) for _ in range(32))
+
+
+async def test_snapshot_byte_budget_falls_back_and_releases_reservation(tmp_path: Path) -> None:
+    publisher = EventPublisher(cast(Redis, object()))
+    frame = Frame(np.zeros((10, 20, 3), np.uint8), 1, 0, datetime.now(UTC))
+    writer = SnapshotWriter(
+        LocalSnapshotStorage(tmp_path), publisher, max_retained_bytes=frame.image.nbytes
+    )
+    writer.offer(event(), frame, True)
+    fallback = event()
+    writer.offer(fallback, frame, True)
+    assert publisher.queue.get_nowait() is fallback
+    assert writer.results["busy"] == 1
+    assert writer.pending_jobs == 1 and writer.retained_bytes <= writer.max_retained_bytes
+    await writer.close()
+    assert writer.retained_bytes == 0 and writer.results["written"] == 1

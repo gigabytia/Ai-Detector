@@ -148,7 +148,7 @@ REST зоны → PostgreSQL commit → camera.changed → internal CameraSpec (
 
 ## Реализованный поток M8
 
-DetectionResult.frame (без рисования) → bounded SnapshotWriter → JPEG/storage.put → EventMessage(snapshot?) → существующий RAM-outbox/Lua XADD+PUBLISH → ingest event+snapshot в одной DB-транзакции → ACK/XDEL. Pub/sub содержит только DomainEvent, не storage_key. При ошибке optional capture — обычное событие. Browser получает URL по REST, не файл из Stream/SSE. Retention удаляет файл, затем metadata, сохраняя events; orphan scan по mtime старше retention window. Очереди JPEG (4) и event outbox (1000+inflight) имеют разные ограничения.
+DetectionResult.frame (без рисования) → bounded SnapshotWriter → JPEG/storage.put → EventMessage(snapshot?) → существующий RAM-outbox/Lua XADD+PUBLISH → ingest event+snapshot в одной DB-транзакции → ACK/XDEL. Pub/sub содержит только DomainEvent, не storage_key. При ошибке optional capture — обычное событие. Browser получает URL по REST, не файл из Stream/SSE. Retention удаляет файл, затем metadata, сохраняя events; orphan scan по mtime старше retention window. В M8 очередь JPEG была4. В M13 —32 jobs и128MiB conservative raw-frame reservations, два encode/write threads; event outbox (1000+inflight) имеет независимое ограничение. Это не total RSS cap.
 
 ## Реализованный поток M9
 
@@ -165,3 +165,7 @@ Matched inside source timestamps → existing ZoneEngine Visit → strict thresh
 ## M12 — measured performance
 
 M12: capture source.read → frame.captured_monotonic → latest buffer0/1 → fair selected batch≤4 → detector whole-call timer → result delivery/local latency histogram. Это локальная граница, не sensor-to-browser и не DB commit. Метрики не меняют event/snapshot/analytics wire format.
+
+## M13: проверенные resource boundaries
+
+POST upload → ASGI whole-body cap (file limit +1MiB multipart allowance, Content-Length/chunked) → parser с закрытием partial spools → независимый file cap. CSV: два export slots/process → projected server-side cursor100 rows → bounded incremental UTF8 encoder → complete response либо422/503, не partial download. Создание камер сериализовано transaction advisory lock перед quota count/insert; direct SQL/старые writer processes не защищены. Snapshot burst budget и метрики busy/failed отдельно от alarm/outbox delivery. Подробности — ADR-040 и deployment.md.

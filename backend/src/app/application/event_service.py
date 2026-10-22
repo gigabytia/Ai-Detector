@@ -4,6 +4,7 @@ import asyncio
 import base64
 import json
 import logging
+from contextlib import aclosing
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -19,7 +20,7 @@ from app.application.errors import (
     ServiceUnavailableError,
     UnprocessableError,
 )
-from app.application.event_export import MAX_EXPORT_ROWS, encode_export
+from app.application.event_export import MAX_EXPORT_ROWS, CsvExportBuffer
 from app.infrastructure.database.repositories.events import EventRepository, event_read
 from app.schemas.events import EventPage, EventRead, EventUpdate
 
@@ -31,6 +32,8 @@ def decode_cursor(cursor: str | None) -> tuple[datetime, UUID] | None:
         return None
     try:
         at, event_id = json.loads(base64.urlsafe_b64decode(cursor))
+        if not isinstance(at, str) or not isinstance(event_id, str):
+            raise ValueError("cursor components must be strings")
         timestamp = datetime.fromisoformat(at)
         if timestamp.tzinfo is None:
             raise ValueError("timezone required")
@@ -40,10 +43,17 @@ def decode_cursor(cursor: str | None) -> tuple[datetime, UUID] | None:
 
 
 class EventService:
-    def __init__(self, repository: EventRepository, redis: Redis, clock: Clock) -> None:
+    def __init__(
+        self,
+        repository: EventRepository,
+        redis: Redis,
+        clock: Clock,
+        export_slots: asyncio.Semaphore,
+    ) -> None:
         self.repository = repository
         self.redis = redis
         self.clock = clock
+        self.export_slots = export_slots
 
     @staticmethod
     def window(
@@ -90,12 +100,22 @@ class EventService:
     ) -> bytes:
         start, end = self.window(start, end)
         try:
+            await asyncio.wait_for(self.export_slots.acquire(), timeout=0.05)
+        except TimeoutError as exc:
+            raise ServiceUnavailableError("CSV export busy; retry later") from exc
+        try:
+            buffer = CsvExportBuffer()
             rows = await self.repository.export_rows(
                 MAX_EXPORT_ROWS + 1, camera_id, status, event_type, start, end
             )
-            return await asyncio.to_thread(encode_export, rows)
+            async with aclosing(rows):
+                async for batch in rows:
+                    await asyncio.to_thread(buffer.extend, batch)
+            return buffer.finish()
         except (SQLAlchemyError, OSError) as exc:
             raise ServiceUnavailableError("CSV export temporarily unavailable") from exc
+        finally:
+            self.export_slots.release()
 
     async def get(self, event_id: UUID) -> EventRead:
         try:

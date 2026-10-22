@@ -14,7 +14,9 @@ COPY shared shared
 COPY vision-worker vision-worker
 RUN uv sync --frozen --no-dev --package ai-detector-vision-worker
 
-RUN useradd --system --uid 10001 app && mkdir -p /data/uploads && chown app /data/uploads
+RUN useradd --system --uid 10001 app \
+    && mkdir -p /data/uploads /data/snapshots \
+    && chown app /data/uploads /data/snapshots
 USER app
 ENV WORKER_HTTP_HOST=0.0.0.0 YOLO_CONFIG_DIR=/tmp
 EXPOSE 8001

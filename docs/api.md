@@ -188,3 +188,11 @@ Success `text/csv; charset=utf-8`, attachment events.csv, private no-store/nosni
 ## M12 — measured performance
 
 Worker M12: `/metrics` (отдельный worker port), Prometheus local data/no network I/O; `/health/ready.detector.inference_threads` сообщает actual count. Backend OpenAPI/storage не менялись.
+
+## M13: ошибки и границы ресурсов без изменения OpenAPI shape
+
+- Создание камер: quota check/count/insert под PostgreSQL transaction advisory lock; лишние concurrent POST отклоняются422. Пустой source_url update —422, malformed cursor —422.
+- POST uploads: whole-body cap file-limit+1MiB до бесконтрольного spool, включая chunked multipart; file-specific cap сохранён. Превышение413 JSON (reverse proxy может вернуть свою страницу).
+- CSV export: server-side cursor batches100, at most2 exports/API process, занято503 JSON; row/byte overflow422 без attachment, DB503. Схема19 колонок и filters прежние.
+- Snapshot metadata DB failure —503, отсутствующий объект —404. Не-ASCII неверный internal worker token —401, не500.
+- Все public REST/SSE/preview/snapshot/metrics по-прежнему **без operator auth**. Loopback bind в Compose — снижение экспозиции, не авторизация. См. deployment.md.

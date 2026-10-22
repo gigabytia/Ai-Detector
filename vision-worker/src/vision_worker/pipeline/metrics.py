@@ -119,6 +119,22 @@ class PipelineMetrics:
             "Last heartbeat Redis result; scrape does no network I/O",
             registry=self.registry,
         )
+        self.snapshot_jobs = Gauge(
+            "ai_detector_snapshot_jobs",
+            "Retained snapshot jobs (includes running encodes)",
+            registry=self.registry,
+        )
+        self.snapshot_bytes = Gauge(
+            "ai_detector_snapshot_retained_bytes",
+            "Conservative raw frame reservation, not total RSS or encoded/output memory",
+            registry=self.registry,
+        )
+        self.snapshot_results = Gauge(
+            "ai_detector_snapshot_results",
+            "Snapshot outcomes since worker start; not durable ACKs",
+            ["result"],
+            registry=self.registry,
+        )
         self.cuda_enabled = Gauge(
             "ai_detector_cuda_enabled",
             "Detector configured for CUDA; not utilization or availability probe",
@@ -159,6 +175,13 @@ class PipelineMetrics:
             self.queues.labels(kind).set(publisher.queue.qsize() if publisher else 0)
             self.dropped.labels(kind).set(publisher.dropped if publisher else 0)
             self.delivery_healthy.labels(kind).set(int(publisher.healthy) if publisher else 1)
+        snapshots = getattr(supervisor, "snapshots", None)
+        self.snapshot_jobs.set(snapshots.pending_jobs if snapshots else 0)
+        self.snapshot_bytes.set(snapshots.retained_bytes if snapshots else 0)
+        for outcome in ("written", "busy", "failed", "disabled"):
+            self.snapshot_results.labels(outcome).set(
+                snapshots.results[outcome] if snapshots else 0
+            )
         self.detector_info.info(
             {
                 name: supervisor.detector_info.get(name, "unknown")

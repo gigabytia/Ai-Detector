@@ -22,22 +22,42 @@ logger = logging.getLogger(__name__)
 
 
 class SnapshotWriter:
-    def __init__(self, storage: SnapshotStorage, events: EventPublisher, capacity: int = 4) -> None:
+    def __init__(
+        self,
+        storage: SnapshotStorage,
+        events: EventPublisher,
+        capacity: int = 32,
+        max_retained_bytes: int = 128 * 1024**2,
+    ) -> None:
         self.storage = storage
         self.events = events
         self.capacity = capacity
+        self.max_retained_bytes = max_retained_bytes
+        self.retained_bytes = 0
+        self.results = {"disabled": 0, "busy": 0, "failed": 0, "written": 0}
         self._pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="snapshot")
         self._tasks: set[asyncio.Task[None]] = set()
         self._closed = False
 
+    @property
+    def pending_jobs(self) -> int:
+        return len(self._tasks)
+
     def offer(self, event: DomainEvent, frame: Frame, enabled: bool) -> None:
-        if not enabled or self._closed or len(self._tasks) >= self.capacity:
+        if (
+            not enabled
+            or self._closed
+            or len(self._tasks) >= self.capacity
+            or self.retained_bytes + frame.image.nbytes > self.max_retained_bytes
+        ):
+            self.results["busy" if enabled else "disabled"] += 1
             if enabled:
                 logger.warning(
                     "snapshot skipped: writer closed or busy", extra={"event_id": str(event.id)}
                 )
             self.events.offer(event)
             return
+        self.retained_bytes += frame.image.nbytes
         task = asyncio.create_task(self._prepare(event, frame), name=f"snapshot-{event.id}")
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
@@ -67,11 +87,15 @@ class SnapshotWriter:
                 self._pool, self._write, event, frame
             )
             outgoing: DomainEvent = EventMessage(**event.model_dump(), snapshot=metadata)
+            self.results["written"] += 1
         except Exception:
+            self.results["failed"] += 1
             logger.exception(
                 "snapshot failed; publishing event without image", extra={"event_id": str(event.id)}
             )
             outgoing = event
+        finally:
+            self.retained_bytes -= frame.image.nbytes
         self.events.offer(outgoing)
 
     async def close(self) -> None:

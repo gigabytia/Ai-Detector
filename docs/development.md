@@ -148,3 +148,10 @@ npm --prefix frontend test
 Обновить .env по UPDATE_MILESTONE_8.md, убедиться, что SNAPSHOT_PATH совпадает у API и worker и доступен для записи. После `upgrade head` ждать событие mock до ~15 с, открыть «Детали события»: исходное разрешение, overlay toggle, заметка. Отключить снимки в config камеры: новая тревога остаётся без изображения; повторное включение не меняет run_id. Не трогать runtime data ради обновления.
 
 `make check`; integration только на отдельной тестовой БД: очищаются snapshots/events/cameras/zones, Redis DB13. Retention тесты используют временные каталоги и искусственно старые даты. Fault-скрипты docs/qa/m8/scripts реально останавливают QA-сервисы и не предназначены для production.
+
+
+## M13: обязательная изоляция интеграционных проверок
+
+Исторические упоминания Redis DB13 выше **не означают достаточную изоляцию**: Pub/Sub общие для всех logical DB. Используйте отдельный Redis **instance/port**, а не только номер DB, и отдельную одноразовую PostgreSQL БД. Тесты очищают таблицы и Redis DB13 тестового instance. Не запускайте их параллельно с рабочим API/worker на том же Redis process. Fault-скрипты из QA останавливают только выделенные тестовые сервисы.
+
+M13 добавляет regression tests конкурентного лимита камер, пустого source update, токена с не-ASCII, cursor types, streamed upload cap и закрытия spool, CSV batch/caps/concurrency, snapshot burst/byte budget, UI ошибок proxy/storage. Команды прежние: `make check`; затем на изолированных сервисах `uv run pytest -m integration`. См. `docs/qa/m13/README.md`.

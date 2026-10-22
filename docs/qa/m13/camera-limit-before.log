@@ -1,0 +1,41 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.6.0
+rootdir: /data/m10/Ai-Detector
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests/integration/test_cameras_api.py F                                  [100%]
+
+=================================== FAILURES ===================================
+_____________ test_concurrent_creation_cannot_exceed_camera_limit ______________
+
+client = <starlette.testclient.TestClient object at 0x7fb735194b60>
+
+    def test_concurrent_creation_cannot_exceed_camera_limit(client: TestClient) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+    
+        def create(index: int) -> int:
+            return client.post(
+                "/api/v1/cameras", json={**MOCK, "name": f"concurrent-{index}"}
+            ).status_code
+    
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            codes = list(pool.map(create, range(12)))
+>       assert codes.count(201) == 3, codes
+E       AssertionError: [201, 201, 201, 201, 201, 201, ...]
+E       assert 8 == 3
+E        +  where 8 = <built-in method count of list object at 0x7fb7354a7580>(201)
+E        +    where <built-in method count of list object at 0x7fb7354a7580> = [201, 201, 201, 201, 201, 201, ...].count
+
+tests/integration/test_cameras_api.py:400: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /data/m10/Ai-Detector/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/integration/test_cameras_api.py::test_concurrent_creation_cannot_exceed_camera_limit
+========================= 1 failed, 1 warning in 1.11s =========================

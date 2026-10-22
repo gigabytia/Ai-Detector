@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import builtins
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from uuid import UUID
 
@@ -92,7 +93,7 @@ class EventRepository:
         event_type: str | None,
         start: datetime | None,
         end: datetime | None,
-    ) -> builtins.list[RowMapping]:
+    ) -> AsyncGenerator[builtins.list[RowMapping], None]:
         # One SELECT = one consistent DB snapshot. No ORM/snapshot N+1 and no storage keys.
         columns = [
             getattr(EventModel, name)
@@ -131,7 +132,16 @@ class EventRepository:
         from sqlalchemy import text
 
         await self.session.execute(text("SET LOCAL statement_timeout = '15000ms'"))
-        return list((await self.session.execute(query)).mappings())
+        result = await self.session.stream(query, execution_options={"yield_per": 100})
+
+        async def batches() -> AsyncGenerator[builtins.list[RowMapping], None]:
+            try:
+                async for rows in result.mappings().partitions(100):
+                    yield list(rows)
+            finally:
+                await result.close()
+
+        return batches()
 
     async def get(self, event_id: UUID, lock: bool = False) -> EventModel | None:
         query = select(EventModel).where(EventModel.id == event_id)

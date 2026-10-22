@@ -45,3 +45,16 @@ def test_caps_reject_whole_export_instead_of_silent_truncation(
     with pytest.raises(UnprocessableError) as error:
         encode_export([{}, {}])
     assert error.value.code == "EXPORT_TOO_LARGE"
+
+
+def test_incremental_csv_matches_single_pass_and_keeps_caps_across_batches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = [{"message": f"Строка {i}", "note": "=1+1"} for i in range(7)]
+    buffer = event_export.CsvExportBuffer()
+    buffer.extend(rows[:3])
+    buffer.extend(rows[3:])
+    assert buffer.finish() == encode_export(rows)
+    monkeypatch.setattr(event_export, "MAX_EXPORT_ROWS", 7)
+    with pytest.raises(UnprocessableError):
+        buffer.extend([{}])

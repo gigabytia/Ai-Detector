@@ -1,0 +1,40 @@
+## /data/raw/audit13-verified/events.csv
+
+- Shape: 4,832 rows x 19 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): id, snapshot_id
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| id | text | 100% | 4,832 | top: f2c6ea5c-38a0-46ff-8e6b-646fb880b7c0 (1), a30c3646-f405-4360-9408-ec19b2d92725 (1), 72d508cb-8c7e-4f24-80b2-992cc90ae90d (1), 41bdcf17-1928-4678-ab21-681b3f9a5501 (1), d97ff679-3773-4e08-809f-a4f89d24e9d7 (1) |
+| occurred_at | date-text | 100% | 1,160 | 2026-10-22 → 2026-10-22 |
+| camera_id | text | 100% | 8 | top: 5dc61d1e-a10e-4a50-8193-23029fcc2390 (736), f98715a4-c8de-4ea8-b3a8-2c9f3e0d69a9 (736), 3a6548d7-047d-46fa-ab72-324eb857e6c2 (736), 977e0f8f-b33e-45ab-bc4d-2bbe6c353d00 (736), 5867d1d5-2e1c-44f2-9930-419db99a2737 (472) |
+| camera_name | text | 100% | 8 | top: Audit13 CPU 3 (736), Audit13 CPU 2 (736), Audit13 CPU 1 (736), Audit13 CPU 4 (736), Audit13 CPU 7 (472) |
+| run_id | text | 100% | 12 | top: 67384e5e-18e4-41f4-82a6-024e0b2802c4 (472), f5b4c748-1f39-4a42-93a4-516245204085 (472), 3b7bb149-dba7-4778-8223-468fc6476196 (472), db707e9e-fae9-451f-a3b0-bedb8c3921bc (472), 02299b0f-97b8-46aa-bc46-7028839a681f (472) |
+| track_id | number | 100% | 236 | 1 → 236, mean 107.1 |
+| type | text | 100% | 2 | top: PERSON_LOITERING_IN_DANGER_ZONE (2,416), PERSON_ENTERED_DANGER_ZONE (2,416) |
+| severity | text | 100% | 2 | top: warning (2,416), critical (2,416) |
+| status | text | 100% | 1 | top: NEW (4,832) |
+| zone_id | text | 100% | 8 | top: 84430da2-f4bc-42ec-b49c-cb886afb2bb7 (736), 8206f00c-6878-4d43-ad99-a7cd2dd898c7 (736), 649c5542-f8d6-461f-8fe4-b7243110b47a (736), eba8c970-4d5f-43f5-8515-0a7a1b1fb20e (736), cd5cf550-aca6-4e31-8eda-1f41bce9ab00 (472) |
+| line_id | empty | 0% | 0 |  |
+| detector_confidence | number | 100% | 71 | 0.6645 → 0.8726, mean 0.8125 |
+| event_confidence | number | 100% | 71 | 0.6645 → 0.8726, mean 0.8125 |
+| message | text | 100% | 472 | top: Человек #132 долго находится в опасной з (12), Человек #131 долго находится в опасной з (12), Человек #129 долго находится в опасной з (12), Человек #130 долго находится в опасной з (12), Человек #131 вошёл в опасную зону «Audit (12) |
+| note | empty | 0% | 0 |  |
+| acknowledged_at | empty | 0% | 0 |  |
+| false_positive_at | empty | 0% | 0 |  |
+| metadata_json | text | 100% | 588 | top: {"bbox":[0.2749259289400077,0.3746879577 (906), {"bbox":[0.059996126904899694,0.36793317 (906), {"bbox":[0.8267533667293596,0.3655611673 (906), {"bbox":[0.00025087992350260416,0.512881 (906), {"bbox":[0.00023415088653564454,0.512668 (129) |
+| snapshot_id | text | 100% | 4,832 | top: 0920e1bf-3a98-5e2a-b44c-13db3ec86cd2 (1), 07e6aeda-61f7-5008-9134-580b930355a3 (1), 4fefa01e-2c2c-5b0e-8d51-2040cf4ee5a6 (1), f040c6f9-e06f-50e4-aaa3-2d298ea83b31 (1), b572fd40-ade5-58f7-bd59-f92baa102071 (1) |
+
+**Warnings:**
+
+- ⚠️ `occurred_at` looks like dates stored as text; parse before time analysis
+- ⚠️ `status` is constant
+- ⚠️ `line_id` is entirely null
+- ⚠️ `note` is entirely null
+- ⚠️ `acknowledged_at` is entirely null
+- ⚠️ `false_positive_at` is entirely null
+
+### Plausibility
+
+- rate hint: `track_id` sums to 517,680 across 1 days ≈ 517,680/day (meaningful only if this column is additive)

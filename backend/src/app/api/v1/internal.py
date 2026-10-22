@@ -18,7 +18,9 @@ def require_worker_token(
     if token is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "WORKER_API_TOKEN is not set")
     expected = f"Bearer {token.get_secret_value()}"
-    if authorization is None or not secrets.compare_digest(authorization, expected):
+    if authorization is None or not secrets.compare_digest(
+        authorization.encode("utf-8"), expected.encode("utf-8")
+    ):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid worker token")
 
 

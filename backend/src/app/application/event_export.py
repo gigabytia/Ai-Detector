@@ -57,22 +57,37 @@ def csv_cell(value: object) -> str:
     return result
 
 
+class CsvExportBuffer:
+    """Incremental bounded output; callers need not materialize every database row."""
+
+    def __init__(self) -> None:
+        self.output = bytearray(b"\xef\xbb\xbf")
+        self.line = io.StringIO(newline="")
+        self.writer = csv.writer(self.line, lineterminator="\r\n")
+        self.writer.writerow(EXPORT_COLUMNS)
+        self.output.extend(self.line.getvalue().encode("utf-8"))
+        self.rows = 0
+        if len(self.output) > MAX_EXPORT_BYTES:
+            raise export_too_large()
+
+    def extend(self, rows: Iterable[Mapping[Any, Any]]) -> None:
+        for row in rows:
+            if self.rows >= MAX_EXPORT_ROWS:
+                raise export_too_large()
+            self.line.seek(0)
+            self.line.truncate(0)
+            self.writer.writerow([csv_cell(row.get(key)) for key in EXPORT_COLUMNS])
+            data = self.line.getvalue().encode("utf-8")
+            if len(self.output) + len(data) > MAX_EXPORT_BYTES:
+                raise export_too_large()
+            self.output.extend(data)
+            self.rows += 1
+
+    def finish(self) -> bytes:
+        return bytes(self.output)
+
+
 def encode_export(rows: Iterable[Mapping[Any, Any]]) -> bytes:
-    output = bytearray(
-        b"\xef\xbb\xbf"
-    )  # Excel-compatible UTF-8 BOM, not locale-dependent encoding.
-    line = io.StringIO(newline="")
-    writer = csv.writer(line, lineterminator="\r\n")
-    writer.writerow(EXPORT_COLUMNS)
-    output.extend(line.getvalue().encode("utf-8"))
-    for index, row in enumerate(rows):
-        if index >= MAX_EXPORT_ROWS:
-            raise export_too_large()
-        line.seek(0)
-        line.truncate(0)
-        writer.writerow([csv_cell(row.get(key)) for key in EXPORT_COLUMNS])
-        data = line.getvalue().encode("utf-8")
-        if len(output) + len(data) > MAX_EXPORT_BYTES:
-            raise export_too_large()
-        output.extend(data)
-    return bytes(output)
+    buffer = CsvExportBuffer()
+    buffer.extend(rows)
+    return buffer.finish()

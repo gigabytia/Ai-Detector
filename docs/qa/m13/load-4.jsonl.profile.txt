@@ -1,0 +1,32 @@
+## /data/raw/audit13-verified/load-4.jsonl
+
+- Shape: 36 rows x 12 columns
+- Duplicate rows: 0
+- Candidate key columns (distinct == rows): at, elapsed, processed_total, rss_bytes, api_analytics_ms
+
+| column | type | non-null | distinct | values |
+| --- | --- | --- | --- | --- |
+| at | date-text | 100% | 36 | 2026-10-22 → 2026-10-22 |
+| elapsed | number | 100% | 36 | 0.02928 → 175.1, mean 87.54 |
+| cameras | number | 100% | 1 | 4 → 4, mean 4 |
+| processed_total | number | 100% | 36 | 353 → 4,029, mean 2,215 |
+| errors_total | number | 100% | 1 | 0 → 0, mean 0 |
+| cpu_percent | text | 100% | 34 | top: {"api": 2.8, "worker": 171.9} (2), {"api": 3.0, "worker": 171.7} (2), {"api": 2.9, "worker": 169.6} (1), {"api": 3.4, "worker": 170.8} (1), {"api": 2.2, "worker": 172.6} (1) |
+| rss_bytes | text | 100% | 36 | top: {"api": 101883904, "worker": 777187328} (1), {"api": 102023168, "worker": 767320064} (1), {"api": 102141952, "worker": 767352832} (1), {"api": 102154240, "worker": 767815680} (1), {"api": 102236160, "worker": 775888896} (1) |
+| api_analytics_ms | number | 100% | 36 | 8.84 → 42.99, mean 15.11 |
+| event_backlog | number | 100% | 1 | 0 → 0, mean 0 |
+| analytics_backlog | number | 100% | 1 | 0 → 0, mean 0 |
+| statuses | text | 100% | 36 | top: [{"camera_id": "3a6548d7-047d-46fa-ab72- (36) |
+| metrics | text | 100% | 36 | top: # HELP ai_detector_detector_info Loaded  (36) |
+
+**Warnings:**
+
+- ⚠️ `at` looks like dates stored as text; parse before time analysis
+- ⚠️ `cameras` is constant
+- ⚠️ `errors_total` is constant
+- ⚠️ `event_backlog` is constant
+- ⚠️ `analytics_backlog` is constant
+
+### Plausibility
+
+- rate hint: `processed_total` sums to 79,724 across 1 days ≈ 79,724/day (meaningful only if this column is additive)

@@ -45,3 +45,5 @@
 | [ADR-038](ADR-038-loitering-csv.md) | Непрерывное observed loitering, typed alarm и безопасный bounded CSV |
 
 | [ADR-039](ADR-039-measured-cpu-optimization.md) | Измеряемая CPU optimization, thread warmup и bounded metrics |
+
+| [ADR-040](ADR-040-audit-resource-boundaries.md) | Аудит: конкурентные лимиты, bounded CSV/upload/snapshots и deployment gates |

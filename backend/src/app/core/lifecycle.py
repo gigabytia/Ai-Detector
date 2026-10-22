@@ -43,6 +43,7 @@ class AppResources:
     clock: Clock
     uploads: LocalUploadStorage
     system_service: SystemService
+    csv_export_slots: asyncio.Semaphore = field(default_factory=lambda: asyncio.Semaphore(2))
     live: LiveHub | None = None
     event_tasks: EventTasksProbe = field(default_factory=EventTasksProbe)
     analytics_tasks: EventTasksProbe = field(

@@ -1,0 +1,23 @@
+{
+  "pass": true,
+  "scope": "Cold isolated PostgreSQL + all DB-referenced JPEGs + upload files; service stopped and both Streams already drained; no Redis AOF/disaster-recovery/HA certification",
+  "table_counts": {
+    "alembic_version": 1,
+    "camera_configs": 8,
+    "camera_samples": 3612,
+    "cameras": 8,
+    "events": 4832,
+    "lines": 0,
+    "snapshots": 4832,
+    "track_sessions": 2416,
+    "zones": 8
+  },
+  "restored_table_counts_equal": true,
+  "snapshot_files_checked": 4832,
+  "upload_files_checked": 4,
+  "all_file_hashes_equal": true,
+  "restored_api_jpegs_checked": 5,
+  "restored_csv_and_dashboard_match_events": true,
+  "database_dump_sha256": "9a57fa454de3ae3f7d4866e1f1a79cc6ab1ed8aa6d8166f3a4ee6908e5944132",
+  "snapshot_manifest_sha256": "429298750abc8bf12dc9326685794fb8d564ef0e9eb189ef22544eb1e34b68dd"
+}

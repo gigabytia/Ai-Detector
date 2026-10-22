@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +15,14 @@ from app.infrastructure.database.models import CameraModel
 class CameraRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def lock_creation(self) -> None:
+        """Serialize quota count+insert across API processes until commit/rollback.
+
+        Transaction advisory lock: namespace 0xA1DE, operation 1. Row locks do not
+        protect an empty table. All API creation paths must acquire this lock.
+        """
+        await self._session.execute(text("SELECT pg_advisory_xact_lock(41438, 1)"))
 
     async def list_active(self) -> Sequence[CameraModel]:
         result = await self._session.scalars(

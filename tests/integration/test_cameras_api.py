@@ -385,3 +385,45 @@ def test_loitering_config_default_override_inheritance_validation_and_worker_spe
         ]
         == 10
     )
+
+
+def test_concurrent_creation_cannot_exceed_camera_limit(client: TestClient) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    def create(index: int) -> int:
+        return int(
+            client.post("/api/v1/cameras", json={**MOCK, "name": f"concurrent-{index}"}).status_code
+        )
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        codes = list(pool.map(create, range(12)))
+    assert codes.count(201) == 3, codes
+    assert all(code in (201, 422) for code in codes), codes
+    assert len(client.get("/api/v1/cameras").json()) == 3
+
+
+def test_empty_source_update_is_rejected(client: TestClient) -> None:
+    camera = client.post("/api/v1/cameras", json=MOCK).json()
+    response = client.patch(f"/api/v1/cameras/{camera['id']}", json={"source_url": ""})
+    assert response.status_code == 422
+    assert client.get(f"/api/v1/cameras/{camera['id']}").json()["source_url"] == MOCK["source_url"]
+
+
+def test_upload_envelope_limit_precedes_multipart_spool(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/uploads",
+        content=b"not-a-multipart-body",
+        headers={
+            "Content-Type": "multipart/form-data; boundary=test",
+            "Content-Length": str(2 * 1024**2),
+        },
+    )
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "UPLOAD_TOO_LARGE"
+
+
+def test_non_ascii_worker_token_is_unauthorized_not_500(client: TestClient) -> None:
+    response = client.get(
+        "/api/v1/internal/worker/cameras", headers={"Authorization": b"Bearer \xffinvalid"}
+    )
+    assert response.status_code == 401

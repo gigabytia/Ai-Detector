@@ -84,7 +84,9 @@ def get_zone_service(resources: Resources, session: Session) -> ZoneService:
 
 
 def get_event_service(resources: Resources, session: Session) -> EventService:
-    return EventService(EventRepository(session), resources.redis, resources.clock)
+    return EventService(
+        EventRepository(session), resources.redis, resources.clock, resources.csv_export_slots
+    )
 
 
 def get_line_service(resources: Resources, session: Session) -> LineService:

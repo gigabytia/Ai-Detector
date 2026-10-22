@@ -1,0 +1,206 @@
+{
+  "route_layout_checks": [
+    {
+      "route": "/monitoring",
+      "width": 1280,
+      "theme": "light",
+      "overflow": 0,
+      "text": 469
+    },
+    {
+      "route": "/cameras",
+      "width": 1280,
+      "theme": "light",
+      "overflow": 0,
+      "text": 881
+    },
+    {
+      "route": "/events",
+      "width": 1280,
+      "theme": "light",
+      "overflow": 0,
+      "text": 10687
+    },
+    {
+      "route": "/analytics",
+      "width": 1280,
+      "theme": "light",
+      "overflow": 0,
+      "text": 5508
+    },
+    {
+      "route": "/settings",
+      "width": 1280,
+      "theme": "light",
+      "overflow": 0,
+      "text": 200
+    },
+    {
+      "route": "/monitoring/d5bf64cc-f8f1-4e82-8dcc-da235749f83e",
+      "width": 1280,
+      "theme": "light",
+      "overflow": 0,
+      "text": 809
+    },
+    {
+      "route": "/events/d298b7e7-6181-483a-87f0-ccb1b9d005ee",
+      "width": 1280,
+      "theme": "light",
+      "overflow": 0,
+      "text": 581
+    },
+    {
+      "route": "/monitoring",
+      "width": 1280,
+      "theme": "dark",
+      "overflow": 0,
+      "text": 468
+    },
+    {
+      "route": "/cameras",
+      "width": 1280,
+      "theme": "dark",
+      "overflow": 0,
+      "text": 881
+    },
+    {
+      "route": "/events",
+      "width": 1280,
+      "theme": "dark",
+      "overflow": 0,
+      "text": 10687
+    },
+    {
+      "route": "/analytics",
+      "width": 1280,
+      "theme": "dark",
+      "overflow": 0,
+      "text": 5508
+    },
+    {
+      "route": "/settings",
+      "width": 1280,
+      "theme": "dark",
+      "overflow": 0,
+      "text": 200
+    },
+    {
+      "route": "/monitoring/d5bf64cc-f8f1-4e82-8dcc-da235749f83e",
+      "width": 1280,
+      "theme": "dark",
+      "overflow": 0,
+      "text": 819
+    },
+    {
+      "route": "/events/d298b7e7-6181-483a-87f0-ccb1b9d005ee",
+      "width": 1280,
+      "theme": "dark",
+      "overflow": 0,
+      "text": 581
+    },
+    {
+      "route": "/monitoring",
+      "width": 390,
+      "theme": "light",
+      "overflow": 0,
+      "text": 468
+    },
+    {
+      "route": "/cameras",
+      "width": 390,
+      "theme": "light",
+      "overflow": 0,
+      "text": 881
+    },
+    {
+      "route": "/events",
+      "width": 390,
+      "theme": "light",
+      "overflow": 0,
+      "text": 10687
+    },
+    {
+      "route": "/analytics",
+      "width": 390,
+      "theme": "light",
+      "overflow": 0,
+      "text": 5452
+    },
+    {
+      "route": "/settings",
+      "width": 390,
+      "theme": "light",
+      "overflow": 0,
+      "text": 200
+    },
+    {
+      "route": "/monitoring/d5bf64cc-f8f1-4e82-8dcc-da235749f83e",
+      "width": 390,
+      "theme": "light",
+      "overflow": 0,
+      "text": 819
+    },
+    {
+      "route": "/events/d298b7e7-6181-483a-87f0-ccb1b9d005ee",
+      "width": 390,
+      "theme": "light",
+      "overflow": 0,
+      "text": 581
+    },
+    {
+      "route": "/monitoring",
+      "width": 390,
+      "theme": "dark",
+      "overflow": 0,
+      "text": 468
+    },
+    {
+      "route": "/cameras",
+      "width": 390,
+      "theme": "dark",
+      "overflow": 0,
+      "text": 881
+    },
+    {
+      "route": "/events",
+      "width": 390,
+      "theme": "dark",
+      "overflow": 0,
+      "text": 10673
+    },
+    {
+      "route": "/analytics",
+      "width": 390,
+      "theme": "dark",
+      "overflow": 0,
+      "text": 5454
+    },
+    {
+      "route": "/settings",
+      "width": 390,
+      "theme": "dark",
+      "overflow": 0,
+      "text": 200
+    },
+    {
+      "route": "/monitoring/d5bf64cc-f8f1-4e82-8dcc-da235749f83e",
+      "width": 390,
+      "theme": "dark",
+      "overflow": 0,
+      "text": 819
+    },
+    {
+      "route": "/events/d298b7e7-6181-483a-87f0-ccb1b9d005ee",
+      "width": 390,
+      "theme": "dark",
+      "overflow": 0,
+      "text": 581
+    }
+  ],
+  "pageerrors": [],
+  "ws_frames": 54,
+  "csv_download": true,
+  "export_503_error": true,
+  "analytics_503_retry": true,
+  "blocked_storage_render": true
+}

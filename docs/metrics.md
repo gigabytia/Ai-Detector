@@ -22,3 +22,8 @@
 Cumulative histograms имеют фиксированные buckets и bounded kind/type labels; camera gauges только live session IDs, children удаляются после removal, нет cardinality по source URL/run/frame. Result age нужен, чтобы не принять stale active_tracks за текущее наблюдение. Snapshot/preview уже имеют bounded queues/on-demand encoding, но их queue sizes пока не экспортируются. Operator false-positive counter/DB stats/Stream backlog/GPU util не притворяются нулями — их здесь нет.
 
 Для одного worker p95 local за окно: `histogram_quantile(0.95, sum by(le) (rate(ai_detector_local_frame_latency_seconds_bucket[5m])))`. Единицы seconds; coarse histogram p95 не равен exact sample p95 из benchmark. Scrape interval/rate window выбирать на deployment; Prometheus/Grafana stack не развёрнут. process metrics platform-dependent, Windows здесь не проверен.
+
+
+## M13 snapshot writer gauges
+
+`ai_detector_snapshot_jobs` включает ожидающие и выполняющиеся задачи; максимум32. `ai_detector_snapshot_retained_bytes` — консервативный raw-frame reservation (до128MiB), не полный RSS и не размер JPEG/очереди Redis. `ai_detector_snapshot_results{result="written|busy|failed|disabled"}` — локальные накопительные исходы writer с начала worker, gauges; written не подтверждает ingest/durability. Busy/failed означают alarm без картинки; alert на их рост. Scrape по-прежнему не делает внешнего I/O.

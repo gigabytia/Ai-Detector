@@ -903,3 +903,25 @@ async def test_csv_oversize_and_database_failure_are_json_not_partial_download(
         response = await client.get("/api/v1/events/export")
         assert response.status_code == 503
         assert response.headers["content-type"] == "application/json"
+
+
+async def test_csv_concurrency_limit_is_503_without_partial_attachment(
+    transport: tuple[Redis, async_sessionmaker[AsyncSession], Settings],
+) -> None:
+    _, _, settings = transport
+    app = create_app(settings)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client,
+    ):
+        slots = app.state.resources.csv_export_slots
+        await slots.acquire()
+        await slots.acquire()
+        try:
+            response = await client.get("/api/v1/events/export")
+            assert response.status_code == 503
+            assert "content-disposition" not in response.headers
+        finally:
+            slots.release()
+            slots.release()
+        assert (await client.get("/api/v1/events/export")).status_code == 200
