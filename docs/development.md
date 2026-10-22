@@ -1,3 +1,5 @@
+> M15: для локального GPU используйте `start.cmd --profile cuda` один раз, затем `start.cmd`; выбор описан в GPU_WINDOWS.md. Требуется uv>=0.13.5. Plain uv commands ниже по умолчанию используют CPU; для GPU добавляйте `--no-group cpu --group cuda` после `uv sync`/`uv run`. Docker GPU/Windows native hardware здесь не сертифицированы.
+
 # Разработка
 
 ## Что нужно

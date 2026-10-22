@@ -21,3 +21,7 @@ samples/*.mp4
 samples/*.mov
 samples/*.mkv
 samples/*.avi
+
+# Local launcher choice; carries no credentials.
+.runtime-profile.json
+.runtime-profile.json.tmp

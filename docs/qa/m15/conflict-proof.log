@@ -1,0 +1,2 @@
+Would use project environment at: .venv
+error: Groups `cpu` and `cuda` are incompatible with the conflicts: {`ai-detector:cpu`, `ai-detector:cuda`}

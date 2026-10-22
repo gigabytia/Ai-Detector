@@ -1,0 +1,22 @@
+Toolchain PASS: supported Node; coherent pinned ESLint trio (/data/m15/source/Ai-Detector/frontend/).
+Requested accelerator profile: cpu
+Keeping existing .env unchanged.
+Accelerator PASS: cpu | torch 2.14.1+cpu | torchvision 0.29.1+cpu | CUDA runtime None | CPU (explicit) | matmul/NMS PASS
+Redis PING + PostgreSQL SELECT 1: PASS
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> a43b43e08e6b, create cameras
+INFO  [alembic.runtime.migration] Running upgrade a43b43e08e6b -> b452b4c88e6b, Per-camera detection configuration.
+INFO  [alembic.runtime.migration] Running upgrade b452b4c88e6b -> c631d038af01, Danger zones and per-camera zone timing overrides.
+INFO  [alembic.runtime.migration] Running upgrade c631d038af01 -> 14d6499b16a2, event history and operator status
+INFO  [alembic.runtime.migration] Running upgrade 14d6499b16a2 -> 48f1a410c0ce, event snapshots and camera snapshot config
+INFO  [alembic.runtime.migration] Running upgrade 48f1a410c0ce -> e2c6db45c9b8, camera lines and crossing event reference
+INFO  [alembic.runtime.migration] Running upgrade e2c6db45c9b8 -> a9345caf81b1, camera observations and completed track sessions
+INFO  [alembic.runtime.migration] Running upgrade a9345caf81b1 -> b6b7cfcd87c5, camera loitering threshold
+Created two DEMO cameras in an empty database.
+Redis PING + PostgreSQL SELECT 1: PASS
+/data/m15/source/Ai-Detector/models/person-detector/yolo26n.pt
+Service logs: /data/m15/source/Ai-Detector/data/dev-logs/20261022-142015
+READY: http://localhost:5173  |  Ctrl+C stops this app; Docker data is preserved.
+
+Stopping app services...

@@ -160,3 +160,94 @@ def test_recently_closed_listener_does_not_block_restart(dev: ModuleType) -> Non
             connection, _ = listener.accept()
             connection.close()
     dev.require_free_port(port)
+
+
+def test_profile_defaults_to_cpu(dev: ModuleType, tmp_path: Path) -> None:
+    assert dev.select_profile(tmp_path, None) == "cpu"
+
+
+@pytest.mark.parametrize("profile", ["cpu", "cuda"])
+def test_profile_is_saved_and_reused(dev: ModuleType, tmp_path: Path, profile: str) -> None:
+    dev.save_profile(tmp_path, profile)
+    assert dev.select_profile(tmp_path, None) == profile
+    assert not (tmp_path / ".runtime-profile.json.tmp").exists()
+
+
+@pytest.mark.parametrize(
+    "text", ["broken", "[]", '{"schema":2,"profile":"cuda"}', '{"schema":1,"profile":"bogus"}']
+)
+def test_corrupt_profile_requires_explicit_choice(
+    dev: ModuleType, tmp_path: Path, text: str
+) -> None:
+    (tmp_path / ".runtime-profile.json").write_text(text)
+    with pytest.raises(dev.StartupError, match="Invalid"):
+        dev.select_profile(tmp_path, None)
+    assert dev.select_profile(tmp_path, "cpu") == "cpu"
+
+
+def test_gpu_setup_installs_selected_group_checks_before_infra_and_remembers(
+    dev: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = configure_fake_setup(dev, tmp_path, monkeypatch)
+    assert dev.main(["--setup-only", "--profile", "cuda"]) == 0
+    assert ["uv", "sync", "--frozen", "--no-group", "cpu", "--group", "cuda"] in calls
+    check = next(i for i, c in enumerate(calls) if "scripts/check_accelerator.py" in c)
+    infra = next(i for i, c in enumerate(calls) if "up" in c)
+    assert calls[check][-2:] == ["--profile", "cuda"]
+    assert check < infra
+    assert dev.select_profile(tmp_path, None) == "cuda"
+    calls.clear()
+    assert dev.main(["--setup-only"]) == 0
+    assert ["uv", "sync", "--frozen", "--no-group", "cpu", "--group", "cuda"] in calls
+
+
+def test_failed_cuda_even_skip_install_cannot_touch_infra_or_save_choice(
+    dev: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = configure_fake_setup(dev, tmp_path, monkeypatch)
+    dev.save_profile(tmp_path, "cpu")
+    original = dev.run
+
+    def run(args: list[str], **kwargs: Any) -> str:
+        if "scripts/check_accelerator.py" in args:
+            raise dev.StartupError("CUDA unavailable")
+        return str(original(args, **kwargs))
+
+    monkeypatch.setattr(dev, "run", run)
+    assert dev.main(["--setup-only", "--skip-install", "--profile", "cuda"]) == 1
+    assert not any("alembic" in c or "up" in c for c in calls)
+    assert dev.select_profile(tmp_path, None) == "cpu"
+
+
+def test_gpu_override_only_for_owned_processes_and_env_file_preserved(
+    dev: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configure_fake_setup(dev, tmp_path, monkeypatch)
+    original = b"INFERENCE_DEVICE=cpu\r\n# user config\r\n"
+    (tmp_path / ".env").write_bytes(original)
+    monkeypatch.setenv("INFERENCE_DEVICE", "cpu")
+    children_envs: list[dict[str, str]] = []
+
+    def popen(args: list[str], **kwargs: Any) -> SimpleNamespace:
+        children_envs.append(kwargs["env"].copy())
+        return SimpleNamespace(poll=lambda: None)
+
+    def interrupt(seconds: float) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(dev.subprocess, "Popen", popen)
+    monkeypatch.setattr(dev, "wait_ready", lambda *args: None)
+    monkeypatch.setattr(dev, "stop_children", lambda *args: None)
+    monkeypatch.setattr(dev.time, "sleep", interrupt)
+    assert dev.main(["--no-infra", "--skip-install", "--profile", "cuda"]) == 0
+    assert len(children_envs) == 3
+    assert all(x["INFERENCE_DEVICE"] == "cuda" for x in children_envs)
+    assert dev.os.environ["INFERENCE_DEVICE"] == "cpu"
+    assert (tmp_path / ".env").read_bytes() == original
+    assert dev.select_profile(tmp_path, None) == "cuda"
+
+
+def test_nonstring_saved_profile_has_actionable_error(dev: ModuleType, tmp_path: Path) -> None:
+    (tmp_path / ".runtime-profile.json").write_text('{"schema":1,"profile":[]}')
+    with pytest.raises(dev.StartupError, match="choose --profile"):
+        dev.select_profile(tmp_path, None)

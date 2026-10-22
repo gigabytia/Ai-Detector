@@ -27,7 +27,7 @@ ai-detector-worker = "vision_worker.main:run"
 ai-detector-model = "vision_worker.inference.fetch:run"
 
 [build-system]
-requires = ["uv_build>=0.12,<0.13"]
+requires = ["uv_build>=0.12,<0.14"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
@@ -35,6 +35,3 @@ module-name = "vision_worker"
 
 [tool.uv.sources]
 ai-detector-shared = { workspace = true }
-
-torch = { index = "pytorch-cpu", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }
-torchvision = { index = "pytorch-cpu", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }

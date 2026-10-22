@@ -1,0 +1,17 @@
+from pathlib import Path
+import json,shutil,subprocess,os,hashlib
+r=Path('/data/m15/source/Ai-Detector'); t=Path('/data/m15/gpu-negative'); t.mkdir(exist_ok=True)
+for f in ['scripts/dev.py','scripts/check_accelerator.py','frontend/package.json','frontend/package-lock.json','frontend/scripts/check-toolchain.mjs']:
+ p=t/f;p.parent.mkdir(exist_ok=True,parents=True);shutil.copyfile(r/f,p)
+(t/'.venv').symlink_to('/data/m15/cuda-env',target_is_directory=True)
+(t/'.env').write_bytes(b'# PRIVATE TEST CONFIG; must not be overwritten\r\nINFERENCE_DEVICE=cpu\r\n')
+(t/'.runtime-profile.json').write_text('{"schema":1,"profile":"cpu"}\n')
+before={f:hashlib.sha256((t/f).read_bytes()).hexdigest() for f in ['.env','.runtime-profile.json']}
+env=os.environ.copy();env['PATH']='/data/m15/tools/node_modules/node/bin:'+str(Path.home()/'.local/bin')+':'+env['PATH']
+p=subprocess.run(['/data/m15/cuda-env/bin/python',str(t/'scripts/dev.py'),'--profile','cuda','--skip-install','--no-infra','--setup-only'],env=env,cwd='/data',capture_output=True,text=True,timeout=60)
+Path('/data/m15/cuda-negative-launcher.log').write_text(p.stdout+p.stderr)
+assert p.returncode==1 and 'no usable NVIDIA GPU' in p.stderr and 'CPU fallback is disabled' in p.stderr
+assert not (t/'data').exists()
+assert all(hashlib.sha256((t/f).read_bytes()).hexdigest()==h for f,h in before.items())
+proof={'scope':'Real Linux CUDA wheel import, no NVIDIA GPU; negative actual subprocess launcher from another cwd','exit_code':p.returncode,'gpu_unavailable_diagnostic':True,'no_cpu_fallback':True,'prior_cpu_profile_unchanged':True,'existing_env_unchanged':True,'no_service_logs_created':True}
+Path('/data/m15/cuda-negative-proof.json').write_text(json.dumps(proof,indent=2));print(json.dumps(proof))

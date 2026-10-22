@@ -1,0 +1,17 @@
+
+> ai-detector-frontend@0.1.0 preinstall
+> node scripts/check-toolchain.mjs
+
+Toolchain PASS: supported Node; coherent pinned ESLint trio (/data/m15/source/Ai-Detector/frontend/).
+
+added 368 packages, and audited 369 packages in 9s
+
+103 packages are looking for funding
+  run `npm fund` for details
+
+4 high severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.

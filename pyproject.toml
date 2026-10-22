@@ -11,6 +11,9 @@ dependencies = [
 
 [tool.uv]
 package = false
+required-version = ">=0.13.5"
+default-groups = ["dev", "cpu"]
+conflicts = [[{ group = "cpu" }, { group = "cuda" }]]
 override-dependencies = ["opencv-python; sys_platform == 'never'"]
 # Audit security floors for transitive HTTP/image dependencies.
 constraint-dependencies = ["certifi>=2026.10.19", "pillow>=13.0.0"]
@@ -22,8 +25,19 @@ members = ["shared", "backend", "vision-worker"]
 ai-detector-shared = { workspace = true }
 ai-detector-backend = { workspace = true }
 ai-detector-vision-worker = { workspace = true }
+# Default remains CPU. CUDA is an explicit, mutually exclusive dependency group.
+torch = [
+    { index = "pytorch-cpu", group = "cpu", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { index = "pytorch-cu130", group = "cuda", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+    { index = "pytorch-cpu", group = "cpu", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { index = "pytorch-cu130", group = "cuda", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
 
 [dependency-groups]
+cpu = ["torch==2.14.1", "torchvision==0.29.1"]
+cuda = ["torch==2.14.1", "torchvision==0.29.1"]
 dev = [
     "pytest>=9.1",
     "pytest-asyncio>=1.4",
@@ -70,6 +84,11 @@ name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
 [[tool.mypy.overrides]]
-module = ["ultralytics.*", "yaml.*"]
+module = ["ultralytics.*", "torchvision.*", "yaml.*"]
 ignore_missing_imports = true

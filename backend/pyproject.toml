@@ -22,7 +22,7 @@ ai-detector-openapi = "app.openapi_export:main"
 ai-detector-seed = "app.seed:main"
 
 [build-system]
-requires = ["uv_build>=0.12,<0.13"]
+requires = ["uv_build>=0.12,<0.14"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]

@@ -23,3 +23,6 @@
 /docs/qa/m14/*.log -whitespace
 
 /start.cmd text eol=crlf
+
+# Preserve raw M15 command evidence; logs may contain terminal whitespace.
+/docs/qa/m15/*.log -whitespace

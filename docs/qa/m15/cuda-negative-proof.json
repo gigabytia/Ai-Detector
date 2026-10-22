@@ -1,0 +1,9 @@
+{
+  "scope": "Real Linux CUDA wheel import, no NVIDIA GPU; negative actual subprocess launcher from another cwd",
+  "exit_code": 1,
+  "gpu_unavailable_diagnostic": true,
+  "no_cpu_fallback": true,
+  "prior_cpu_profile_unchanged": true,
+  "existing_env_unchanged": true,
+  "no_service_logs_created": true
+}

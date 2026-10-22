@@ -1,0 +1,5 @@
+Toolchain PASS: supported Node; coherent pinned ESLint trio (/data/m15/gpu-negative/frontend/).
+Requested accelerator profile: cuda
+Keeping existing .env unchanged.
+ACCELERATOR STOPPED: CUDA build is installed but no usable NVIDIA GPU is available. Check nvidia-smi/driver and CUDA_VISIBLE_DEVICES; CPU fallback is disabled. See GPU_WINDOWS.md. No CPU fallback; .env was not rewritten.
+STARTUP STOPPED: Step failed (1): python

@@ -1,0 +1,32 @@
+import hashlib,json,os,signal,subprocess,time,urllib.request
+from pathlib import Path
+R=Path('/data/m15/source/Ai-Detector');P=Path('/data/m15');env=os.environ.copy();env['PATH']='/data/m15/tools/node_modules/node/bin:'+str(Path.home()/'.local/bin')+':'+env['PATH'];before=hashlib.sha256((R/'.env').read_bytes()).hexdigest()
+def get(url):
+ with urllib.request.urlopen(url,timeout=5) as r:return r.status,r.read()
+with (P/'start-live.log').open('w') as log:proc=subprocess.Popen([str(R/'.venv/bin/python'),str(R/'scripts/dev.py'),'--no-infra','--skip-install'],cwd=P,env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+try:
+ for _ in range(240):
+  if proc.poll() is not None:raise AssertionError('Launcher exited; inspect start-live.log')
+  if 'READY:' in (P/'start-live.log').read_text():break
+  time.sleep(.5)
+ else:raise AssertionError('Launcher timeout')
+ for port in [18150,18151]:assert get(f'http://127.0.0.1:{port}/health/ready')[0]==200
+ assert get('http://127.0.0.1:5173')[0]==200
+ cams=json.loads(get('http://127.0.0.1:18150/api/v1/cameras')[1]);cams=cams.get('items',[]) if isinstance(cams,dict) else cams;assert len(cams)==2
+ for cam in cams:assert json.loads(get(f"http://127.0.0.1:18150/api/v1/cameras/{cam['id']}/zones")[1])
+ for _ in range(80):
+  events=json.loads(get('http://127.0.0.1:18150/api/v1/events')[1])['items']
+  if events:break
+  time.sleep(.5)
+ assert events
+ image=next((e for e in events if e.get('snapshot_id')),None);assert image;assert get('http://127.0.0.1:18150/api/v1/snapshots/'+image['snapshot_id'])[1].startswith(b'\xff\xd8')
+ assert hashlib.sha256((R/'.env').read_bytes()).hexdigest()==before
+ proc.send_signal(signal.SIGINT);proc.wait(timeout=40);assert proc.returncode==0
+ for port in [18150,18151,5173]:
+  import socket
+  with socket.socket() as s:assert s.connect_ex(('127.0.0.1',port))!=0
+ # A second setup sees existing cameras and must not seed/modify them again.
+ run=subprocess.run([str(R/'.venv/bin/python'),str(R/'scripts/dev.py'),'--no-infra','--skip-install','--setup-only'],cwd=P,env=env,capture_output=True,text=True,timeout=60);(P/'second-setup.log').write_text(run.stdout+run.stderr);assert run.returncode==0;assert 'Keeping existing cameras/zones unchanged' in run.stdout
+ proof={'pass':True,'profile':'cpu','profile_saved':json.loads((R/'.runtime-profile.json').read_text())['profile']=='cpu','scope':'Linux real native local PG/Valkey, subprocess launcher from a different cwd; Windows branch unit-tested, not an actual Windows OS or Docker run','api_worker_frontend_ready':True,'fresh_db_demo_cameras':2,'zones_events_jpeg':True,'existing_env_byte_unchanged':True,'ctrl_c_exit_zero':True,'owned_ports_closed':True,'second_setup_no_seed':True};(P/'startup-proof.json').write_text(json.dumps(proof,indent=2));print(json.dumps(proof))
+finally:
+ if proc.poll() is None:proc.send_signal(signal.SIGINT);proc.wait(timeout=40)

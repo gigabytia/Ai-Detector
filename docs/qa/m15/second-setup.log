@@ -1,0 +1,11 @@
+Toolchain PASS: supported Node; coherent pinned ESLint trio (/data/m15/source/Ai-Detector/frontend/).
+Requested accelerator profile: cpu
+Keeping existing .env unchanged.
+Accelerator PASS: cpu | torch 2.14.1+cpu | torchvision 0.29.1+cpu | CUDA runtime None | CPU (explicit) | matmul/NMS PASS
+Redis PING + PostgreSQL SELECT 1: PASS
+Keeping existing cameras/zones unchanged; no automatic seed.
+Redis PING + PostgreSQL SELECT 1: PASS
+/data/m15/source/Ai-Detector/models/person-detector/yolo26n.pt
+Setup PASS. Local databases remain running; no app processes started.
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.

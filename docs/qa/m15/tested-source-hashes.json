@@ -1,0 +1,23 @@
+{
+  ".env.example": "19cab1a5cd1040a5e8f859cb79d94f6761e87ec0e421f8b86354dd654c1a2af4",
+  ".gitattributes": "dfa64d1815b5cafa22153cb6627c39ad6828724f9e5e7cec3aa9c33c691559a3",
+  ".github/workflows/ci.yml": "8adb12f4e97f59d84b82e2d31aab2602985dccbfc921705582691dee815c3e3a",
+  ".gitignore": "cb1b205c6e93ea2f3f3fec60fa1302744949d2f81eb4dea0fa91e89f27e4d65f",
+  "GPU_WINDOWS.md": "8d78250afbb82606e6b8975b90e7d5ab974e311c6e8e6e68246947f6d3144e0b",
+  "PROGRESS.md": "e074c6327a34ad833f8bb0b760a550602720b650453452af8c10287c017be247",
+  "README.md": "9e04e95307df931e142d6058fbee2a20b416bef798c6ea4f3ca026b5c084f32a",
+  "START_WINDOWS.md": "b8784b6828b5c62809d550a598f54d6e4c374434ef22f4f5e84da8a4ae02abd3",
+  "UPDATE_MILESTONE_15.md": "d051b3644d9f9a1078daec00eca825a057771a6cbd421e73926c046af3917730",
+  "backend/pyproject.toml": "fba952cfb186946a4d73af87771fc18812a25b729aaaa4deb0cdc4d749471342",
+  "docker/api.Dockerfile": "228101012a50703cae30954310cef0116e4be9e94c285b5b646fd488ebb1c67c",
+  "docker/worker.Dockerfile": "10c2fa9f090199fe008442640dbd260fc424c13e32c98c665b04979db7046258",
+  "docs/development.md": "819eba88ae5038b1ba89e4854a2129a7350cdf218d582afc9df7d337357cc81e",
+  "pyproject.toml": "6ee9fd5f0342133da6423c9dd2816955099dd49c068654577f2edb9281adecc4",
+  "scripts/check_accelerator.py": "79357cc299fda8bbac5bdbc5da999994f76e37c3dcb914903e8da80201f26e4f",
+  "scripts/dev.py": "2c38af17c0dd5922f2c3f08769de22e136c9fe64623b62a6b06af6712528a176",
+  "shared/pyproject.toml": "6d9b8692481c3bf855a77cf7a2fe03ad9c00b33f27c40dae276c5664fcc10469",
+  "tests/unit/test_accelerator_profiles.py": "34b040cf47e9bbafcded0683591dd5f2a9100af1add4f212d25b532693833c39",
+  "tests/unit/test_dev_launcher.py": "1f81b52f69dd7dc8012e7e2a9a46d7436f97c3ad8a30dbcddb32ccf2185247c7",
+  "uv.lock": "6a89b7d57762cef6dfa975e12194c8d7ab4fd120607add4765f57da2d1795a8b",
+  "vision-worker/pyproject.toml": "3cd9b4a8f9a55cd74bc1665a11a8af4253155eeaabd0aca4b2585ea09ae3b6c1"
+}

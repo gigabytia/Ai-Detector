@@ -4,6 +4,10 @@
 
 ## Текущий этап
 
+**Milestone 15 — сохраняемый CPU/CUDA-профиль.** База полный M14 ca55552; единый uv.lock с default CPU и исключающей CUDA13.0 группой (torch2.14.1/torchvision0.29.1), preflight versions/build/real matmul+NMS, fail-closed, отдельный локальный выбор без перезаписи .env. GPU_WINDOWS.md и UPDATE_MILESTONE_15.md. Первая GPU-команда `.\start.cmd --profile cuda`, затем обычный start.cmd. Physical GPU/Windows acceptance требует компьютера пользователя; прежние production gates открыты.
+
+### Исторический M14
+
 **Milestone 14 — локальный запуск после распаковки.** База полный M13 c76adca, настоящая Git-история и веса сохранены. Fixed npm lint trio/lock, preinstall guard/strict engines, IPv4 Redis defaults, start.cmd → Python launcher с frozen installs, infrastructure/protocol preflight, migration/model checks, empty-only demo seed, readiness/logs/owned-process shutdown. START_WINDOWS.md и UPDATE_MILESTONE_14.md. Existing .env/data не перезаписывать/не паковать. QA в docs/qa/m14; Windows-native/контейнерный запуск не заявлять. Production NO-GO M13 сохраняется. Ниже этапы исторические.
 
 Реализация заново восстановлена на базе присланного архива Milestone 3 после утраты предыдущего рабочего окружения. Это не побайтовое восстановление незавершённой сессии: использованы сохранённые архитектурные документы, ADR и доступный контекст. Исходный `AI_DETECTOR_v2_MASTER_PROMPT.md` в архиве отсутствовал.

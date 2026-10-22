@@ -1,0 +1,25 @@
+Downloading cpython-3.12.15-linux-x86_64-gnu (download) (32.9MiB)
+ Downloaded cpython-3.12.15-linux-x86_64-gnu (download)
+Using CPython 3.12.15
+Resolved 115 packages in 6.09s
+Added cuda-bindings v13.4.4
+Added cuda-pathfinder v1.8.3
+Added cuda-toolkit v13.0.3.0
+Added nvidia-cublas v13.1.1.3
+Added nvidia-cuda-cupti v13.0.85
+Added nvidia-cuda-nvrtc v13.0.88
+Added nvidia-cuda-runtime v13.0.96
+Added nvidia-cudnn-cu13 v9.24.0.43
+Added nvidia-cufft v12.0.0.61
+Added nvidia-cufile v1.15.1.6
+Added nvidia-curand v10.4.0.35
+Added nvidia-cusolver v12.0.4.66
+Added nvidia-cusparse v12.6.3.3
+Added nvidia-cusparselt-cu13 v0.8.1
+Added nvidia-nccl-cu13 v2.30.7
+Added nvidia-nvjitlink v13.4.92
+Added nvidia-nvshmem-cu13 v3.4.5
+Added nvidia-nvtx v13.0.85
+Updated torch v2.14.1, v2.14.1+cpu -> v2.14.1, v2.14.1+cpu, v2.14.1+cu130
+Updated torchvision v0.29.1, v0.29.1+cpu -> v0.29.1, v0.29.1+cpu, v0.29.1+cu130
+Added triton v3.8.0

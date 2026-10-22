@@ -43,6 +43,45 @@ def ensure_env(root: Path) -> bool:
     return True
 
 
+def select_profile(root: Path, requested: str | None) -> str:
+    if requested:
+        return requested
+    path = root / ".runtime-profile.json"
+    if not path.exists():
+        return "cpu"
+    try:
+        saved = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise StartupError("Invalid .runtime-profile.json; choose --profile cpu or cuda.") from exc
+    if (
+        not isinstance(saved, dict)
+        or saved.get("schema") != 1
+        or not isinstance(saved.get("profile"), str)
+        or saved.get("profile") not in {"cpu", "cuda"}
+    ):
+        raise StartupError("Invalid .runtime-profile.json; choose --profile cpu or cuda.")
+    return str(saved["profile"])
+
+
+def save_profile(root: Path, profile: str) -> None:
+    # One local value, no credentials; replace atomically only after successful startup/setup.
+    path = root / ".runtime-profile.json"
+    temporary = root / ".runtime-profile.json.tmp"
+    try:
+        temporary.write_text(json.dumps({"schema": 1, "profile": profile}) + "\n", encoding="utf-8")
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def profile_sync_flags(profile: str) -> list[str]:
+    return (
+        ["--no-group", "cpu", "--group", "cuda"]
+        if profile == "cuda"
+        else ["--no-group", "cuda", "--group", "cpu"]
+    )
+
+
 def executable(name: str) -> str:
     found = shutil.which(name)
     if not found:
@@ -127,6 +166,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--skip-install", action="store_true", help="Reuse an existing frozen installation"
     )
+    parser.add_argument(
+        "--profile", choices=["cpu", "cuda"], help="Persist after success; default CPU"
+    )
     args = parser.parse_args(argv)
     children: list[subprocess.Popen[bytes]] = []
     logs = []
@@ -134,6 +176,8 @@ def main(argv: list[str] | None = None) -> int:
         uv, node, npm = executable("uv"), executable("node"), executable("npm")
         # Validate pins, lockfile and supported Node before any install/network/DB changes.
         run([node, "scripts/check-toolchain.mjs"], cwd=ROOT / "frontend")
+        profile = select_profile(ROOT, args.profile)
+        print(f"Requested accelerator profile: {profile}", flush=True)
         docker = executable("docker") if not args.no_infra else None
         if docker:
             run([docker, "compose", "version"])
@@ -144,11 +188,13 @@ def main(argv: list[str] | None = None) -> int:
             flush=True,
         )
         if not args.skip_install:
-            run([uv, "sync", "--frozen"])
+            run([uv, "sync", "--frozen", *profile_sync_flags(profile)])
             run([npm, "ci", "--include=dev"], cwd=ROOT / "frontend")
         python = ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
         if not python.exists():
             raise StartupError("Missing .venv; rerun without --skip-install.")
+        # Must pass even with --skip-install; a stale CPU wheel must never masquerade as CUDA.
+        run([str(python), "scripts/check_accelerator.py", "--profile", profile])
         config = json.loads(run([str(python), "scripts/dev_check.py", "--config"], capture=True))
         ports = [config["api_port"], config["worker_port"], 5173]
         if len(set(ports)) != len(ports):
@@ -177,6 +223,7 @@ def main(argv: list[str] | None = None) -> int:
                 "run",
                 "--frozen",
                 "--no-sync",
+                *profile_sync_flags(profile),
                 "alembic",
                 "-c",
                 "backend/alembic.ini",
@@ -185,8 +232,9 @@ def main(argv: list[str] | None = None) -> int:
             ]
         )
         run([str(python), "scripts/dev_check.py", "--seed-if-empty"])
-        run([uv, "run", "--frozen", "--no-sync", "ai-detector-model"])
+        run([uv, "run", "--frozen", "--no-sync", *profile_sync_flags(profile), "ai-detector-model"])
         if args.setup_only:
+            save_profile(ROOT, profile)
             print("Setup PASS. Local databases remain running; no app processes started.")
             return 0
         directory = ROOT / "data/dev-logs" / time.strftime("%Y%m%d-%H%M%S")
@@ -195,6 +243,8 @@ def main(argv: list[str] | None = None) -> int:
         env = os.environ.copy()
         env.update(
             {
+                # Local profile overrides .env/system only in owned app children.
+                "INFERENCE_DEVICE": profile,
                 "VITE_API_PROXY_TARGET": f"http://127.0.0.1:{config['api_port']}",
                 "VITE_WORKER_PROXY_TARGET": f"http://127.0.0.1:{config['worker_port']}",
             }
@@ -240,6 +290,7 @@ def main(argv: list[str] | None = None) -> int:
             ROOT / "frontend",
         )
         wait_ready("http://127.0.0.1:5173", frontend)
+        save_profile(ROOT, profile)
         print(
             "READY: http://localhost:5173  |  Ctrl+C stops this app; Docker data is preserved.",
             flush=True,

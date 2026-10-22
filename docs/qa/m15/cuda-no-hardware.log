@@ -1,0 +1,1 @@
+ACCELERATOR STOPPED: CUDA build is installed but no usable NVIDIA GPU is available. Check nvidia-smi/driver and CUDA_VISIBLE_DEVICES; CPU fallback is disabled. See GPU_WINDOWS.md. No CPU fallback; .env was not rewritten.

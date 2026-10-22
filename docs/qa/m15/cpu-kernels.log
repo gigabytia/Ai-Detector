@@ -1,0 +1,1 @@
+Accelerator PASS: cpu | torch 2.14.1+cpu | torchvision 0.29.1+cpu | CUDA runtime None | CPU (explicit) | matmul/NMS PASS

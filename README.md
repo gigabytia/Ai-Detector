@@ -2,7 +2,7 @@
 
 Система видеонаблюдения: детекция и трекинг **людей**, события входа в опасную зону, пересечения линии и долгого нахождения в зоне, интерфейс оператора.
 
-**Статус:** M14 — воспроизводимый локальный запуск и защита от конфликтов npm поверх проверенного M13. На Windows: [START_WINDOWS.md](START_WINDOWS.md), команда `.\start.cmd` из корня. Нужны uv, поддерживаемый Node и запущенный Docker Desktop. `.env`/данные не включены в архив и не перезаписываются. [Обновление](UPDATE_MILESTONE_14.md), [QA](docs/qa/m14/README.md). Production gates M13 остаются открытыми: [аудит](docs/AUDIT_REPORT.md).
+**Статус:** M15 — сохраняемый NVIDIA GPU/CPU-профиль поверх M14. Для RTX3060 один раз ` .\start.cmd --profile cuda `, затем ` .\start.cmd `; [GPU-инструкция](GPU_WINDOWS.md). CPU остаётся default без выбранного профиля. Нужны uv>=0.13.5, поддерживаемый Node и Docker Desktop; `.env` не перезаписывается. [Обновление](UPDATE_MILESTONE_15.md), [QA](docs/qa/m15/README.md). Физическая GPU/Windows здесь не тестировались; production gates [M13](docs/AUDIT_REPORT.md) остаются открытыми.
 
 ## Архитектура
 
